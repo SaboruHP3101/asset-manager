@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { ConfigService } from '@nestjs/config';
 import * as schema from '../db/schema.js';
 
 export const DRIZZLE = 'DRIZZLE_CLIENT';

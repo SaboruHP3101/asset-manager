@@ -38,6 +38,6 @@ export class CreateEmployeeDto {
   roleId: string;
 
   @IsBoolean()
-  @IsOptional() // Optional because the database defaults it to false
+  @IsOptional()
   isDepartmentHead?: boolean;
 }
