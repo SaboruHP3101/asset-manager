@@ -6,6 +6,7 @@ import { DrizzleModule } from './drizzle/drizzle.module.js';
 import { EmployeesModule } from './employees/employees.module.js';
 import { DepartmentsModule } from './departments/departments.module.js';
 import { RolesModule } from './roles/roles.module.js';
+import { AuthModule } from './auth/auth.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { RolesModule } from './roles/roles.module.js';
     EmployeesModule,
     DepartmentsModule,
     RolesModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

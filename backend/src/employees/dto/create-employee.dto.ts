@@ -40,4 +40,8 @@ export class CreateEmployeeDto {
   @IsBoolean()
   @IsOptional()
   isDepartmentHead?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 }

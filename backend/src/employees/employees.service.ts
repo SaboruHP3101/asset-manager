@@ -28,6 +28,7 @@ export class EmployeesService {
 
       return new Employee(newEmployee);
     } catch (error: any) {
+      console.log(error);
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException();
       }
@@ -37,7 +38,7 @@ export class EmployeesService {
   }
 
   async findAll() {
-    return (await this.db.query.employees.findMany()) as Employee[];
+    return (await this.db.select().from(schema.employees)) as Employee[];
   }
 
   async findOne(id: string) {
@@ -47,6 +48,18 @@ export class EmployeesService {
 
     if (!employee) {
       throw new NotFoundException(`Employee with ID ${id} not found`);
+    }
+
+    return new Employee(employee);
+  }
+
+  async findOneByEmail(email: string) {
+    const employee = await this.db.query.employees.findFirst({
+      where: eq(schema.employees.email, email),
+    });
+
+    if (!employee) {
+      throw new NotFoundException(`Employee with email ${email} not found`);
     }
 
     return new Employee(employee);

@@ -55,6 +55,8 @@ export const employees = pgTable('employees', {
   roleId: uuid('role_id')
     .notNull()
     .references(() => roles.id),
+  password: varchar('password', { length: 255 }),
+  isActive: boolean('is_active').notNull().default(true),
   isDepartmentHead: boolean('is_department_head').notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),

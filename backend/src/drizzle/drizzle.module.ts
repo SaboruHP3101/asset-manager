@@ -10,7 +10,6 @@ export const DRIZZLE = 'DRIZZLE_CLIENT';
     {
       provide: DRIZZLE,
       useFactory: () => {
-        console.log(process.env.DATABASE_URL);
         const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
         return drizzle(pool, { schema });

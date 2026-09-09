@@ -38,9 +38,7 @@ export class RolesService {
   }
 
   async findAll() {
-    const roles = await this.db.select().from(schema.roles);
-
-    return roles.map((role) => new Role(role));
+    return (await this.db.select().from(schema.roles)) as Role[];
   }
 
   async findOne(id: string) {

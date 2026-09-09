@@ -7,5 +7,6 @@ import { DrizzleModule } from '../drizzle/drizzle.module.js';
   controllers: [EmployeesController],
   providers: [EmployeesService],
   imports: [DrizzleModule],
+  exports: [EmployeesService],
 })
 export class EmployeesModule {}
