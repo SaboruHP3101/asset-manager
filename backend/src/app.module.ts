@@ -7,6 +7,25 @@ import { EmployeesModule } from './employees/employees.module.js';
 import { DepartmentsModule } from './departments/departments.module.js';
 import { RolesModule } from './roles/roles.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { AssetCategoriesModule } from './asset-categories/asset-categories.module.js';
+import { SuppliersModule } from './suppliers/suppliers.module.js';
+import { SupplierContactsModule } from './supplier-contacts/supplier-contacts.module.js';
+import { SupplierAddressesModule } from './supplier-addresses/supplier-addresses.module.js';
+import { PurchaseRequestsModule } from './purchase-requests/purchase-requests.module.js';
+import { PurchaseContractsModule } from './purchase-contracts/purchase-contracts.module.js';
+import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module.js';
+import { PurchaseOrderRequestsModule } from './purchase-order-requests/purchase-order-requests.module.js';
+import { PurchaseOrderItemsModule } from './purchase-order-items/purchase-order-items.module.js';
+import { AssetsModule } from './assets/assets.module.js';
+import { AssetHandoverHistoryModule } from './asset-handover-history/asset-handover-history.module.js';
+import { RepairRequestsModule } from './repair-requests/repair-requests.module.js';
+import { AssetInventoriesModule } from './asset-inventories/asset-inventories.module.js';
+import { AssetLiquidationsModule } from './asset-liquidations/asset-liquidations.module.js';
+import { AssetLiquidationItemsModule } from './asset-liquidation-items/asset-liquidation-items.module.js';
+import { AssetDepreciationsModule } from './asset-depreciations/asset-depreciations.module.js';
+import { AttachmentsModule } from './attachments/attachments.module.js';
+import { ApprovalHistoryModule } from './approval-history/approval-history.module.js';
+import { ChangeHistoryModule } from './change-history/change-history.module.js';
 
 @Module({
   imports: [
@@ -19,6 +38,25 @@ import { AuthModule } from './auth/auth.module.js';
     DepartmentsModule,
     RolesModule,
     AuthModule,
+    AssetCategoriesModule,
+    SuppliersModule,
+    SupplierContactsModule,
+    SupplierAddressesModule,
+    PurchaseRequestsModule,
+    PurchaseContractsModule,
+    PurchaseOrdersModule,
+    PurchaseOrderRequestsModule,
+    PurchaseOrderItemsModule,
+    AssetsModule,
+    AssetHandoverHistoryModule,
+    RepairRequestsModule,
+    AssetInventoriesModule,
+    AssetLiquidationsModule,
+    AssetLiquidationItemsModule,
+    AssetDepreciationsModule,
+    AttachmentsModule,
+    ApprovalHistoryModule,
+    ChangeHistoryModule,
   ],
   controllers: [AppController],
   providers: [AppService],
