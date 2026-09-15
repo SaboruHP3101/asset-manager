@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -101,5 +102,35 @@ export class AuthService {
     } catch (error) {
       throw new BadRequestException('The token has expired or is incorrect.');
     }
+  }
+
+  async checkEmail(email: string) {
+    let employee;
+    try {
+      employee = await this.employeesService.findOneByEmail(email);
+    } catch (error) {
+      if (!(error instanceof NotFoundException)) throw error;
+      return { exists: false };
+    }
+
+    if (employee.password === null) {
+      return {
+        exists: true,
+        email: employee.email,
+        firstTimeLogin: true,
+        message:
+          'The account has not been activated. Please set your password for the first time.',
+        activationToken: await this.jwtService.signAsync(
+          {
+            sub: employee.id,
+            email: employee.email,
+            purpose: 'activation',
+          } as TokenPayload,
+          { expiresIn: '15m' },
+        ),
+      };
+    }
+
+    return { exists: true, email: employee.email, firstTimeLogin: false };
   }
 }

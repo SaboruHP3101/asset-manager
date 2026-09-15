@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/core/widgets/app_text.dart';
 
 class StatusCard extends StatelessWidget {
   final String title;
@@ -29,27 +30,17 @@ class StatusCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                AppText.fromTheme(
                   title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    color: Color(0xFF1F2024),
-                  ),
+                  context: context,
+                  type: AppTextType.h4,
                 ),
                 if (icon != null) Icon(icon, color: iconColor ?? Colors.blue),
               ],
             ),
             Container(
               margin: EdgeInsets.only(top: 4),
-              child: Text(
-                count,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
+              child: AppText(count, type: AppTextType.h5, fontSize: 28),
             ),
           ],
         ),

@@ -36,4 +36,9 @@ export class AuthController {
 
     return this.authService.setupFirstTimePassword(token, dto);
   }
+
+  @Post('check-exists')
+  findOneByEmail(@Body() { email }: { email: string }) {
+    return this.authService.checkEmail(email);
+  }
 }
