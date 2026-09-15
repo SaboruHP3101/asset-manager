@@ -133,4 +133,39 @@ export class AuthService {
 
     return { exists: true, email: employee.email, firstTimeLogin: false };
   }
+
+  // Xác thực token và lấy thông tin nhân viên cùng phòng ban, vai trò
+  async getProfile(authHeader?: string) {
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.substring(7)
+      : null;
+
+    if (!token) throw new UnauthorizedException('Access token is required.');
+
+    try {
+      const payload = await this.jwtService.verifyAsync<{ sub: string }>(token);
+      const [profile] = await this.db
+        .select({
+          employeeCode: schema.employees.employeeCode,
+          fullName: schema.employees.fullName,
+          email: schema.employees.email,
+          phoneNumber: schema.employees.phoneNumber,
+          department: schema.departments.name,
+          role: schema.roles.name,
+          isDepartmentHead: schema.employees.isDepartmentHead,
+        })
+        .from(schema.employees)
+        .innerJoin(
+          schema.departments,
+          eq(schema.employees.departmentId, schema.departments.id),
+        )
+        .innerJoin(schema.roles, eq(schema.employees.roleId, schema.roles.id))
+        .where(eq(schema.employees.id, payload.sub));
+
+      if (!profile) throw new UnauthorizedException('Account not found.');
+      return profile;
+    } catch {
+      throw new UnauthorizedException('Access token is invalid or expired.');
+    }
+  }
 }

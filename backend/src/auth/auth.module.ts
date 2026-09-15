@@ -14,7 +14,8 @@ import { DrizzleModule } from '../drizzle/drizzle.module.js';
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: 1,
+          // Giữ phiên đăng nhập trong một ngày
+          expiresIn: '1d',
         },
       }),
     }),

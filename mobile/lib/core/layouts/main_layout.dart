@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/profile/profile_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -12,15 +13,16 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0;
 
-  // The list of top-level screens accessible via the navigation bar
+  // Các màn hình chính được hiển thị từ thanh điều hướng
   final List<Widget> _screens = const [
     HomeScreen(),
     Center(child: Text('Search Screen')),
     Center(child: Text('Send Screen')),
-    Center(child: Text('Profile Screen')),
+    ProfileScreen(),
   ];
 
   void _onTabTapped(int index) {
+    // Cập nhật màn hình khi người dùng chọn một tab
     setState(() {
       _currentIndex = index;
     });
@@ -29,7 +31,7 @@ class _MainLayoutState extends State<MainLayout> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // IndexedStack preserves the state of your pages when switching tabs
+      // Giữ trạng thái của các màn hình khi đổi tab
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
