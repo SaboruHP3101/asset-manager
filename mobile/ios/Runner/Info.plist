@@ -26,6 +26,13 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- Giải thích quyền dùng camera, thư viện và micro cho biểu mẫu sửa chữa -->
+	<key>NSCameraUsageDescription</key>
+	<string>Dùng camera để chụp tài sản và quét mã QR.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Dùng micro khi quay video tình trạng tài sản.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Chọn ảnh hoặc video mô tả tình trạng tài sản.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

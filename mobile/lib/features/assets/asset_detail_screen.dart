@@ -1,0 +1,164 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import '../repair_requests/repair_request_form.dart';
+
+class AssetDetailScreen extends StatefulWidget {
+  const AssetDetailScreen({required this.assetId, super.key});
+
+  final String assetId;
+
+  @override
+  State<AssetDetailScreen> createState() => _AssetDetailScreenState();
+}
+
+class _AssetDetailScreenState extends State<AssetDetailScreen> {
+  static const _apiUrl = String.fromEnvironment(
+    'API_URL',
+    defaultValue: 'http://10.0.2.2:8080',
+  );
+
+  final _storage = const FlutterSecureStorage();
+  final _dio = Dio(BaseOptions(baseUrl: _apiUrl));
+  Map<String, dynamic>? _asset;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Tải thông tin đầy đủ của tài sản được chọn
+    _loadAsset();
+  }
+
+  @override
+  void dispose() {
+    _dio.close();
+    super.dispose();
+  }
+
+  // Gọi API chi tiết bằng token đăng nhập hiện tại
+  Future<void> _loadAsset() async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/assets/mine/${widget.assetId}',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (mounted) setState(() => _asset = response.data);
+    } on DioException {
+      if (mounted) setState(() => _error = 'Không thể tải chi tiết tài sản.');
+    }
+  }
+
+  // Ghép địa chỉ API cho ảnh được lưu ở backend
+  String? _imageUrl() {
+    final url = _asset?['imageUrl'] as String?;
+    if (url == null) return null;
+    return url.startsWith('http') ? url : '$_apiUrl$url';
+  }
+
+  // Đổi trạng thái kỹ thuật thành nội dung tiếng Việt
+  String _statusText(String status) {
+    if (status == 'in_use' || status == 'using') return 'Đang sử dụng';
+    if (status == 'repairing' || status == 'fixing') return 'Đang sửa chữa';
+    if (status == 'available') return 'Sẵn sàng';
+    return status.replaceAll('_', ' ');
+  }
+
+  // Hiển thị một dòng thông tin của tài sản
+  Widget _detailRow(String label, String? value) {
+    return ListTile(
+      title: Text(label),
+      trailing: SizedBox(
+        width: 180,
+        child: Text(
+          value?.isNotEmpty == true ? value! : 'Chưa cập nhật',
+          textAlign: TextAlign.end,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = _asset;
+
+    // Hiển thị trạng thái tải hoặc lỗi trước khi có dữ liệu
+    if (asset == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Chi tiết tài sản')),
+        body: Center(
+          child: _error == null
+              ? const CircularProgressIndicator()
+              : FilledButton.tonal(
+                  onPressed: () {
+                    setState(() => _error = null);
+                    _loadAsset();
+                  },
+                  child: const Text('Thử lại'),
+                ),
+        ),
+      );
+    }
+
+    final imageUrl = _imageUrl();
+
+    // Bố cục ảnh lớn, danh sách chi tiết và nút sửa chữa
+    return Scaffold(
+      appBar: AppBar(title: Text(asset['name'] ?? 'Tài sản')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SizedBox(
+                height: 240,
+                child: imageUrl == null
+                    ? const ColoredBox(
+                        color: Color(0xFFE8EAF0),
+                        child: Icon(Icons.inventory_2_outlined, size: 72),
+                      )
+                    : Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const ColoredBox(
+                          color: Color(0xFFE8EAF0),
+                          child: Icon(Icons.broken_image_outlined, size: 72),
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: Column(
+                children: [
+                  _detailRow('Mã tài sản', asset['assetCode']),
+                  _detailRow('Danh mục', asset['category']),
+                  _detailRow('Phòng ban', asset['department']),
+                  _detailRow('Trạng thái', _statusText(asset['status'] ?? '')),
+                  _detailRow('Ngày mua', asset['purchaseDate']),
+                  _detailRow('Ngày sử dụng', asset['inServiceDate']),
+                  _detailRow('Nhà cung cấp', asset['supplier']),
+                  _detailRow('Nguyên giá', '${asset['initialValue']} VNĐ'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      RepairRequestForm(initialAssetId: widget.assetId),
+                ),
+              ),
+              icon: const Icon(Icons.build_outlined),
+              label: const Text('Gửi yêu cầu sửa chữa'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

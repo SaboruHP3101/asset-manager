@@ -136,14 +136,8 @@ export class AuthService {
 
   // Xác thực token và lấy thông tin nhân viên cùng phòng ban, vai trò
   async getProfile(authHeader?: string) {
-    const token = authHeader?.startsWith('Bearer ')
-      ? authHeader.substring(7)
-      : null;
-
-    if (!token) throw new UnauthorizedException('Access token is required.');
-
     try {
-      const payload = await this.jwtService.verifyAsync<{ sub: string }>(token);
+      const employeeId = await this.getEmployeeId(authHeader);
       const [profile] = await this.db
         .select({
           employeeCode: schema.employees.employeeCode,
@@ -160,10 +154,27 @@ export class AuthService {
           eq(schema.employees.departmentId, schema.departments.id),
         )
         .innerJoin(schema.roles, eq(schema.employees.roleId, schema.roles.id))
-        .where(eq(schema.employees.id, payload.sub));
+        .where(eq(schema.employees.id, employeeId));
 
       if (!profile) throw new UnauthorizedException('Account not found.');
+
       return profile;
+    } catch {
+      throw new UnauthorizedException('Access token is invalid or expired.');
+    }
+  }
+
+  // Lấy mã nhân viên từ access token để dùng cho các API cá nhân
+  async getEmployeeId(authHeader?: string) {
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.substring(7)
+      : null;
+
+    if (!token) throw new UnauthorizedException('Access token is required.');
+
+    try {
+      const payload = await this.jwtService.verifyAsync<{ sub: string }>(token);
+      return payload.sub;
     } catch {
       throw new UnauthorizedException('Access token is invalid or expired.');
     }

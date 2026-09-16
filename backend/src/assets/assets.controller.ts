@@ -7,6 +7,8 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Headers,
+  Query,
 } from '@nestjs/common';
 import {
   ApiConflictResponse,
@@ -19,11 +21,15 @@ import { AssetsService } from './assets.service.js';
 import { CreateAssetDto } from './dto/create-asset.dto.js';
 import { UpdateAssetDto } from './dto/update-asset.dto.js';
 import { Asset } from './entities/asset.entity.js';
+import { AuthService } from '../auth/auth.service.js';
 
 @ApiTags('assets')
 @Controller('assets')
 export class AssetsController {
-  constructor(private readonly assetsService: AssetsService) {}
+  constructor(
+    private readonly assetsService: AssetsService,
+    private readonly authService: AuthService,
+  ) {}
 
   @Post()
   @ApiCreatedResponse({ type: Asset })
@@ -38,6 +44,30 @@ export class AssetsController {
   @ApiOkResponse({ type: Asset, isArray: true })
   findAll() {
     return this.assetsService.findAll();
+  }
+
+  // Lấy tài sản đang được giao cho nhân viên hiện tại
+  @Get('mine')
+  async findMine(
+    @Headers('authorization') authHeader: string,
+    @Query('search') search?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('sort') sort?: string,
+  ) {
+    const employeeId = await this.authService.getEmployeeId(authHeader);
+
+    return this.assetsService.findMine(employeeId, search, categoryId, sort);
+  }
+
+  // Lấy chi tiết một tài sản thuộc nhân viên hiện tại
+  @Get('mine/:id')
+  async findMineById(
+    @Headers('authorization') authHeader: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const employeeId = await this.authService.getEmployeeId(authHeader);
+
+    return this.assetsService.findMineById(employeeId, id);
   }
 
   @Get(':id')

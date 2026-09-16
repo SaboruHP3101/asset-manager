@@ -5,7 +5,15 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { DrizzleQueryError, eq } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  DrizzleQueryError,
+  eq,
+  ilike,
+  inArray,
+} from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
@@ -43,6 +51,133 @@ export class AssetsService {
     const records = await this.db.select().from(schema.assets);
 
     return records.map((record) => new Asset(record));
+  }
+
+  // Tìm, lọc và sắp xếp tài sản của một nhân viên
+  async findMine(
+    employeeId: string,
+    search?: string,
+    categoryId?: string,
+    sort = 'name_asc',
+  ) {
+    const conditions = [eq(schema.assets.currentUserId, employeeId)];
+
+    if (search?.trim()) {
+      conditions.push(ilike(schema.assetCategories.name, `%${search.trim()}%`));
+    }
+
+    if (categoryId) {
+      conditions.push(eq(schema.assets.assetCategoryId, categoryId));
+    }
+
+    const records = await this.db
+      .select({
+        id: schema.assets.id,
+        assetCode: schema.assets.assetCode,
+        qrCode: schema.assets.qrCode,
+        name: schema.assetCategories.name,
+        department: schema.departments.name,
+        status: schema.assets.status,
+      })
+      .from(schema.assets)
+      .innerJoin(
+        schema.assetCategories,
+        eq(schema.assets.assetCategoryId, schema.assetCategories.id),
+      )
+      .leftJoin(
+        schema.departments,
+        eq(schema.assets.currentManagingDepartmentId, schema.departments.id),
+      )
+      .where(and(...conditions))
+      .orderBy(
+        sort === 'name_desc'
+          ? desc(schema.assetCategories.name)
+          : asc(schema.assetCategories.name),
+      );
+
+    if (records.length === 0) return [];
+
+    // Lấy ảnh đầu tiên của từng tài sản nếu có
+    const attachments = await this.db
+      .select()
+      .from(schema.attachments)
+      .where(
+        and(
+          eq(schema.attachments.entityType, 'asset'),
+          inArray(
+            schema.attachments.entityId,
+            records.map((record) => record.id),
+          ),
+        ),
+      )
+      .orderBy(asc(schema.attachments.createdAt));
+
+    const images = new Map<string, string>();
+
+    for (const attachment of attachments) {
+      if (!images.has(attachment.entityId)) {
+        images.set(attachment.entityId, attachment.url);
+      }
+    }
+
+    return records.map((record) => ({
+      ...record,
+      imageUrl: images.get(record.id) ?? null,
+    }));
+  }
+
+  // Lấy đầy đủ thông tin tài sản để hiển thị trang chi tiết
+  async findMineById(employeeId: string, assetId: string) {
+    const [record] = await this.db
+      .select({
+        id: schema.assets.id,
+        assetCode: schema.assets.assetCode,
+        qrCode: schema.assets.qrCode,
+        name: schema.assetCategories.name,
+        category: schema.assetCategories.name,
+        department: schema.departments.name,
+        supplier: schema.suppliers.legalName,
+        status: schema.assets.status,
+        purchaseDate: schema.assets.purchaseDate,
+        inServiceDate: schema.assets.inServiceDate,
+        initialValue: schema.assets.initialValue,
+      })
+      .from(schema.assets)
+      .innerJoin(
+        schema.assetCategories,
+        eq(schema.assets.assetCategoryId, schema.assetCategories.id),
+      )
+      .innerJoin(
+        schema.suppliers,
+        eq(schema.assets.supplierId, schema.suppliers.id),
+      )
+      .leftJoin(
+        schema.departments,
+        eq(schema.assets.currentManagingDepartmentId, schema.departments.id),
+      )
+      .where(
+        and(
+          eq(schema.assets.id, assetId),
+          eq(schema.assets.currentUserId, employeeId),
+        ),
+      );
+
+    if (!record) {
+      throw new NotFoundException('Không tìm thấy tài sản được quản lý.');
+    }
+
+    const [attachment] = await this.db
+      .select({ url: schema.attachments.url })
+      .from(schema.attachments)
+      .where(
+        and(
+          eq(schema.attachments.entityType, 'asset'),
+          eq(schema.attachments.entityId, assetId),
+        ),
+      )
+      .orderBy(asc(schema.attachments.createdAt));
+
+    return { ...record, imageUrl: attachment?.url ?? null };
   }
 
   async findOne(id: string) {

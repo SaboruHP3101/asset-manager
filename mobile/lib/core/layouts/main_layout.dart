@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/profile/profile_screen.dart';
+import '../../features/assets/assets_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -16,7 +17,7 @@ class _MainLayoutState extends State<MainLayout> {
   // Các màn hình chính được hiển thị từ thanh điều hướng
   final List<Widget> _screens = const [
     HomeScreen(),
-    Center(child: Text('Search Screen')),
+    AssetsScreen(),
     Center(child: Text('Send Screen')),
     ProfileScreen(),
   ];

@@ -5,13 +5,14 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { DrizzleQueryError, eq } from 'drizzle-orm';
+import { and, DrizzleQueryError, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
 import { CreateRepairRequestDto } from './dto/create-repair-request.dto.js';
 import { UpdateRepairRequestDto } from './dto/update-repair-request.dto.js';
 import { RepairRequest } from './entities/repair-request.entity.js';
+import { CreateMyRepairRequestDto } from './dto/create-my-repair-request.dto.js';
 
 @Injectable()
 export class RepairRequestsService {
@@ -37,6 +38,56 @@ export class RepairRequestsService {
 
       throw new InternalServerErrorException('Không thể tạo yêu cầu sửa chữa');
     }
+  }
+
+  // Tạo yêu cầu pending và lưu thông tin ảnh, video đi kèm
+  async createMine(
+    employeeId: string,
+    dto: CreateMyRepairRequestDto,
+    files: Express.Multer.File[],
+  ) {
+    const [asset] = await this.db
+      .select({ id: schema.assets.id })
+      .from(schema.assets)
+      .where(
+        and(
+          eq(schema.assets.id, dto.assetId),
+          eq(schema.assets.currentUserId, employeeId),
+        ),
+      );
+
+    if (!asset) {
+      throw new NotFoundException('Không tìm thấy tài sản được quản lý.');
+    }
+
+    return this.db.transaction(async (tx) => {
+      const [request] = await tx
+        .insert(schema.repairRequests)
+        .values({
+          assetId: dto.assetId,
+          reporterId: employeeId,
+          reportDate: new Date().toISOString().slice(0, 10),
+          issueDescription: dto.issueDescription,
+          status: 'pending',
+        })
+        .returning();
+
+      if (files.length > 0) {
+        await tx.insert(schema.attachments).values(
+          files.map((file) => ({
+            entityType: 'repair_request',
+            entityId: request.id,
+            fileName: file.originalname,
+            url: `/uploads/repair-requests/${file.filename}`,
+            mimeType: file.mimetype,
+            size: file.size,
+            uploadedByEmployeeId: employeeId,
+          })),
+        );
+      }
+
+      return new RepairRequest(request);
+    });
   }
 
   async findAll() {
