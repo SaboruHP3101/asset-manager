@@ -28,6 +28,7 @@ import { ApprovalHistoryModule } from './approval-history/approval-history.modul
 import { ChangeHistoryModule } from './change-history/change-history.module.js';
 import { RequestAuditModule } from './request-audit/request-audit.module.js';
 import { TransferRequestsModule } from './transfer-requests/transfer-requests.module.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { TransferRequestsModule } from './transfer-requests/transfer-requests.mo
     ApprovalHistoryModule,
     ChangeHistoryModule,
     TransferRequestsModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -6,7 +6,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { and, DrizzleQueryError, eq } from 'drizzle-orm';
+import { and, desc, DrizzleQueryError, eq, notInArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
@@ -89,6 +89,24 @@ export class RepairRequestsService {
       throw new NotFoundException('Không tìm thấy tài sản được quản lý.');
     }
 
+    // Mỗi tài sản chỉ có một luồng sửa chữa đang hoạt động để timeline và trạng
+    // thái tài sản không bị phân nhánh thành nhiều yêu cầu song song.
+    const [activeRequest] = await this.db
+      .select({ id: schema.repairRequests.id })
+      .from(schema.repairRequests)
+      .where(
+        and(
+          eq(schema.repairRequests.assetId, dto.assetId),
+          eq(schema.repairRequests.reporterId, actor.id),
+          notInArray(schema.repairRequests.status, ['closed', 'cancelled']),
+        ),
+      );
+    if (activeRequest) {
+      throw new ConflictException(
+        'Tài sản đang có một yêu cầu sửa chữa chưa hoàn tất.',
+      );
+    }
+
     return this.db.transaction(async (tx) => {
       const [request] = await tx
         .insert(schema.repairRequests)
@@ -128,6 +146,44 @@ export class RepairRequestsService {
 
       return new RepairRequest(request);
     });
+  }
+
+  /**
+   * Trả yêu cầu gần nhất của một tài sản cùng audit trail để mobile quyết định
+   * hiển thị nút tạo mới hay màn hình tiến trình. Chỉ chủ tài sản được phép xem.
+   */
+  async findMyLatestByAsset(employeeId: string, assetId: string) {
+    const [asset] = await this.db
+      .select({ id: schema.assets.id })
+      .from(schema.assets)
+      .where(
+        and(
+          eq(schema.assets.id, assetId),
+          eq(schema.assets.currentUserId, employeeId),
+        ),
+      );
+    if (!asset) {
+      throw new NotFoundException('Không tìm thấy tài sản được quản lý.');
+    }
+
+    const [request] = await this.db
+      .select()
+      .from(schema.repairRequests)
+      .where(
+        and(
+          eq(schema.repairRequests.assetId, assetId),
+          eq(schema.repairRequests.reporterId, employeeId),
+        ),
+      )
+      .orderBy(desc(schema.repairRequests.createdAt))
+      .limit(1);
+
+    if (!request) return null;
+
+    return {
+      request: new RepairRequest(request),
+      timeline: await this.audit.findTrail('repair', request.id),
+    };
   }
 
   /** Đọc và khóa luồng bằng trạng thái mong đợi trước mỗi hành động nghiệp vụ. */

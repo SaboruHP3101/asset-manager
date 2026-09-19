@@ -105,6 +105,15 @@ export class RepairRequestsController {
     return this.repairRequestsService.create(dto, actor);
   }
 
+  /** Lấy yêu cầu gần nhất và timeline của một tài sản thuộc nhân viên hiện tại. */
+  @Get('mine/asset/:assetId')
+  findMyLatestByAsset(
+    @Param('assetId', ParseUUIDPipe) assetId: string,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairRequestsService.findMyLatestByAsset(actor.id, assetId);
+  }
+
   /** Endpoint riêng cho từng hành động để service có thể kiểm soát thứ tự trạng thái. */
   @Post(':id/assess')
   @RequireWorkflowAction(WORKFLOW_ACTIONS.repairAssess)

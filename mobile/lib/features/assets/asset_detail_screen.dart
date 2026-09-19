@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../repair_requests/repair_request_form.dart';
+import '../repair_requests/repair_progress_screen.dart';
 
 class AssetDetailScreen extends StatefulWidget {
   const AssetDetailScreen({required this.assetId, super.key});
@@ -22,6 +23,8 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
   final _storage = const FlutterSecureStorage();
   final _dio = Dio(BaseOptions(baseUrl: _apiUrl));
   Map<String, dynamic>? _asset;
+  Map<String, dynamic>? _repairProgress;
+  bool _checkingRepair = true;
   String? _error;
 
   @override
@@ -46,9 +49,48 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
       if (mounted) setState(() => _asset = response.data);
+      await _loadRepairProgress();
     } on DioException {
       if (mounted) setState(() => _error = 'Không thể tải chi tiết tài sản.');
     }
+  }
+
+  // Kiểm tra request gần nhất để nút sửa chữa phản ánh đúng dữ liệu trong DB.
+  Future<void> _loadRepairProgress() async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      final response = await _dio.get<Object?>(
+        '/repair-requests/mine/asset/${widget.assetId}',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (!mounted) return;
+      setState(() {
+        _repairProgress = response.data as Map<String, dynamic>?;
+        _checkingRepair = false;
+      });
+    } on DioException {
+      if (mounted) setState(() => _checkingRepair = false);
+    }
+  }
+
+  // Sau khi tạo request thành công, tải lại trạng thái để đổi nút ngay lập tức.
+  Future<void> _openRepairAction() async {
+    if (_repairProgress != null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => RepairProgressScreen(assetId: widget.assetId),
+        ),
+      );
+      await _loadRepairProgress();
+      return;
+    }
+
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => RepairRequestForm(initialAssetId: widget.assetId),
+      ),
+    );
+    if (created == true) await _loadRepairProgress();
   }
 
   // Ghép địa chỉ API cho ảnh được lưu ở backend
@@ -147,14 +189,22 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      RepairRequestForm(initialAssetId: widget.assetId),
-                ),
+              onPressed: _checkingRepair ? null : _openRepairAction,
+              icon: _checkingRepair
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      _repairProgress == null
+                          ? Icons.build_outlined
+                          : Icons.timeline_outlined,
+                    ),
+              label: Text(
+                _repairProgress == null
+                    ? 'Gửi yêu cầu sửa chữa'
+                    : 'Xem tiến trình sửa chữa',
               ),
-              icon: const Icon(Icons.build_outlined),
-              label: const Text('Gửi yêu cầu sửa chữa'),
             ),
           ],
         ),

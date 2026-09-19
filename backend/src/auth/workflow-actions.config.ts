@@ -40,7 +40,7 @@ export const EMPLOYEE_ACTIONS: readonly WorkflowAction[] = [
 
 /**
  * Bảng này chỉ chứa quyền bổ sung theo chuyên môn. EMPLOYEE_ACTIONS được cộng
- * tự động cho mọi role đã cấu hình nên kế toán, IT hoặc thu mua vẫn dùng app cá nhân.
+ * cho mọi nhân viên, kể cả role mới chưa được khai báo trong bảng này.
  */
 export const ROLE_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
   {
@@ -72,8 +72,7 @@ export function getAllowedWorkflowActions(
   roleName: string,
   isDepartmentHead: boolean,
 ): WorkflowAction[] {
-  const roleActions = ROLE_ACTIONS[roleName];
-  if (!roleActions) return [];
+  const roleActions = ROLE_ACTIONS[roleName] ?? [];
 
   return [
     ...new Set([

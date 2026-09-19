@@ -43,11 +43,14 @@ async function seedRoles() {
   const roleIds = new Map(rows.map((row) => [row.name, row.id]));
 
   /**
-   * Chuẩn hóa dữ liệu từ phiên bản cũ: trưởng bộ phận là một cờ của nhân viên,
-   * không phải role; đồng thời rút gọn tên role Nhân viên IT thành IT.
+   * Chuẩn hóa các role quản lý cũ về Nhân viên và giữ trách nhiệm trưởng phòng
+   * bằng isDepartmentHead. Cách này xử lý cả dữ liệu seed cũ dùng tên Quản lý.
    */
-  const legacyDepartmentHeadId = roleIds.get('Trưởng bộ phận');
-  if (legacyDepartmentHeadId) {
+  const legacyHeadRoleIds = ['Quản lý', 'Trưởng bộ phận']
+    .map((name) => roleIds.get(name))
+    .filter((id): id is string => Boolean(id));
+
+  for (const legacyHeadRoleId of legacyHeadRoleIds) {
     await db
       .update(schema.employees)
       .set({
@@ -55,10 +58,8 @@ async function seedRoles() {
         isDepartmentHead: true,
         updatedAt: new Date(),
       })
-      .where(eq(schema.employees.roleId, legacyDepartmentHeadId));
-    await db
-      .delete(schema.roles)
-      .where(eq(schema.roles.id, legacyDepartmentHeadId));
+      .where(eq(schema.employees.roleId, legacyHeadRoleId));
+    await db.delete(schema.roles).where(eq(schema.roles.id, legacyHeadRoleId));
   }
 
   const legacyItId = roleIds.get('Nhân viên IT');
@@ -192,7 +193,7 @@ async function seedSuppliers() {
   return new Map(rows.map((row) => [row.supplierCode, row.id]));
 }
 
-// Thêm năm tài khoản có cùng mật khẩu dành cho môi trường phát triển
+// Thêm sáu tài khoản đại diện cho các role và phòng ban trong môi trường phát triển
 async function seedEmployees(
   departmentIds: Map<string, string>,
   roleIds: Map<string, string>,

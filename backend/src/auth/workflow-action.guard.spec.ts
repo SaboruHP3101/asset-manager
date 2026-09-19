@@ -44,4 +44,14 @@ describe('WorkflowActionGuard', () => {
     expect(guard.canActivate(contextFor('IT'))).toBe(true);
     expect(guard.canActivate(contextFor('Kế toán'))).toBe(true);
   });
+
+  it('cho phép role mới hoặc role cũ tạo request nhưng không cấp quyền chuyên môn', () => {
+    const reportGuard = guardFor(WORKFLOW_ACTIONS.repairReport);
+    const financeGuard = guardFor(WORKFLOW_ACTIONS.purchaseApproveFinance);
+
+    expect(reportGuard.canActivate(contextFor('Quản lý'))).toBe(true);
+    expect(() => financeGuard.canActivate(contextFor('Quản lý'))).toThrow(
+      ForbiddenException,
+    );
+  });
 });
