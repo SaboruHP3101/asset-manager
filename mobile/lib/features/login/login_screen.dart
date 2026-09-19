@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/layouts/main_layout.dart';
 import '../../core/network/api_client.dart';
@@ -40,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
   // Hàm kiểm tra xem giá trị nhập vào có phải là email hay không
   String? _validateEmail(String? value) {
     final email = value?.trim() ?? '';
-    if (email.isEmpty) return 'Email is required';
+    if (email.isEmpty) return 'Địa chỉ email bắt buộc';
     if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
       return 'Vui lòng nhập email';
     }
@@ -70,7 +71,9 @@ class _LoginScreenState extends State<LoginScreen> {
             _activationToken = response.data?['activationToken'] as String?;
           });
         } else {
-          setState(() => _emailError = 'No account found for this email');
+          setState(
+            () => _emailError = 'Không tìm thấy tài khoản với email này',
+          );
         }
       } else if (_firstTimeLogin) {
         final response = await _dio.post<Map<String, dynamic>>(
@@ -83,7 +86,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         final token = response.data?['access_token'] as String?;
         if (token == null) {
-          setState(() => _passwordError = 'Unable to set password');
+          setState(() => _passwordError = 'Không thể đặt mật khẩu');
           return;
         }
         await _completeLogin(token);
@@ -98,7 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         final token = response.data?['accessToken'] as String?;
         if (token == null) {
-          setState(() => _passwordError = 'Unable to log in');
+          setState(() => _passwordError = 'Không thể đăng nhập');
           return;
         }
         await _completeLogin(token);
@@ -112,11 +115,11 @@ class _LoginScreenState extends State<LoginScreen> {
         if (_emailVerified) {
           _passwordError = message is String
               ? message
-              : 'Network error. Try again.';
+              : 'Lỗi mạng. Vui lòng thử lại.';
         } else {
           _emailError = error.response?.statusCode == 404
-              ? 'No account found for this email'
-              : 'Network error. Try again.';
+              ? 'Không tìm thấy tài khoản với email này'
+              : 'Lỗi mạng. Vui lòng thử lại.';
         }
       });
     } finally {
@@ -134,151 +137,192 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 80),
-                const SizedBox(
-                  height: 150,
-                  child: Center(
-                    child: Icon(
-                      Icons.image_outlined,
-                      size: 40,
-                      color: Colors.blueAccent,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 38),
-                Text(
-                  'Welcome!',
-                  style: Theme.of(context).textTheme.headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 18),
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: _emailVerified
-                      ? TextInputAction.next
-                      : TextInputAction.done,
-                  enabled: !_loading,
-                  decoration: const InputDecoration(
-                    labelText: 'Email address',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validateEmail,
-                  onChanged: (_) {
-                    if (_emailVerified) {
-                      setState(() {
-                        _emailVerified = false;
-                        _firstTimeLogin = false;
-                        _activationToken = null;
-                        _passwordController.clear();
-                        _confirmPasswordController.clear();
-                      });
-                    }
-                    if (_emailError != null) setState(() => _emailError = null);
-                  },
-                  onFieldSubmitted: (_) {
-                    if (!_emailVerified) _submit();
-                  },
-                ),
-                if (_emailVerified) ...[
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _hidePassword,
-                    textInputAction: TextInputAction.done,
-                    enabled: !_loading,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        onPressed: () =>
-                            setState(() => _hidePassword = !_hidePassword),
-                        icon: Icon(
-                          _hidePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+        systemStatusBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        body: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: 350,
+                    width: double.infinity,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.asset(
+                          'assets/images/warehouse.jpg',
+                          fit: BoxFit.cover,
                         ),
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Password is required';
-                      }
-                      if (_firstTimeLogin && value.length < 6) {
-                        return 'Password must be at least 6 characters';
-                      }
-                      return _passwordError;
-                    },
-                    onChanged: (_) {
-                      if (_passwordError != null) {
-                        setState(() => _passwordError = null);
-                      }
-                    },
-                    onFieldSubmitted: (_) {
-                      if (!_firstTimeLogin) _submit();
-                    },
-                  ),
-                  if (_firstTimeLogin) ...[
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: _confirmPasswordController,
-                      obscureText: _hideConfirmPassword,
-                      textInputAction: TextInputAction.done,
-                      enabled: !_loading,
-                      decoration: InputDecoration(
-                        labelText: 'Retype password',
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          onPressed: () => setState(
-                            () => _hideConfirmPassword = !_hideConfirmPassword,
-                          ),
-                          icon: Icon(
-                            _hideConfirmPassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
+                        const Align(
+                          alignment: Alignment.topCenter,
+                          child: SizedBox(
+                            height: 35,
+                            width: double.infinity,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Color.fromRGBO(0, 0, 0, 0.65),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please retype your password';
-                        }
-                        if (value != _passwordController.text) {
-                          return 'Passwords do not match';
-                        }
-                        return null;
-                      },
-                      onFieldSubmitted: (_) => _submit(),
+                      ],
                     ),
-                  ],
+                  ),
+                  const SizedBox(height: 38),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Chào mừng!',
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 18),
+                        TextFormField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: _emailVerified
+                              ? TextInputAction.next
+                              : TextInputAction.done,
+                          enabled: !_loading,
+                          decoration: const InputDecoration(
+                            labelText: 'Địa chỉ email',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: _validateEmail,
+                          onChanged: (_) {
+                            if (_emailVerified) {
+                              setState(() {
+                                _emailVerified = false;
+                                _firstTimeLogin = false;
+                                _activationToken = null;
+                                _passwordController.clear();
+                                _confirmPasswordController.clear();
+                              });
+                            }
+                            if (_emailError != null) {
+                              setState(() => _emailError = null);
+                            }
+                          },
+                          onFieldSubmitted: (_) {
+                            if (!_emailVerified) _submit();
+                          },
+                        ),
+                        if (_emailVerified) ...[
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _hidePassword,
+                            textInputAction: TextInputAction.done,
+                            enabled: !_loading,
+                            decoration: InputDecoration(
+                              labelText: 'Mật khẩu',
+                              border: const OutlineInputBorder(),
+                              suffixIcon: IconButton(
+                                onPressed: () => setState(
+                                  () => _hidePassword = !_hidePassword,
+                                ),
+                                icon: Icon(
+                                  _hidePassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                ),
+                              ),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Mật khẩu bắt buộc';
+                              }
+                              if (_firstTimeLogin && value.length < 6) {
+                                return 'Mật khẩu phải ít nhất 6 ký tự';
+                              }
+                              return _passwordError;
+                            },
+                            onChanged: (_) {
+                              if (_passwordError != null) {
+                                setState(() => _passwordError = null);
+                              }
+                            },
+                            onFieldSubmitted: (_) {
+                              if (!_firstTimeLogin) _submit();
+                            },
+                          ),
+                          if (_firstTimeLogin) ...[
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: _confirmPasswordController,
+                              obscureText: _hideConfirmPassword,
+                              textInputAction: TextInputAction.done,
+                              enabled: !_loading,
+                              decoration: InputDecoration(
+                                labelText: 'Retype password',
+                                border: const OutlineInputBorder(),
+                                suffixIcon: IconButton(
+                                  onPressed: () => setState(
+                                    () => _hideConfirmPassword =
+                                        !_hideConfirmPassword,
+                                  ),
+                                  icon: Icon(
+                                    _hideConfirmPassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                ),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Vui lòng nhập lại mật khẩu';
+                                }
+                                if (value != _passwordController.text) {
+                                  return 'Mẩu khẩu không trùng nhau';
+                                }
+                                return null;
+                              },
+                              onFieldSubmitted: (_) => _submit(),
+                            ),
+                          ],
+                        ],
+                        const SizedBox(height: 20),
+                        FilledButton(
+                          onPressed: _loading ? null : _submit,
+                          child: _loading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  !_emailVerified
+                                      ? 'Tiếp theo'
+                                      : _firstTimeLogin
+                                      ? 'Tạo mật khẩu lần đầu'
+                                      : 'Đăng nhập',
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-                const SizedBox(height: 20),
-                FilledButton(
-                  onPressed: _loading ? null : _submit,
-                  child: _loading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          !_emailVerified
-                              ? 'Next'
-                              : _firstTimeLogin
-                              ? 'Create password'
-                              : 'Login',
-                        ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
