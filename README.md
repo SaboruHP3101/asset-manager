@@ -1,170 +1,161 @@
 # Asset Management System
 
-An enterprise-oriented asset management system for managing company assets, assignments, procurement, maintenance, inventory, suppliers, and related workflows.
+Hệ thống quản lý vòng đời tài sản doanh nghiệp, bao gồm tài sản, nhân viên, nhà cung cấp, mua sắm, điều chuyển, sửa chữa, kiểm kê và thanh lý.
 
-The project is organized as a monorepo with three main applications:
-
-```text
-.
-├── backend/       # NestJS REST API
-├── mobile/        # Flutter mobile application
-├── back-office/   # React admin dashboard
-└── README.md
-```
-
-## Tech Stack
-
-### Backend
-
-Located in:
+## Cấu trúc dự án
 
 ```text
-/backend
+asset-manager/
+├── backend/   # REST API
+└── mobile/    # Ứng dụng nhân viên
 ```
 
-Built with:
+## Backend
 
-* NestJS
-* TypeScript
-* Drizzle ORM
-* PostgreSQL
-* REST API
-* JWT-based authentication
-* OpenAPI / Swagger
-* Docker for local infrastructure
+### Mục tiêu
 
-Responsibilities include:
+Cung cấp REST API cho quản lý tài sản và các quy trình mua sắm, điều chuyển, sửa chữa; hỗ trợ JWT, phân quyền theo vai trò và audit trail.
 
-* Authentication and authorization
-* User and employee management
-* Asset management
-* Asset categories
-* Departments
-* Roles and permissions
-* Suppliers
-* Purchase requests
-* Asset assignments and transfers
-* Maintenance and repair records
-* Inventory checks
-* Asset liquidation / disposal
-* File attachment metadata
-* Audit logs
-* Business rules and validation
+### Tech stack chính
 
----
+- NestJS, TypeScript
+- PostgreSQL 16 chạy bằng Docker
+- Drizzle ORM
+- JWT
+- Swagger / OpenAPI
+- Vitest
+- Docker Compose
 
-### Mobile Application
+### Yêu cầu
 
-Located in:
+- Node.js 20+
+- npm
+- Docker và Docker Compose
+- GNU Make nếu sử dụng các lệnh `make`
 
-```text
-/mobile
+### Cài đặt và chạy
+
+```bash
+cd backend
+npm install
 ```
 
-Built with:
+Tạo file môi trường:
 
-* Flutter
-* Dart
-
-The mobile application is primarily intended for employees and operational staff.
-
-Possible features include:
-
-* Sign in
-* View assigned assets
-* View asset details
-* Scan QR codes / barcodes
-* Submit asset-related requests
-* Report damaged assets
-* View assignment history
-* Perform inventory checks
-* Upload asset photos
-* Receive asset-related notifications
-
----
-
-### Back Office
-
-Located in:
-
-```text
-/back-office
+```bash
+cp .env.example .env
 ```
 
-Built with:
+Điền cấu hình cần thiết trong `.env`, sau đó khởi động PostgreSQL:
 
-* React
-* TypeScript
-* React Router
-* TanStack Query
+```bash
+make infra-up
+```
 
-The back-office application is intended for administrators, asset managers, procurement teams, and other authorized personnel.
+Nếu máy không có `make`:
 
-Responsibilities include:
+```bash
+docker compose up -d
+```
 
-* Dashboard and statistics
-* Asset administration
-* Employee management
-* Department management
-* Asset category management
-* Supplier management
-* Purchase request workflows
-* Asset handover and transfer management
-* Maintenance management
-* Inventory management
-* Liquidation management
-* Role and permission management
-* Audit history
+Đồng bộ schema và tạo dữ liệu mẫu:
 
----
+```bash
+npm run db:push
+npm run db:seed
+```
 
-# Requirements
+Chạy API ở chế độ development:
 
-Before starting development, install the following tools.
+```bash
+npm run start:dev
+```
 
-## Backend / Back Office
+API mặc định: `http://localhost:8080`
 
-* Node.js 20+
-* npm
-* PostgreSQL 16+
-* Docker and Docker Compose recommended
+Swagger: `http://localhost:8080/api-docs`
+
+### Quản lý hạ tầng
+
+```bash
+# Khởi động PostgreSQL
+make infra-up
+
+# Dừng PostgreSQL nhưng giữ dữ liệu
+make infra-down
+
+# Dừng PostgreSQL và xóa toàn bộ dữ liệu
+make infra-clean
+```
+
+### Build và kiểm tra
+
+```bash
+npm run build
+npm run start:prod
+npm run lint
+npm run test
+npm run test:e2e
+```
 
 ## Mobile
 
-* Flutter SDK
-* Dart SDK
-* Android Studio and/or Xcode
-* Android Emulator, iOS Simulator, or physical device
+### Mục tiêu
 
-Check your Flutter installation with:
+Ứng dụng dành cho nhân viên để đăng nhập, xem tài sản được giao, quét QR và gửi yêu cầu sửa chữa kèm ảnh hoặc video.
+
+### Tech stack chính
+
+- Flutter, Dart
+- Dio
+- Flutter Secure Storage
+- Mobile Scanner
+- Image Picker
+- Video Player
+
+### Yêu cầu
+
+- Flutter SDK hỗ trợ Dart 3.13+
+- Android Studio và Android SDK
+- JDK 17
+- Xcode trên macOS nếu build iOS
+- Thiết bị thật hoặc emulator/simulator
+
+Kiểm tra môi trường:
 
 ```bash
 flutter doctor
 ```
 
----
-
-# Getting Started
-
-Clone the repository:
+### Cài đặt và chạy
 
 ```bash
-git clone <repository-url>
-cd asset-manager
+cd mobile
+flutter pub get
+flutter run
 ```
 
----
-
-# Backend Setup
-
-Navigate to the backend:
+Chỉ định địa chỉ backend khi cần:
 
 ```bash
-cd backend
+flutter run --dart-define=API_URL=http://<backend-host>:8080
 ```
 
-Install dependencies:
+Với Android Emulator, địa chỉ mặc định là:
+
+```text
+http://10.0.2.2:8080
+```
+
+### Build
 
 ```bash
-npm install
+# Android
+flutter build apk
+
+# Web
+flutter build web
+
+# iOS — yêu cầu macOS và Xcode
+flutter build ios
 ```
