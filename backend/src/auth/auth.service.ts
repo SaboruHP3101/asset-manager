@@ -14,6 +14,7 @@ import { DRIZZLE } from '../drizzle/drizzle.module.js';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import * as schema from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { getAllowedWorkflowActions } from './workflow-actions.config.js';
 
 type TokenPayload = {
   purpose: string;
@@ -158,7 +159,15 @@ export class AuthService {
 
       if (!profile) throw new UnauthorizedException('Account not found.');
 
-      return profile;
+      // Trả quyền đã phân giải để Flutter hiển thị đúng nút hành động mà không
+      // phải sao chép bảng role-to-action sang mã Dart.
+      return {
+        ...profile,
+        allowedActions: getAllowedWorkflowActions(
+          profile.role,
+          profile.isDepartmentHead,
+        ),
+      };
     } catch {
       throw new UnauthorizedException('Access token is invalid or expired.');
     }

@@ -7,9 +7,9 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Headers,
   UploadedFiles,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiConflictResponse,
@@ -28,8 +28,22 @@ import { RepairRequestsService } from './repair-requests.service.js';
 import { CreateRepairRequestDto } from './dto/create-repair-request.dto.js';
 import { UpdateRepairRequestDto } from './dto/update-repair-request.dto.js';
 import { RepairRequest } from './entities/repair-request.entity.js';
-import { AuthService } from '../auth/auth.service.js';
 import { CreateMyRepairRequestDto } from './dto/create-my-repair-request.dto.js';
+import {
+  AssessRepairDto,
+  AssignRepairDto,
+  CompleteRepairDto,
+  ConfirmRepairDto,
+  RepairApprovalDto,
+} from './dto/repair-workflow.dto.js';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
+import {
+  RequireWorkflowAction,
+  WorkflowActionGuard,
+} from '../auth/workflow-action.guard.js';
+import { CurrentEmployee } from '../auth/current-employee.decorator.js';
+import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
+import { WORKFLOW_ACTIONS } from '../auth/workflow-actions.config.js';
 
 const uploadFolder = 'uploads/repair-requests';
 
@@ -60,32 +74,86 @@ const repairUpload = AnyFilesInterceptor({
 
 @ApiTags('repair-requests')
 @Controller('repair-requests')
+@UseGuards(JwtAuthGuard, WorkflowActionGuard)
+/** Quản lý vòng đời sửa chữa, bao gồm tải minh chứng và nghiệm thu của người báo. */
 export class RepairRequestsController {
-  constructor(
-    private readonly repairRequestsService: RepairRequestsService,
-    private readonly authService: AuthService,
-  ) {}
+  constructor(private readonly repairRequestsService: RepairRequestsService) {}
 
   // Tạo yêu cầu sửa chữa cho tài sản của nhân viên hiện tại
   @Post('mine')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairReport)
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(repairUpload)
   async createMine(
-    @Headers('authorization') authHeader: string,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
     @Body() dto: CreateMyRepairRequestDto,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    const employeeId = await this.authService.getEmployeeId(authHeader);
-    return this.repairRequestsService.createMine(employeeId, dto, files ?? []);
+    return this.repairRequestsService.createMine(actor, dto, files ?? []);
   }
 
   @Post()
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairReport)
   @ApiCreatedResponse({ type: RepairRequest })
   @ApiConflictResponse({
     description: 'Dữ liệu đã tồn tại hoặc có tham chiếu không hợp lệ',
   })
-  create(@Body() dto: CreateRepairRequestDto) {
-    return this.repairRequestsService.create(dto);
+  create(
+    @Body() dto: CreateRepairRequestDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairRequestsService.create(dto, actor);
+  }
+
+  /** Endpoint riêng cho từng hành động để service có thể kiểm soát thứ tự trạng thái. */
+  @Post(':id/assess')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairAssess)
+  assess(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AssessRepairDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairRequestsService.assess(id, dto, actor);
+  }
+
+  @Post(':id/approve-department')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairApproveDepartment)
+  approveDepartment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RepairApprovalDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairRequestsService.approveDepartment(id, dto, actor);
+  }
+
+  @Post(':id/assign')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairAssign)
+  assign(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AssignRepairDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairRequestsService.assign(id, dto, actor);
+  }
+
+  @Post(':id/complete')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairComplete)
+  complete(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CompleteRepairDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairRequestsService.complete(id, dto, actor);
+  }
+
+  @Post(':id/confirm-result')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairConfirmResult)
+  confirmResult(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ConfirmRepairDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairRequestsService.confirmResult(id, dto, actor);
   }
 
   @Get()

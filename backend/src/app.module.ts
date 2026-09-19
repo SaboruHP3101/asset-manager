@@ -26,6 +26,8 @@ import { AssetDepreciationsModule } from './asset-depreciations/asset-depreciati
 import { AttachmentsModule } from './attachments/attachments.module.js';
 import { ApprovalHistoryModule } from './approval-history/approval-history.module.js';
 import { ChangeHistoryModule } from './change-history/change-history.module.js';
+import { RequestAuditModule } from './request-audit/request-audit.module.js';
+import { TransferRequestsModule } from './transfer-requests/transfer-requests.module.js';
 
 @Module({
   imports: [
@@ -34,6 +36,7 @@ import { ChangeHistoryModule } from './change-history/change-history.module.js';
       expandVariables: true, // Thêm dòng này để NestJS tự dịch các biến ${} trong file .env
     }),
     DrizzleModule,
+    RequestAuditModule,
     EmployeesModule,
     DepartmentsModule,
     RolesModule,
@@ -57,6 +60,7 @@ import { ChangeHistoryModule } from './change-history/change-history.module.js';
     AttachmentsModule,
     ApprovalHistoryModule,
     ChangeHistoryModule,
+    TransferRequestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

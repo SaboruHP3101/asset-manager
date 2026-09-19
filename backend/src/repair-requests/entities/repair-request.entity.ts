@@ -1,3 +1,4 @@
+/** Resource phản hồi chứa dữ liệu và tiến độ hiện tại của yêu cầu sửa chữa. */
 export class RepairRequest {
   id: string;
   assetId: string;

@@ -6,12 +6,48 @@ import {
   integer,
   jsonb,
   numeric,
+  index,
+  pgEnum,
   pgTable,
   text,
   timestamp,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+
+export const purchaseStatusEnum = pgEnum('purchase_status', [
+  'draft',
+  'submitted',
+  'dept_approved',
+  'finance_approved',
+  'exec_approved',
+  'ordered',
+  'received',
+  'asset_created',
+  'allocated',
+  'cancelled',
+]);
+
+export const transferStatusEnum = pgEnum('transfer_status', [
+  'requested',
+  'dept_approved',
+  'verified',
+  'handoff_pending',
+  'completed',
+  'cancelled',
+]);
+
+export const repairStatusEnum = pgEnum('repair_status', [
+  'reported',
+  'assessed',
+  'approval_pending',
+  'in_progress',
+  'completed',
+  'confirmed',
+  'rejected',
+  'closed',
+  'cancelled',
+]);
 
 const createdAt = () =>
   timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
@@ -115,26 +151,58 @@ export const supplierAddresses = pgTable('supplier_addresses', {
   country: varchar('country', { length: 255 }).notNull(),
 });
 
-export const purchaseRequests = pgTable('purchase_requests', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  requesterId: uuid('requester_id')
-    .notNull()
-    .references(() => employees.id),
-  departmentId: uuid('department_id')
-    .notNull()
-    .references(() => departments.id),
-  assetCategoryId: uuid('asset_category_id')
-    .notNull()
-    .references(() => assetCategories.id),
-  quantity: integer('quantity').notNull(),
-  requestDate: date('request_date', { mode: 'string' }).notNull(),
-  status: varchar('status', { length: 100 }).notNull(),
-  reason: text('reason').notNull(),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-  createdBy: createdBy(),
-  updatedBy: updatedBy(),
-});
+export const purchaseRequests = pgTable(
+  'purchase_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    requesterId: uuid('requester_id')
+      .notNull()
+      .references(() => employees.id),
+    departmentId: uuid('department_id')
+      .notNull()
+      .references(() => departments.id),
+    assetCategoryId: uuid('asset_category_id')
+      .notNull()
+      .references(() => assetCategories.id),
+    quantity: integer('quantity').notNull(),
+    requestDate: date('request_date', { mode: 'string' }).notNull(),
+    status: purchaseStatusEnum('status').notNull().default('draft'),
+    reason: text('reason').notNull(),
+    deptHeadId: uuid('dept_head_id').references(() => employees.id),
+    deptHeadApprovedAt: timestamp('dept_head_approved_at', {
+      withTimezone: true,
+    }),
+    financeReviewedBy: uuid('finance_reviewed_by').references(
+      () => employees.id,
+    ),
+    financeReviewedAt: timestamp('finance_reviewed_at', {
+      withTimezone: true,
+    }),
+    execApprovedBy: uuid('exec_approved_by').references(() => employees.id),
+    execApprovedAt: timestamp('exec_approved_at', { withTimezone: true }),
+    procurementBy: uuid('procurement_by').references(() => employees.id),
+    procuredAt: timestamp('procured_at', { withTimezone: true }),
+    supplierId: uuid('supplier_id').references(() => suppliers.id),
+    invoiceNumber: varchar('invoice_number', { length: 255 }),
+    receivedAt: timestamp('received_at', { withTimezone: true }),
+    receivedBy: uuid('received_by').references(() => employees.id),
+    receivedAssets: uuid('received_assets').array(),
+    allocatedTo: uuid('allocated_to').references(() => employees.id),
+    allocatedAt: timestamp('allocated_at', { withTimezone: true }),
+    allocationConfirmedBy: uuid('allocation_confirmed_by').references(
+      () => employees.id,
+    ),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    createdBy: createdBy(),
+    updatedBy: updatedBy(),
+  },
+  (table) => [
+    index('idx_purchase_status').on(table.status),
+    index('idx_purchase_department').on(table.departmentId),
+    index('idx_purchase_requester').on(table.requesterId),
+  ],
+);
 
 export const purchaseContracts = pgTable('purchase_contracts', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -225,6 +293,9 @@ export const assets = pgTable('assets', {
   purchaseOrderItemId: uuid('purchase_order_item_id').references(
     () => purchaseOrderItems.id,
   ),
+  name: varchar('name', { length: 255 }),
+  currentLocation: varchar('current_location', { length: 500 }),
+  currentValue: numeric('current_value'),
   status: varchar('status', { length: 100 }).notNull(),
   initialValue: numeric('initial_value').notNull(),
   purchaseDate: date('purchase_date', { mode: 'string' }).notNull(),
@@ -262,23 +333,125 @@ export const assetHandoverHistory = pgTable('asset_handover_history', {
   updatedBy: updatedBy(),
 });
 
-export const repairRequests = pgTable('repair_requests', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  assetId: uuid('asset_id')
-    .notNull()
-    .references(() => assets.id),
-  reporterId: uuid('reporter_id')
-    .notNull()
-    .references(() => employees.id),
-  reportDate: date('report_date', { mode: 'string' }).notNull(),
-  issueDescription: text('issue_description').notNull(),
-  status: varchar('status', { length: 100 }).notNull(),
-  repairCost: numeric('repair_cost'),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-  createdBy: createdBy(),
-  updatedBy: updatedBy(),
-});
+export const transferRequests = pgTable(
+  'transfer_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    status: transferStatusEnum('status').notNull().default('requested'),
+    assetId: uuid('asset_id')
+      .notNull()
+      .references(() => assets.id),
+    initiatedBy: uuid('initiated_by')
+      .notNull()
+      .references(() => employees.id),
+    fromDepartmentId: uuid('from_department_id')
+      .notNull()
+      .references(() => departments.id),
+    toDepartmentId: uuid('to_department_id')
+      .notNull()
+      .references(() => departments.id),
+    toUserId: uuid('to_user_id').references(() => employees.id),
+    newLocation: varchar('new_location', { length: 500 }),
+    reason: text('reason').notNull(),
+    deptHeadApprovedBy: uuid('dept_head_approved_by').references(
+      () => employees.id,
+    ),
+    deptHeadApprovedAt: timestamp('dept_head_approved_at', {
+      withTimezone: true,
+    }),
+    assetTeamVerifiedBy: uuid('asset_team_verified_by').references(
+      () => employees.id,
+    ),
+    assetTeamVerifiedAt: timestamp('asset_team_verified_at', {
+      withTimezone: true,
+    }),
+    senderConfirmedBy: uuid('sender_confirmed_by').references(
+      () => employees.id,
+    ),
+    senderConfirmedAt: timestamp('sender_confirmed_at', { withTimezone: true }),
+    receiverConfirmedBy: uuid('receiver_confirmed_by').references(
+      () => employees.id,
+    ),
+    receiverConfirmedAt: timestamp('receiver_confirmed_at', {
+      withTimezone: true,
+    }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index('idx_transfer_status').on(table.status),
+    index('idx_transfer_asset').on(table.assetId),
+    index('idx_transfer_from_department').on(table.fromDepartmentId),
+    index('idx_transfer_to_department').on(table.toDepartmentId),
+  ],
+);
+
+export const repairRequests = pgTable(
+  'repair_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    assetId: uuid('asset_id')
+      .notNull()
+      .references(() => assets.id),
+    reporterId: uuid('reporter_id')
+      .notNull()
+      .references(() => employees.id),
+    departmentId: uuid('department_id').references(() => departments.id),
+    reportDate: date('report_date', { mode: 'string' }).notNull(),
+    issueDescription: text('issue_description').notNull(),
+    status: repairStatusEnum('status').notNull().default('reported'),
+    assessedBy: uuid('assessed_by').references(() => employees.id),
+    assessedAt: timestamp('assessed_at', { withTimezone: true }),
+    assessmentNotes: text('assessment_notes'),
+    needsApproval: boolean('needs_approval').notNull().default(false),
+    estimatedRepairCost: numeric('estimated_repair_cost'),
+    approvedBy: uuid('approved_by').references(() => employees.id),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    assignedTo: uuid('assigned_to').references(() => employees.id),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    resultNotes: text('result_notes'),
+    repairCost: numeric('repair_cost'),
+    confirmedBy: uuid('confirmed_by').references(() => employees.id),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    confirmationStatus: varchar('confirmation_status', { length: 50 }),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    createdBy: createdBy(),
+    updatedBy: updatedBy(),
+  },
+  (table) => [
+    index('idx_repair_status').on(table.status),
+    index('idx_repair_asset').on(table.assetId),
+    index('idx_repair_department').on(table.departmentId),
+    index('idx_repair_reporter').on(table.reporterId),
+  ],
+);
+
+export const requestApprovals = pgTable(
+  'request_approvals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    requestType: varchar('request_type', { length: 50 }).notNull(),
+    requestId: uuid('request_id').notNull(),
+    actionType: varchar('action_type', { length: 50 }).notNull(),
+    approverRole: varchar('approver_role', { length: 50 }).notNull(),
+    approvedBy: uuid('approved_by')
+      .notNull()
+      .references(() => employees.id),
+    status: varchar('status', { length: 50 }).notNull(),
+    notes: text('notes'),
+    metadata: jsonb('metadata'),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index('idx_request_approval_type').on(table.requestType),
+    index('idx_request_approval_request').on(table.requestId),
+    index('idx_request_approval_created_at').on(table.createdAt),
+  ],
+);
 
 export const assetInventories = pgTable('asset_inventories', {
   id: uuid('id').primaryKey().defaultRandom(),

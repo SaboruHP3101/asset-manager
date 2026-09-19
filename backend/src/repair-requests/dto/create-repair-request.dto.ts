@@ -1,6 +1,7 @@
 import {
   IsDateString,
   IsNotEmpty,
+  IsIn,
   IsNumberString,
   IsOptional,
   IsString,
@@ -14,11 +15,6 @@ export class CreateRepairRequestDto {
   @IsNotEmpty()
   assetId: string;
 
-  /** UUID của nhân viên báo hỏng. */
-  @IsUUID()
-  @IsNotEmpty()
-  reporterId: string;
-
   /** Ngày báo hỏng theo định dạng ISO 8601. */
   @IsDateString()
   @IsNotEmpty()
@@ -30,10 +26,29 @@ export class CreateRepairRequestDto {
   issueDescription: string;
 
   /** Trạng thái. */
-  @IsString()
-  @IsNotEmpty()
+  @IsIn([
+    'reported',
+    'assessed',
+    'approval_pending',
+    'in_progress',
+    'completed',
+    'confirmed',
+    'rejected',
+    'closed',
+    'cancelled',
+  ])
+  @IsOptional()
   @MaxLength(100)
-  status: string;
+  status?:
+    | 'reported'
+    | 'assessed'
+    | 'approval_pending'
+    | 'in_progress'
+    | 'completed'
+    | 'confirmed'
+    | 'rejected'
+    | 'closed'
+    | 'cancelled';
 
   /** Chi phí sửa chữa dưới dạng chuỗi số thập phân. */
   @IsNumberString()

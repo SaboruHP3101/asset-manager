@@ -5,6 +5,8 @@ import { AuthController } from './auth.controller.js';
 import { ConfigService } from '@nestjs/config';
 import { EmployeesModule } from '../employees/employees.module.js';
 import { DrizzleModule } from '../drizzle/drizzle.module.js';
+import { JwtAuthGuard } from './jwt-auth.guard.js';
+import { WorkflowActionGuard } from './workflow-action.guard.js';
 
 @Module({
   imports: [
@@ -22,8 +24,8 @@ import { DrizzleModule } from '../drizzle/drizzle.module.js';
     EmployeesModule,
     DrizzleModule,
   ],
-  providers: [AuthService],
+  providers: [AuthService, JwtAuthGuard, WorkflowActionGuard],
   controllers: [AuthController],
-  exports: [AuthService],
+  exports: [AuthService, JwtAuthGuard, WorkflowActionGuard],
 })
 export class AuthModule {}

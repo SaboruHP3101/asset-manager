@@ -1,3 +1,4 @@
+/** Resource phản hồi đại diện cho trạng thái hiện tại của một luồng mua sắm. */
 export class PurchaseRequest {
   id: string;
   requesterId: string;
