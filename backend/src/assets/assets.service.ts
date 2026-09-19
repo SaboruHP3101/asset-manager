@@ -67,7 +67,32 @@ export class AssetsService {
     }
 
     if (categoryId) {
-      conditions.push(eq(schema.assets.assetCategoryId, categoryId));
+      /**
+       * Mobile gửi danh mục cha, trong khi tài sản thường nằm ở danh mục lá.
+       * Mở rộng toàn bộ cây con để bộ lọc cha bao gồm đúng các tài sản bên dưới.
+       */
+      const categories = await this.db
+        .select({
+          id: schema.assetCategories.id,
+          parentId: schema.assetCategories.parentCategoryId,
+        })
+        .from(schema.assetCategories);
+      const categoryIds = new Set<string>([categoryId]);
+      let foundChild = true;
+      while (foundChild) {
+        foundChild = false;
+        for (const category of categories) {
+          if (
+            category.parentId &&
+            categoryIds.has(category.parentId) &&
+            !categoryIds.has(category.id)
+          ) {
+            categoryIds.add(category.id);
+            foundChild = true;
+          }
+        }
+      }
+      conditions.push(inArray(schema.assets.assetCategoryId, [...categoryIds]));
     }
 
     const records = await this.db
@@ -124,6 +149,41 @@ export class AssetsService {
       ...record,
       imageUrl: images.get(record.id) ?? null,
     }));
+  }
+
+  /**
+   * Chỉ trả danh mục gốc có tài sản của nhân viên ở một nhánh con. API riêng này
+   * giúp mobile không hiển thị lựa chọn filter chắc chắn cho kết quả rỗng.
+   */
+  async findMyParentCategories(employeeId: string) {
+    const [categories, ownedCategories] = await Promise.all([
+      this.db
+        .select({
+          id: schema.assetCategories.id,
+          name: schema.assetCategories.name,
+          parentId: schema.assetCategories.parentCategoryId,
+        })
+        .from(schema.assetCategories),
+      this.db
+        .selectDistinct({ categoryId: schema.assets.assetCategoryId })
+        .from(schema.assets)
+        .where(eq(schema.assets.currentUserId, employeeId)),
+    ]);
+
+    const categoryById = new Map(categories.map((item) => [item.id, item]));
+    const rootIds = new Set<string>();
+    for (const owned of ownedCategories) {
+      let current = categoryById.get(owned.categoryId);
+      while (current?.parentId) {
+        current = categoryById.get(current.parentId);
+      }
+      if (current) rootIds.add(current.id);
+    }
+
+    return categories
+      .filter((category) => rootIds.has(category.id))
+      .map(({ id, name }) => ({ id, name }))
+      .sort((left, right) => left.name.localeCompare(right.name, 'vi'));
   }
 
   // Lấy đầy đủ thông tin tài sản để hiển thị trang chi tiết

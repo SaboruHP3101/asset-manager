@@ -6,6 +6,7 @@ class StatusCard extends StatelessWidget {
   final String count;
   final IconData? icon;
   final Color? iconColor;
+  final bool loading;
 
   const StatusCard({
     super.key,
@@ -13,6 +14,7 @@ class StatusCard extends StatelessWidget {
     required this.count,
     this.icon,
     this.iconColor,
+    this.loading = false,
   });
 
   @override
@@ -39,8 +41,15 @@ class StatusCard extends StatelessWidget {
               ],
             ),
             Container(
-              margin: EdgeInsets.only(top: 4),
-              child: AppText(count, type: AppTextType.h5, fontSize: 28),
+              margin: const EdgeInsets.only(top: 4),
+              height: 36,
+              alignment: Alignment.centerLeft,
+              child: loading
+                  ? const SizedBox.square(
+                      dimension: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    )
+                  : AppText(count, type: AppTextType.h5, fontSize: 28),
             ),
           ],
         ),

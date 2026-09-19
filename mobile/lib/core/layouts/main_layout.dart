@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/assets/assets_screen.dart';
+import '../../features/repair_requests/repair_requests_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -15,16 +16,18 @@ class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0;
 
   // Các màn hình chính được hiển thị từ thanh điều hướng
-  final List<Widget> _screens = const [
+  late final List<Widget> _screens = [
     HomeScreen(),
     AssetsScreen(),
-    Center(child: Text('Send Screen')),
+    const RepairRequestsScreen(),
     ProfileScreen(),
   ];
 
   void _onTabTapped(int index) {
     // Cập nhật màn hình khi người dùng chọn một tab
     setState(() {
+      // Tạo lại màn Yêu cầu để phản ánh request vừa tạo từ tab Tài sản.
+      if (index == 2) _screens[2] = RepairRequestsScreen(key: UniqueKey());
       _currentIndex = index;
     });
   }

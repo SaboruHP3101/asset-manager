@@ -5,9 +5,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../core/widgets/vertical_timeline.dart';
 
 class RepairProgressScreen extends StatefulWidget {
-  const RepairProgressScreen({required this.assetId, super.key});
+  const RepairProgressScreen({this.assetId, this.requestId, super.key})
+      : assert(assetId != null || requestId != null);
 
-  final String assetId;
+  final String? assetId;
+  final String? requestId;
 
   @override
   State<RepairProgressScreen> createState() => _RepairProgressScreenState();
@@ -40,8 +42,11 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
     setState(() => _error = null);
     try {
       final token = await _storage.read(key: 'access_token');
+      final endpoint = widget.requestId != null
+          ? '/repair-requests/mine/${widget.requestId}/progress'
+          : '/repair-requests/mine/asset/${widget.assetId}';
       final response = await _dio.get<Map<String, dynamic>>(
-        '/repair-requests/mine/asset/${widget.assetId}',
+        endpoint,
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
       if (!mounted) return;

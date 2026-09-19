@@ -6,7 +6,15 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { and, desc, DrizzleQueryError, eq, notInArray } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  DrizzleQueryError,
+  eq,
+  inArray,
+  notInArray,
+} from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
@@ -179,6 +187,77 @@ export class RepairRequestsService {
       .limit(1);
 
     if (!request) return null;
+
+    return {
+      request: new RepairRequest(request),
+      timeline: await this.audit.findTrail('repair', request.id),
+    };
+  }
+
+  /** Lấy toàn bộ yêu cầu của nhân viên kèm thông tin tài sản để dựng list card. */
+  async findMine(employeeId: string) {
+    const requests = await this.db
+      .select({
+        id: schema.repairRequests.id,
+        assetId: schema.repairRequests.assetId,
+        assetCode: schema.assets.assetCode,
+        assetName: schema.assetCategories.name,
+        status: schema.repairRequests.status,
+        issueDescription: schema.repairRequests.issueDescription,
+        reportDate: schema.repairRequests.reportDate,
+        createdAt: schema.repairRequests.createdAt,
+      })
+      .from(schema.repairRequests)
+      .innerJoin(schema.assets, eq(schema.repairRequests.assetId, schema.assets.id))
+      .innerJoin(
+        schema.assetCategories,
+        eq(schema.assets.assetCategoryId, schema.assetCategories.id),
+      )
+      .where(eq(schema.repairRequests.reporterId, employeeId))
+      .orderBy(desc(schema.repairRequests.createdAt));
+
+    if (requests.length === 0) return [];
+
+    const attachments = await this.db
+      .select({ entityId: schema.attachments.entityId, url: schema.attachments.url })
+      .from(schema.attachments)
+      .where(
+        and(
+          eq(schema.attachments.entityType, 'asset'),
+          inArray(
+            schema.attachments.entityId,
+            requests.map((request) => request.assetId),
+          ),
+        ),
+      )
+      .orderBy(asc(schema.attachments.createdAt));
+    const images = new Map<string, string>();
+    for (const attachment of attachments) {
+      if (!images.has(attachment.entityId)) {
+        images.set(attachment.entityId, attachment.url);
+      }
+    }
+
+    return requests.map((request) => ({
+      ...request,
+      imageUrl: images.get(request.assetId) ?? null,
+    }));
+  }
+
+  /** Trả timeline đúng request được chọn và kiểm tra request thuộc nhân viên. */
+  async findMyProgress(employeeId: string, requestId: string) {
+    const [request] = await this.db
+      .select()
+      .from(schema.repairRequests)
+      .where(
+        and(
+          eq(schema.repairRequests.id, requestId),
+          eq(schema.repairRequests.reporterId, employeeId),
+        ),
+      );
+    if (!request) {
+      throw new NotFoundException('Không tìm thấy yêu cầu sửa chữa.');
+    }
 
     return {
       request: new RepairRequest(request),

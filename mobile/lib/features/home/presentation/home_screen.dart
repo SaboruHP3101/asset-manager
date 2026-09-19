@@ -180,12 +180,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: StatusCard(
                       title: 'Tài sản được giao',
                       count: _assignedAssets?.toString() ?? '—',
+                      loading: _loading,
                     ),
                   ),
                   Expanded(
                     child: StatusCard(
                       title: 'Yêu cầu đang xử lý',
                       count: _activeRequests?.toString() ?? '—',
+                      loading: _loading,
                     ),
                   ),
                 ],

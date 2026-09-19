@@ -59,20 +59,12 @@ class _AssetsScreenState extends State<AssetsScreen> {
     try {
       final options = await _authOptions();
       final categoryResponse = await _dio.get<List<dynamic>>(
-        '/asset-categories',
+        '/assets/mine/categories',
         options: options,
       );
-      final allCategories = categoryResponse.data ?? [];
-      final parentIds = allCategories
-          .map((item) => item['parentCategoryId'])
-          .whereType<String>()
-          .toSet();
-
-      // Chỉ giữ danh mục không có danh mục con
-      _categories = allCategories
-          .where((item) => !parentIds.contains(item['id']))
-          .cast<Map<String, dynamic>>()
-          .toList();
+      // Backend đã giới hạn danh mục cha theo tài sản của nhân viên, tránh các
+      // lựa chọn filter không thể trả kết quả.
+      _categories = (categoryResponse.data ?? []).cast<Map<String, dynamic>>();
       await _loadAssets(showLoading: false);
     } on DioException catch (error) {
       await _handleError(error);
@@ -176,98 +168,137 @@ class _AssetsScreenState extends State<AssetsScreen> {
         actions: [
           // Mở tìm kiếm từ biểu tượng bên phải tiêu đề
           IconButton(
-            onPressed: _openSearch,
+            onPressed: _loading ? null : _openSearch,
             tooltip: 'Tìm kiếm',
             icon: const Icon(Icons.search),
           ),
         ],
       ),
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadData,
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              if (_searchController.text.isNotEmpty) ...[
-                // Hiển thị từ khóa đang được áp dụng
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: InputChip(
-                    label: Text(_searchController.text),
-                    avatar: const Icon(Icons.search, size: 18),
-                    onDeleted: _clearSearch,
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              Row(
+        child: Column(
+          children: [
+            // Giữ bộ lọc và nút sắp xếp luôn hiển thị để bố cục không bị
+            // thay đổi đột ngột mỗi khi ứng dụng tải lại danh sách tài sản.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String?>(
-                      initialValue: _categoryId,
-                      decoration: const InputDecoration(
-                        labelText: 'Danh mục',
-                        border: OutlineInputBorder(),
+                  if (_searchController.text.isNotEmpty) ...[
+                    // Hiển thị từ khóa đang được áp dụng; tạm khóa thao tác xóa
+                    // trong lúc tải để tránh gửi nhiều yêu cầu API chồng nhau.
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: InputChip(
+                        label: Text(_searchController.text),
+                        avatar: const Icon(Icons.search, size: 18),
+                        onDeleted: _loading ? null : _clearSearch,
                       ),
-                      items: [
-                        const DropdownMenuItem(
-                          value: null,
-                          child: Text('Tất cả danh mục'),
-                        ),
-                        ..._categories.map(
-                          (category) => DropdownMenuItem(
-                            value: category['id'] as String,
-                            child: Text(category['name'] as String),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String?>(
+                          initialValue: _categoryId,
+                          decoration: InputDecoration(
+                            labelText: 'Danh mục',
+                            border: const OutlineInputBorder(),
+                            suffixIcon: _loading
+                                ? const Padding(
+                                    padding: EdgeInsets.all(14),
+                                    child: SizedBox.square(
+                                      dimension: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  )
+                                : null,
                           ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: null,
+                              child: Text('Tất cả danh mục'),
+                            ),
+                            ..._categories.map(
+                              (category) => DropdownMenuItem(
+                                value: category['id'] as String,
+                                child: Text(category['name'] as String),
+                              ),
+                            ),
+                          ],
+                          onChanged: _loading
+                              ? null
+                              : (value) {
+                                  setState(() => _categoryId = value);
+                                  _loadAssets();
+                                },
                         ),
-                      ],
-                      onChanged: (value) {
-                        setState(() => _categoryId = value);
-                        _loadAssets();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filledTonal(
-                    tooltip: _sort == 'name_asc' ? 'Tên A–Z' : 'Tên Z–A',
-                    onPressed: () {
-                      setState(() {
-                        _sort = _sort == 'name_asc' ? 'name_desc' : 'name_asc';
-                      });
-                      _loadAssets();
-                    },
-                    icon: Icon(
-                      _sort == 'name_asc'
-                          ? Icons.sort_by_alpha
-                          : Icons.sort_by_alpha_outlined,
-                    ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filledTonal(
+                        tooltip: _sort == 'name_asc' ? 'Tên A–Z' : 'Tên Z–A',
+                        onPressed: _loading
+                            ? null
+                            : () {
+                                setState(() {
+                                  _sort = _sort == 'name_asc'
+                                      ? 'name_desc'
+                                      : 'name_asc';
+                                });
+                                _loadAssets();
+                              },
+                        icon: Icon(
+                          _sort == 'name_asc'
+                              ? Icons.sort_by_alpha
+                              : Icons.sort_by_alpha_outlined,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              if (_loading)
-                const Center(child: CircularProgressIndicator())
-              else if (_error != null)
-                _MessageState(
-                  icon: Icons.cloud_off_outlined,
-                  message: _error!,
-                  buttonText: 'Thử lại',
-                  onPressed: _loadData,
-                )
-              else if (_assets.isEmpty)
-                _MessageState(
-                  icon: Icons.inventory_2_outlined,
-                  message: _searchController.text.isEmpty && _categoryId == null
-                      ? 'Bạn chưa quản lý tài sản nào.'
-                      : 'Không tìm thấy tài sản phù hợp.',
-                )
-              else
-                ..._assets.map(
-                  (asset) =>
-                      AssetCard(asset: asset, onTap: () => _openDetail(asset)),
-                ),
-            ],
-          ),
+            ),
+            // Chỉ thay phần nội dung danh sách bằng trạng thái tải, nhờ đó
+            // bộ lọc phía trên vẫn hiển thị nhưng đã được vô hiệu hóa an toàn.
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : RefreshIndicator(
+                      onRefresh: _loadData,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          if (_error != null)
+                            _MessageState(
+                              icon: Icons.cloud_off_outlined,
+                              message: _error!,
+                              buttonText: 'Thử lại',
+                              onPressed: _loadData,
+                            )
+                          else if (_assets.isEmpty)
+                            _MessageState(
+                              icon: Icons.inventory_2_outlined,
+                              message:
+                                  _searchController.text.isEmpty &&
+                                      _categoryId == null
+                                  ? 'Bạn chưa quản lý tài sản nào.'
+                                  : 'Không tìm thấy tài sản phù hợp.',
+                            )
+                          else
+                            ..._assets.map(
+                              (asset) => AssetCard(
+                                asset: asset,
+                                onTap: () => _openDetail(asset),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+            ),
+          ],
         ),
       ),
     );

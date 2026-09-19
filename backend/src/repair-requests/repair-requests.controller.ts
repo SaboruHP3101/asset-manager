@@ -105,6 +105,21 @@ export class RepairRequestsController {
     return this.repairRequestsService.create(dto, actor);
   }
 
+  /** Danh sách yêu cầu sửa chữa do nhân viên hiện tại tạo. */
+  @Get('mine')
+  findMine(@CurrentEmployee() actor: AuthenticatedEmployee) {
+    return this.repairRequestsService.findMine(actor.id);
+  }
+
+  /** Timeline của đúng yêu cầu được chọn trong danh sách cá nhân. */
+  @Get('mine/:id/progress')
+  findMyProgress(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairRequestsService.findMyProgress(actor.id, id);
+  }
+
   /** Lấy yêu cầu gần nhất và timeline của một tài sản thuộc nhân viên hiện tại. */
   @Get('mine/asset/:assetId')
   findMyLatestByAsset(
