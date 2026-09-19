@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../../core/network/api_client.dart';
 import '../../../core/widgets/app_text.dart';
 import '../../../core/widgets/requirement_grid.dart';
 import '../../../core/widgets/status_card.dart';
@@ -59,7 +59,7 @@ class _RequirementGrid extends StatelessWidget {
         title: 'Yêu cầu điều chuyển',
         icon: Icons.send,
         onTap: () {
-          print('Yêu cầu điều chuyển tapped');
+          debugPrint('Yêu cầu điều chuyển tapped');
         },
       ),
     ];
@@ -76,13 +76,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const _apiUrl = String.fromEnvironment(
-    'API_URL',
-    defaultValue: 'http://10.0.2.2:8080',
-  );
-
-  final _dio = Dio(BaseOptions(baseUrl: _apiUrl));
-  final _storage = const FlutterSecureStorage();
+  final _dio = ApiClient.instance.dio;
 
   int? _assignedAssets;
   int? _activeRequests;
@@ -94,27 +88,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadSummary();
   }
 
-  @override
-  void dispose() {
-    _dio.close();
-    super.dispose();
-  }
-
-  // Lấy token đã lưu để backend xác định đúng nhân viên và phạm vi dữ liệu.
-  Future<Options> _authOptions() async {
-    final token = await _storage.read(key: 'access_token');
-    return Options(headers: {'Authorization': 'Bearer $token'});
-  }
-
   // Tải các số liệu tổng hợp từ DB qua một endpoint dành riêng cho Home.
   Future<void> _loadSummary() async {
     if (mounted) setState(() => _loading = true);
 
     try {
-      final response = await _dio.get<Map<String, dynamic>>(
-        '/dashboard/mine',
-        options: await _authOptions(),
-      );
+      final response = await _dio.get<Map<String, dynamic>>('/dashboard/mine');
       if (!mounted) return;
       setState(() {
         _assignedAssets = response.data?['assignedAssets'] as int? ?? 0;

@@ -1,7 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../core/network/api_client.dart';
+import '../../core/storage/token_storage.dart';
 import '../../core/widgets/app_text.dart';
 import '../login/login_screen.dart';
 
@@ -13,13 +14,8 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  static const _apiUrl = String.fromEnvironment(
-    'API_URL',
-    defaultValue: 'http://10.0.2.2:8080',
-  );
-
-  final _storage = const FlutterSecureStorage();
-  final _dio = Dio(BaseOptions(baseUrl: _apiUrl));
+  final _tokenStorage = TokenStorage.instance;
+  final _dio = ApiClient.instance.dio;
   Map<String, dynamic>? _employee;
   String? _error;
 
@@ -30,20 +26,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfile();
   }
 
-  @override
-  void dispose() {
-    _dio.close();
-    super.dispose();
-  }
-
   // Gọi API bằng token đã lưu sau khi đăng nhập
   Future<void> _loadProfile() async {
     try {
-      final token = await _storage.read(key: 'access_token');
-      final response = await _dio.get<Map<String, dynamic>>(
-        '/auth/me',
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
-      );
+      final response = await _dio.get<Map<String, dynamic>>('/auth/me');
       if (mounted) {
         setState(() => _employee = response.data);
       }
@@ -56,7 +42,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // Xóa token và quay về màn hình đăng nhập
   Future<void> _logout() async {
-    await _storage.delete(key: 'access_token');
+    await _tokenStorage.clearAccessToken();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),

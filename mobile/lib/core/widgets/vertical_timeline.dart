@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 enum TimelineStepState { completed, current, upcoming, rejected }
 
-/** Dữ liệu độc lập với nghiệp vụ để timeline có thể dùng lại cho các flow khác. */
+/// Dữ liệu độc lập với nghiệp vụ để timeline có thể dùng lại cho các flow khác.
 class TimelineStep {
   const TimelineStep({
     required this.title,
@@ -17,7 +17,7 @@ class TimelineStep {
   final TimelineStepState state;
 }
 
-/** Timeline dọc dùng chung cho sửa chữa, mua sắm và điều chuyển sau này. */
+/// Timeline dọc dùng chung cho sửa chữa, mua sắm và điều chuyển sau này.
 class VerticalTimeline extends StatelessWidget {
   const VerticalTimeline({required this.steps, super.key});
 
@@ -60,11 +60,23 @@ class VerticalTimeline extends StatelessWidget {
                     Container(
                       width: 28,
                       height: 28,
-                      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                      child: Icon(_icon(step.state), size: 17, color: Colors.white),
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _icon(step.state),
+                        size: 17,
+                        color: Colors.white,
+                      ),
                     ),
                     if (!isLast)
-                      Expanded(child: Container(width: 2, color: color.withValues(alpha: 0.4))),
+                      Expanded(
+                        child: Container(
+                          width: 2,
+                          color: color.withValues(alpha: 0.4),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -75,18 +87,27 @@ class VerticalTimeline extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(step.title, style: Theme.of(context).textTheme.titleMedium),
+                      Text(
+                        step.title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
                       if (step.subtitle?.isNotEmpty == true) ...[
                         const SizedBox(height: 4),
-                        Text(step.subtitle!, style: Theme.of(context).textTheme.bodyMedium),
+                        Text(
+                          step.subtitle!,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
                       ],
                       if (step.time?.isNotEmpty == true) ...[
                         const SizedBox(height: 4),
                         Text(
                           step.time!,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
                         ),
                       ],
                     ],

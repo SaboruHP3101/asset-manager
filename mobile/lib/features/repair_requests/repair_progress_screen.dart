@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../core/network/api_client.dart';
 import '../../core/widgets/vertical_timeline.dart';
 
 class RepairProgressScreen extends StatefulWidget {
   const RepairProgressScreen({this.assetId, this.requestId, super.key})
-      : assert(assetId != null || requestId != null);
+    : assert(assetId != null || requestId != null);
 
   final String? assetId;
   final String? requestId;
@@ -16,13 +16,7 @@ class RepairProgressScreen extends StatefulWidget {
 }
 
 class _RepairProgressScreenState extends State<RepairProgressScreen> {
-  static const _apiUrl = String.fromEnvironment(
-    'API_URL',
-    defaultValue: 'http://10.0.2.2:8080',
-  );
-
-  final _dio = Dio(BaseOptions(baseUrl: _apiUrl));
-  final _storage = const FlutterSecureStorage();
+  final _dio = ApiClient.instance.dio;
   Map<String, dynamic>? _data;
   String? _error;
 
@@ -32,27 +26,20 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
     _loadProgress();
   }
 
-  @override
-  void dispose() {
-    _dio.close();
-    super.dispose();
-  }
-
+  // Tải tiến trình theo mã yêu cầu hoặc theo tài sản được truyền vào.
   Future<void> _loadProgress() async {
     setState(() => _error = null);
     try {
-      final token = await _storage.read(key: 'access_token');
       final endpoint = widget.requestId != null
           ? '/repair-requests/mine/${widget.requestId}/progress'
           : '/repair-requests/mine/asset/${widget.assetId}';
-      final response = await _dio.get<Map<String, dynamic>>(
-        endpoint,
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
-      );
+      final response = await _dio.get<Map<String, dynamic>>(endpoint);
       if (!mounted) return;
       setState(() => _data = response.data);
     } on DioException {
-      if (mounted) setState(() => _error = 'Không thể tải tiến trình sửa chữa.');
+      if (mounted) {
+        setState(() => _error = 'Không thể tải tiến trình sửa chữa.');
+      }
     }
   }
 
@@ -97,20 +84,23 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
     final request = data['request'] as Map<String, dynamic>;
     final events = (data['timeline'] as List<dynamic>? ?? [])
         .cast<Map<String, dynamic>>();
-    final terminal = request['status'] == 'closed' || request['status'] == 'cancelled';
+    final terminal =
+        request['status'] == 'closed' || request['status'] == 'cancelled';
 
     return events.asMap().entries.map((entry) {
       final event = entry.value;
       final rejected = event['status'] == 'rejected';
       return TimelineStep(
         title: _actionText(event['actionType']?.toString() ?? ''),
-        subtitle: event['notes']?.toString() ?? 'Thực hiện bởi ${event['approverRole']}',
+        subtitle:
+            event['notes']?.toString() ??
+            'Thực hiện bởi ${event['approverRole']}',
         time: _formatTime(event['createdAt']),
         state: rejected
             ? TimelineStepState.rejected
             : (!terminal && entry.key == events.length - 1)
-                ? TimelineStepState.current
-                : TimelineStepState.completed,
+            ? TimelineStepState.current
+            : TimelineStepState.completed,
       );
     }).toList();
   }
@@ -124,7 +114,10 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
           ? Center(
               child: _error == null
                   ? const CircularProgressIndicator()
-                  : FilledButton.tonal(onPressed: _loadProgress, child: const Text('Thử lại')),
+                  : FilledButton.tonal(
+                      onPressed: _loadProgress,
+                      child: const Text('Thử lại'),
+                    ),
             )
           : RefreshIndicator(
               onRefresh: _loadProgress,

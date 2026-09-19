@@ -2,10 +2,11 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:video_player/video_player.dart';
+
+import '../../core/network/api_client.dart';
 
 class RepairRequestForm extends StatefulWidget {
   const RepairRequestForm({this.initialAssetId, super.key});
@@ -17,17 +18,11 @@ class RepairRequestForm extends StatefulWidget {
 }
 
 class _RepairRequestFormState extends State<RepairRequestForm> {
-  static const _apiUrl = String.fromEnvironment(
-    'API_URL',
-    defaultValue: 'http://10.0.2.2:8080',
-  );
-
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
   final _descriptionFocus = FocusNode();
-  final _storage = const FlutterSecureStorage();
   final _picker = ImagePicker();
-  final _dio = Dio(BaseOptions(baseUrl: _apiUrl));
+  final _dio = ApiClient.instance.dio;
   final List<XFile> _media = [];
   List<Map<String, dynamic>> _assets = [];
   String? _assetId;
@@ -46,7 +41,6 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
   void dispose() {
     _descriptionController.dispose();
     _descriptionFocus.dispose();
-    _dio.close();
     super.dispose();
   }
 
@@ -56,22 +50,33 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
     FocusManager.instance.primaryFocus?.unfocus();
   }
 
-  // Tạo header xác thực cho các API cá nhân
-  Future<Options> _authOptions() async {
-    final token = await _storage.read(key: 'access_token');
-    return Options(headers: {'Authorization': 'Bearer $token'});
-  }
-
-  // Lấy các tài sản mà nhân viên hiện tại đang quản lý
+  // Lấy tài sản của nhân viên và loại các tài sản đang có yêu cầu chưa kết thúc.
   Future<void> _loadAssets() async {
     try {
-      final response = await _dio.get<List<dynamic>>(
-        '/assets/mine',
-        options: await _authOptions(),
-      );
+      final responses = await Future.wait([
+        _dio.get<List<dynamic>>('/assets/mine'),
+        _dio.get<List<dynamic>>('/repair-requests/mine'),
+      ]);
+      final assets = (responses[0].data ?? []).cast<Map<String, dynamic>>();
+      final requests = (responses[1].data ?? []).cast<Map<String, dynamic>>();
+      final activeAssetIds = requests
+          .where((request) {
+            final status = request['status']?.toString();
+            return status != 'closed' && status != 'cancelled';
+          })
+          .map((request) => request['assetId']?.toString())
+          .whereType<String>()
+          .toSet();
+      final availableAssets = assets
+          .where((asset) => !activeAssetIds.contains(asset['id']?.toString()))
+          .toList();
+
       if (!mounted) return;
       setState(() {
-        _assets = (response.data ?? []).cast<Map<String, dynamic>>();
+        _assets = availableAssets;
+        if (!_assets.any((asset) => asset['id'] == _assetId)) {
+          _assetId = null;
+        }
         _loading = false;
       });
     } on DioException {
@@ -179,11 +184,7 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
         'issueDescription': _descriptionController.text.trim(),
         'files': files,
       });
-      await _dio.post(
-        '/repair-requests/mine',
-        data: form,
-        options: await _authOptions(),
-      );
+      await _dio.post('/repair-requests/mine', data: form);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -265,8 +266,11 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
                           ),
                         ),
                         border: const OutlineInputBorder(),
+                        helperText: _assets.isEmpty
+                            ? 'Không có tài sản phù hợp để tạo yêu cầu.'
+                            : null,
                         suffixIcon: IconButton(
-                          onPressed: _scanQrCode,
+                          onPressed: _assets.isEmpty ? null : _scanQrCode,
                           tooltip: 'Quét mã QR',
                           icon: const Icon(Icons.qr_code_scanner),
                         ),
@@ -282,7 +286,9 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
                             ),
                           )
                           .toList(),
-                      onChanged: (value) => setState(() => _assetId = value),
+                      onChanged: _assets.isEmpty
+                          ? null
+                          : (value) => setState(() => _assetId = value),
                       validator: (value) => value == null
                           ? 'Vui lòng chọn tài sản cần sửa chữa'
                           : null,
@@ -360,7 +366,9 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
                     ),
                     const SizedBox(height: 20),
                     FilledButton.icon(
-                      onPressed: _submitting ? null : _submit,
+                      onPressed: _submitting || _assets.isEmpty
+                          ? null
+                          : _submit,
                       icon: _submitting
                           ? const SizedBox(
                               width: 18,

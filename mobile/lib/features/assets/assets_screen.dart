@@ -1,7 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../core/network/api_client.dart';
+import '../../core/storage/token_storage.dart';
 import '../login/login_screen.dart';
 import 'asset_detail_screen.dart';
 
@@ -13,13 +14,8 @@ class AssetsScreen extends StatefulWidget {
 }
 
 class _AssetsScreenState extends State<AssetsScreen> {
-  static const _apiUrl = String.fromEnvironment(
-    'API_URL',
-    defaultValue: 'http://10.0.2.2:8080',
-  );
-
-  final _storage = const FlutterSecureStorage();
-  final _dio = Dio(BaseOptions(baseUrl: _apiUrl));
+  final _tokenStorage = TokenStorage.instance;
+  final _dio = ApiClient.instance.dio;
   final _searchController = TextEditingController();
   List<Map<String, dynamic>> _assets = [];
   List<Map<String, dynamic>> _categories = [];
@@ -39,14 +35,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
   @override
   void dispose() {
     _searchController.dispose();
-    _dio.close();
     super.dispose();
-  }
-
-  // Tạo header xác thực từ token đã lưu
-  Future<Options> _authOptions() async {
-    final token = await _storage.read(key: 'access_token');
-    return Options(headers: {'Authorization': 'Bearer $token'});
   }
 
   // Tải danh mục lá và danh sách tài sản của nhân viên
@@ -57,10 +46,8 @@ class _AssetsScreenState extends State<AssetsScreen> {
     });
 
     try {
-      final options = await _authOptions();
       final categoryResponse = await _dio.get<List<dynamic>>(
         '/assets/mine/categories',
-        options: options,
       );
       // Backend đã giới hạn danh mục cha theo tài sản của nhân viên, tránh các
       // lựa chọn filter không thể trả kết quả.
@@ -90,7 +77,6 @@ class _AssetsScreenState extends State<AssetsScreen> {
       final response = await _dio.get<List<dynamic>>(
         '/assets/mine',
         queryParameters: query,
-        options: await _authOptions(),
       );
       if (!mounted) return;
       setState(() {
@@ -141,7 +127,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
   // Xử lý lỗi mạng và phiên đăng nhập hết hạn
   Future<void> _handleError(DioException error) async {
     if (error.response?.statusCode == 401) {
-      await _storage.delete(key: 'access_token');
+      await _tokenStorage.clearAccessToken();
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -420,7 +406,7 @@ class AssetCard extends StatelessWidget {
           children: [
             SizedBox(
               width: 104,
-              height: 120,
+              height: 132,
               child: imageUrl == null
                   ? const ColoredBox(
                       color: Color(0xFFE8EAF0),

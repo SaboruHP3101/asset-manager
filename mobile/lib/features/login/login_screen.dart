@@ -1,8 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../core/layouts/main_layout.dart';
+import '../../core/network/api_client.dart';
+import '../../core/storage/token_storage.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,17 +13,12 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static const _apiUrl = String.fromEnvironment(
-    'API_URL',
-    defaultValue: 'http://10.0.2.2:8080',
-  );
-
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _storage = const FlutterSecureStorage();
-  final _dio = Dio(BaseOptions(baseUrl: _apiUrl));
+  final _tokenStorage = TokenStorage.instance;
+  final _dio = ApiClient.instance.dio;
 
   bool _emailVerified = false;
   bool _loading = false;
@@ -38,7 +34,6 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _dio.close();
     super.dispose();
   }
 
@@ -131,7 +126,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _completeLogin(String token) async {
-    await _storage.write(key: 'access_token', value: token);
+    await _tokenStorage.saveAccessToken(token);
     if (!mounted) return;
     Navigator.of(context)
         .pushReplacement(MaterialPageRoute(builder: (_) => const MainLayout()));
