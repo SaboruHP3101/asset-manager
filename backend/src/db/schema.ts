@@ -886,7 +886,14 @@ export const requestApprovals = pgTable(
     approvedBy: uuid('approved_by')
       .notNull()
       .references(() => employees.id),
+    actorDepartmentId: uuid('actor_department_id').references(
+      () => departments.id,
+    ),
+    actorIsDepartmentHead: boolean('actor_is_department_head'),
     status: varchar('status', { length: 50 }).notNull(),
+    previousStatus: varchar('previous_status', { length: 100 }),
+    newStatus: varchar('new_status', { length: 100 }),
+    reason: text('reason'),
     notes: text('notes'),
     metadata: jsonb('metadata'),
     createdAt: createdAt(),
@@ -987,11 +994,12 @@ export const notifications = pgTable(
     recipientId: uuid('recipient_id')
       .notNull()
       .references(() => employees.id),
-    notificationType: varchar('notification_type', { length: 100 }).notNull(),
+    eventType: varchar('event_type', { length: 100 }).notNull(),
     title: varchar('title', { length: 255 }).notNull(),
-    message: text('message').notNull(),
-    entityType: varchar('entity_type', { length: 100 }),
-    entityId: uuid('entity_id'),
+    body: text('body').notNull(),
+    entityType: varchar('entity_type', { length: 100 }).notNull(),
+    entityId: uuid('entity_id').notNull(),
+    metadata: jsonb('metadata'),
     readAt: timestamp('read_at', { withTimezone: true }),
     createdAt: createdAt(),
   },

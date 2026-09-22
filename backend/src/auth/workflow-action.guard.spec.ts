@@ -4,12 +4,18 @@ import type { Reflector } from '@nestjs/core';
 import { WorkflowActionGuard } from './workflow-action.guard.js';
 import { WORKFLOW_ACTIONS } from './workflow-actions.config.js';
 
-function contextFor(roleName: string, isDepartmentHead = false) {
+function contextFor(
+  roleName: string,
+  isDepartmentHead = false,
+  departmentName = 'WAREHOUSE',
+) {
   return {
     getHandler: () => function handler() {},
     getClass: () => class Controller {},
     switchToHttp: () => ({
-      getRequest: () => ({ user: { roleName, isDepartmentHead } }),
+      getRequest: () => ({
+        user: { roleName, isDepartmentHead, departmentName },
+      }),
     }),
   } as unknown as ExecutionContext;
 }
@@ -53,5 +59,34 @@ describe('WorkflowActionGuard', () => {
     expect(() => assessGuard.canActivate(contextFor('Quản lý'))).toThrow(
       ForbiddenException,
     );
+  });
+
+  it('cấp quyền purchase theo phòng ban và cờ trưởng phòng', () => {
+    expect(
+      guardFor(WORKFLOW_ACTIONS.purchaseRequestEnrichProcurement).canActivate(
+        contextFor('EMPLOYEE', false, 'PROCUREMENT'),
+      ),
+    ).toBe(true);
+    expect(
+      guardFor(WORKFLOW_ACTIONS.purchaseRequestApproveProcurement).canActivate(
+        contextFor('EMPLOYEE', true, 'PROCUREMENT'),
+      ),
+    ).toBe(true);
+    expect(
+      guardFor(WORKFLOW_ACTIONS.purchaseRequestApproveIt).canActivate(
+        contextFor('EMPLOYEE', true, 'IT'),
+      ),
+    ).toBe(true);
+  });
+
+  it('không cấp quyền purchase approval cho Accounting hoặc Executive', () => {
+    const guard = guardFor(WORKFLOW_ACTIONS.purchaseRequestApproveProcurement);
+
+    expect(() =>
+      guard.canActivate(contextFor('ACCOUNTING', true, 'ACCOUNTING')),
+    ).toThrow(ForbiddenException);
+    expect(() =>
+      guard.canActivate(contextFor('EXECUTIVE', true, 'EXECUTIVE')),
+    ).toThrow(ForbiddenException);
   });
 });

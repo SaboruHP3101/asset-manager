@@ -8,5 +8,6 @@ export interface AuthenticatedEmployee {
   roleId: string;
   roleName: string;
   departmentId: string;
+  departmentName: string;
   isDepartmentHead: boolean;
 }

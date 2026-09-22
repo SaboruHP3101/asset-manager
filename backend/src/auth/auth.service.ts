@@ -166,6 +166,7 @@ export class AuthService {
         allowedActions: getAllowedWorkflowActions(
           profile.role,
           profile.isDepartmentHead,
+          profile.department,
         ),
       };
     } catch {

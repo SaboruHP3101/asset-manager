@@ -14,6 +14,27 @@ export const WORKFLOW_ACTIONS = {
   repairAssign: 'repair.assign',
   repairComplete: 'repair.complete',
   repairConfirmResult: 'repair.confirm_result',
+  purchaseRequestCreate: 'purchase.request.create',
+  purchaseRequestUpdate: 'purchase.request.update',
+  purchaseRequestSubmit: 'purchase.request.submit',
+  purchaseRequestApproveDepartment: 'purchase.request.approve_department',
+  purchaseRequestEnrichProcurement: 'purchase.request.enrich_procurement',
+  purchaseRequestApproveProcurement: 'purchase.request.approve_procurement',
+  purchaseRequestApproveIt: 'purchase.request.approve_it',
+  purchaseOrderCreate: 'purchase.order.create',
+  purchaseOrderSubmit: 'purchase.order.submit',
+  purchaseOrderApprove: 'purchase.order.approve',
+  purchaseOrderCancel: 'purchase.order.cancel',
+  purchaseReceiptRecord: 'purchase.receipt.record',
+  purchaseReceiptInspectIt: 'purchase.receipt.inspect_it',
+  purchaseReceiptInspectProcurement: 'purchase.receipt.inspect_procurement',
+  purchaseReceiptCloseShort: 'purchase.receipt.close_short',
+  purchaseAllocationCreateInitial: 'purchase.allocation.create_initial',
+  purchaseAllocationReallocateIt: 'purchase.allocation.reallocate_it',
+  purchaseAllocationReallocateProcurement:
+    'purchase.allocation.reallocate_procurement',
+  purchaseAllocationConfirmDepartment: 'purchase.allocation.confirm_department',
+  purchaseAllocationConfirmRecipient: 'purchase.allocation.confirm_recipient',
 } as const;
 
 export type WorkflowAction =
@@ -28,6 +49,10 @@ export const EMPLOYEE_ACTIONS: readonly WorkflowAction[] = [
   WORKFLOW_ACTIONS.transferConfirm,
   WORKFLOW_ACTIONS.repairReport,
   WORKFLOW_ACTIONS.repairConfirmResult,
+  WORKFLOW_ACTIONS.purchaseRequestCreate,
+  WORKFLOW_ACTIONS.purchaseRequestUpdate,
+  WORKFLOW_ACTIONS.purchaseRequestSubmit,
+  WORKFLOW_ACTIONS.purchaseAllocationConfirmRecipient,
 ];
 
 /**
@@ -51,7 +76,38 @@ export const ROLE_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
 export const DEPARTMENT_HEAD_ACTIONS: readonly WorkflowAction[] = [
   WORKFLOW_ACTIONS.transferApproveDepartment,
   WORKFLOW_ACTIONS.repairApproveDepartment,
+  WORKFLOW_ACTIONS.purchaseRequestApproveDepartment,
+  WORKFLOW_ACTIONS.purchaseAllocationCreateInitial,
+  WORKFLOW_ACTIONS.purchaseAllocationConfirmDepartment,
 ];
+
+const DEPARTMENT_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
+  {
+    PROCUREMENT: [
+      WORKFLOW_ACTIONS.purchaseRequestEnrichProcurement,
+      WORKFLOW_ACTIONS.purchaseOrderCreate,
+      WORKFLOW_ACTIONS.purchaseOrderSubmit,
+      WORKFLOW_ACTIONS.purchaseReceiptRecord,
+      WORKFLOW_ACTIONS.purchaseReceiptInspectProcurement,
+      WORKFLOW_ACTIONS.purchaseAllocationReallocateProcurement,
+    ],
+    IT: [
+      WORKFLOW_ACTIONS.purchaseReceiptInspectIt,
+      WORKFLOW_ACTIONS.purchaseAllocationReallocateIt,
+    ],
+  };
+
+const DEPARTMENT_HEAD_PURCHASE_ACTIONS: Readonly<
+  Record<string, readonly WorkflowAction[]>
+> = {
+  PROCUREMENT: [
+    WORKFLOW_ACTIONS.purchaseRequestApproveProcurement,
+    WORKFLOW_ACTIONS.purchaseOrderApprove,
+    WORKFLOW_ACTIONS.purchaseOrderCancel,
+    WORKFLOW_ACTIONS.purchaseReceiptCloseShort,
+  ],
+  IT: [WORKFLOW_ACTIONS.purchaseRequestApproveIt],
+};
 
 /**
  * Tính danh sách quyền cuối cùng tại một nơi duy nhất để guard và /auth/me luôn
@@ -60,14 +116,24 @@ export const DEPARTMENT_HEAD_ACTIONS: readonly WorkflowAction[] = [
 export function getAllowedWorkflowActions(
   roleName: string,
   isDepartmentHead: boolean,
+  departmentName?: string,
 ): WorkflowAction[] {
   const roleActions = ROLE_ACTIONS[roleName] ?? [];
+  const departmentActions = departmentName
+    ? (DEPARTMENT_ACTIONS[departmentName] ?? [])
+    : [];
+  const departmentHeadPurchaseActions =
+    isDepartmentHead && departmentName
+      ? (DEPARTMENT_HEAD_PURCHASE_ACTIONS[departmentName] ?? [])
+      : [];
 
   return [
     ...new Set([
       ...EMPLOYEE_ACTIONS,
       ...roleActions,
+      ...departmentActions,
       ...(isDepartmentHead ? DEPARTMENT_HEAD_ACTIONS : []),
+      ...departmentHeadPurchaseActions,
     ]),
   ];
 }

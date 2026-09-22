@@ -51,6 +51,7 @@ describe('RepairRequestsService', () => {
         roleId: 'role-id',
         roleName: 'IT',
         departmentId: 'department-id',
+        departmentName: 'IT',
         isDepartmentHead: false,
       },
     );

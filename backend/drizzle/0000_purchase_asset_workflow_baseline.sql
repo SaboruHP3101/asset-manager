@@ -218,11 +218,12 @@ CREATE TABLE "employees" (
 CREATE TABLE "notifications" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"recipient_id" uuid NOT NULL,
-	"notification_type" varchar(100) NOT NULL,
+	"event_type" varchar(100) NOT NULL,
 	"title" varchar(255) NOT NULL,
-	"message" text NOT NULL,
-	"entity_type" varchar(100),
-	"entity_id" uuid,
+	"body" text NOT NULL,
+	"entity_type" varchar(100) NOT NULL,
+	"entity_id" uuid NOT NULL,
+	"metadata" jsonb,
 	"read_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -453,7 +454,12 @@ CREATE TABLE "request_approvals" (
 	"action_type" varchar(50) NOT NULL,
 	"approver_role" varchar(50) NOT NULL,
 	"approved_by" uuid NOT NULL,
+	"actor_department_id" uuid,
+	"actor_is_department_head" boolean,
 	"status" varchar(50) NOT NULL,
+	"previous_status" varchar(100),
+	"new_status" varchar(100),
+	"reason" text,
 	"notes" text,
 	"metadata" jsonb,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
@@ -639,6 +645,7 @@ ALTER TABLE "repair_requests" ADD CONSTRAINT "repair_requests_confirmed_by_emplo
 ALTER TABLE "repair_requests" ADD CONSTRAINT "repair_requests_created_by_employees_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."employees"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "repair_requests" ADD CONSTRAINT "repair_requests_updated_by_employees_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."employees"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "request_approvals" ADD CONSTRAINT "request_approvals_approved_by_employees_id_fk" FOREIGN KEY ("approved_by") REFERENCES "public"."employees"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "request_approvals" ADD CONSTRAINT "request_approvals_actor_department_id_departments_id_fk" FOREIGN KEY ("actor_department_id") REFERENCES "public"."departments"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "roles" ADD CONSTRAINT "roles_created_by_employees_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."employees"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "roles" ADD CONSTRAINT "roles_updated_by_employees_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."employees"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "supplier_addresses" ADD CONSTRAINT "supplier_addresses_supplier_id_suppliers_id_fk" FOREIGN KEY ("supplier_id") REFERENCES "public"."suppliers"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

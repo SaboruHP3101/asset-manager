@@ -7,6 +7,7 @@ import { EmployeesModule } from '../employees/employees.module.js';
 import { DrizzleModule } from '../drizzle/drizzle.module.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { WorkflowActionGuard } from './workflow-action.guard.js';
+import { PurchaseAuthorizationService } from './purchase-authorization.service.js';
 
 @Module({
   imports: [
@@ -24,8 +25,18 @@ import { WorkflowActionGuard } from './workflow-action.guard.js';
     EmployeesModule,
     DrizzleModule,
   ],
-  providers: [AuthService, JwtAuthGuard, WorkflowActionGuard],
+  providers: [
+    AuthService,
+    JwtAuthGuard,
+    WorkflowActionGuard,
+    PurchaseAuthorizationService,
+  ],
   controllers: [AuthController],
-  exports: [AuthService, JwtAuthGuard, WorkflowActionGuard],
+  exports: [
+    AuthService,
+    JwtAuthGuard,
+    WorkflowActionGuard,
+    PurchaseAuthorizationService,
+  ],
 })
 export class AuthModule {}

@@ -43,6 +43,7 @@ export class WorkflowActionGuard implements CanActivate {
     const allowedActions = getAllowedWorkflowActions(
       employee.roleName,
       employee.isDepartmentHead,
+      employee.departmentName,
     );
 
     if (!allowedActions.includes(action)) {

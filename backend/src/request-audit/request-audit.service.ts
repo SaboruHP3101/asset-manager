@@ -3,6 +3,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
+import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 
 export type RequestType = 'purchase' | 'transfer' | 'repair';
 export type ApprovalResult = 'approved' | 'rejected' | 'pending';
@@ -16,6 +17,26 @@ export interface AuditEntry {
   approverRole: string;
   status: ApprovalResult;
   notes?: string;
+  metadata?: Record<string, unknown>;
+  workflowRevision?: number;
+  actorDepartmentId?: string;
+  actorIsDepartmentHead?: boolean;
+  previousStatus?: string;
+  newStatus?: string;
+  reason?: string;
+}
+
+export interface PurchaseAuditEntry {
+  requestId: string;
+  revision: number;
+  actionType: string;
+  actor: AuthenticatedEmployee;
+  result: ApprovalResult;
+  previousStatus: string;
+  newStatus: string;
+  reason?: string;
+  entityType: 'request' | 'order' | 'receipt' | 'asset' | 'allocation';
+  entityId: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -38,6 +59,34 @@ export class RequestAuditService {
     await db.insert(schema.requestApprovals).values({
       ...entry,
       metadata: entry.metadata ?? null,
+    });
+  }
+
+  /** Purchase audit luôn chụp đủ actor, revision và ranh giới trạng thái. */
+  async logPurchase(
+    db: NodePgDatabase<typeof schema>,
+    entry: PurchaseAuditEntry,
+  ): Promise<void> {
+    await this.log(db, {
+      requestType: 'purchase',
+      requestId: entry.requestId,
+      workflowRevision: entry.revision,
+      actionType: entry.actionType,
+      approvedBy: entry.actor.id,
+      approverRole: entry.actor.roleName,
+      actorDepartmentId: entry.actor.departmentId,
+      actorIsDepartmentHead: entry.actor.isDepartmentHead,
+      status: entry.result,
+      previousStatus: entry.previousStatus,
+      newStatus: entry.newStatus,
+      reason: entry.reason,
+      notes: entry.reason,
+      metadata: {
+        ...entry.metadata,
+        entityType: entry.entityType,
+        entityId: entry.entityId,
+        revision: entry.revision,
+      },
     });
   }
 

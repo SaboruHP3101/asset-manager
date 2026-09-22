@@ -1995,8 +1995,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "notification_type": {
-          "name": "notification_type",
+        "event_type": {
+          "name": "event_type",
           "type": "varchar(100)",
           "primaryKey": false,
           "notNull": true
@@ -2007,8 +2007,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "message": {
-          "name": "message",
+        "body": {
+          "name": "body",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -2017,11 +2017,17 @@
           "name": "entity_type",
           "type": "varchar(100)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "entity_id": {
           "name": "entity_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -4697,11 +4703,41 @@
           "primaryKey": false,
           "notNull": true
         },
+        "actor_department_id": {
+          "name": "actor_department_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actor_is_department_head": {
+          "name": "actor_is_department_head",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true
+        },
+        "previous_status": {
+          "name": "previous_status",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "new_status": {
+          "name": "new_status",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "notes": {
           "name": "notes",
@@ -4777,6 +4813,19 @@
           "tableTo": "employees",
           "columnsFrom": [
             "approved_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "request_approvals_actor_department_id_departments_id_fk": {
+          "name": "request_approvals_actor_department_id_departments_id_fk",
+          "tableFrom": "request_approvals",
+          "tableTo": "departments",
+          "columnsFrom": [
+            "actor_department_id"
           ],
           "columnsTo": [
             "id"
