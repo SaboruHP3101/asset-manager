@@ -208,7 +208,10 @@ export class RepairRequestsService {
         createdAt: schema.repairRequests.createdAt,
       })
       .from(schema.repairRequests)
-      .innerJoin(schema.assets, eq(schema.repairRequests.assetId, schema.assets.id))
+      .innerJoin(
+        schema.assets,
+        eq(schema.repairRequests.assetId, schema.assets.id),
+      )
       .innerJoin(
         schema.assetCategories,
         eq(schema.assets.assetCategoryId, schema.assetCategories.id),
@@ -219,7 +222,10 @@ export class RepairRequestsService {
     if (requests.length === 0) return [];
 
     const attachments = await this.db
-      .select({ entityId: schema.attachments.entityId, url: schema.attachments.url })
+      .select({
+        entityId: schema.attachments.entityId,
+        url: schema.attachments.url,
+      })
       .from(schema.attachments)
       .where(
         and(

@@ -61,9 +61,7 @@ export class AssetsController {
 
   // Chỉ lấy danh mục cha đang có tài sản thuộc nhân viên hiện tại
   @Get('mine/categories')
-  async findMyParentCategories(
-    @Headers('authorization') authHeader: string,
-  ) {
+  async findMyParentCategories(@Headers('authorization') authHeader: string) {
     const employeeId = await this.authService.getEmployeeId(authHeader);
     return this.assetsService.findMyParentCategories(employeeId);
   }

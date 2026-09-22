@@ -29,10 +29,7 @@ export class DashboardService {
           .where(
             and(
               eq(schema.purchaseRequests.requesterId, employeeId),
-              notInArray(schema.purchaseRequests.status, [
-                'allocated',
-                'cancelled',
-              ]),
+              notInArray(schema.purchaseRequests.status, ['fully_ordered']),
             ),
           ),
         this.db

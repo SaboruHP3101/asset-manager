@@ -1,7 +1,9 @@
+import { sql } from 'drizzle-orm';
 import {
   AnyPgColumn,
   bigint,
   boolean,
+  check,
   date,
   integer,
   jsonb,
@@ -11,23 +13,125 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
 
-export const purchaseStatusEnum = pgEnum('purchase_status', [
+/**
+ * it - IT duyệt chuyên môn, kiểm tra và quản lý thiết bị điện tử.
+ * procurement - Thu mua kiểm tra và quản lý các hạng mục không phải thiết bị điện tử.
+ */
+export const assetManagementOwnerEnum = pgEnum('asset_management_owner', [
+  'it',
+  'procurement',
+]);
+
+/**
+ * individual_asset - Theo dõi riêng từng đơn vị, tạo asset code và QR sau khi tiếp nhận đạt.
+ * consumable - Chỉ theo dõi số lượng tiếp nhận, không tạo asset hoặc QR cho từng đơn vị.
+ */
+export const assetTrackingModeEnum = pgEnum('asset_tracking_mode', [
+  'individual_asset',
+  'consumable',
+]);
+
+/**
+ * draft - Bản nháp đang được người đề nghị chỉnh sửa.
+ * pending_department_head - Đã gửi và đang chờ Trưởng phòng của đơn vị đề nghị duyệt nhu cầu.
+ * pending_procurement_enrichment - Trưởng phòng đã duyệt, đang chờ Thu mua bổ sung báo giá và nhà cung cấp.
+ * pending_procurement_head - Đã đủ thông tin thương mại, đang chờ Trưởng Thu mua duyệt.
+ * pending_it_head - Có hạng mục điện tử đã qua Thu mua và đang chờ Trưởng IT duyệt.
+ * revision_required - Bị từ chối và đã trả về phòng ban để chỉnh sửa revision mới.
+ * approved - Tất cả cấp duyệt bắt buộc đã hoàn tất, có thể bắt đầu đặt mua.
+ * ordering - Đã tạo ít nhất một PO nhưng vẫn còn số lượng chưa đặt hết.
+ * fully_ordered - Toàn bộ số lượng đã được đưa vào các PO hợp lệ.
+ */
+export const purchaseRequestStatusEnum = pgEnum('purchase_request_status', [
   'draft',
-  'submitted',
-  'dept_approved',
-  'finance_approved',
-  'exec_approved',
-  'ordered',
-  'received',
-  'asset_created',
-  'allocated',
+  'pending_department_head',
+  'pending_procurement_enrichment',
+  'pending_procurement_head',
+  'pending_it_head',
+  'revision_required',
+  'approved',
+  'ordering',
+  'fully_ordered',
+]);
+
+/**
+ * draft - PO đang được Thu mua soạn và vẫn có thể chỉnh sửa.
+ * pending_procurement_head - PO đã gửi, đang chờ Trưởng Thu mua duyệt phát hành.
+ * issued - PO đã được duyệt và phát hành cho nhà cung cấp.
+ * partially_received - Đã tiếp nhận một phần số lượng đặt mua.
+ * fully_received - Đã tiếp nhận đủ toàn bộ số lượng đặt mua.
+ * closed_short - PO được đóng khi nhà cung cấp giao thiếu và không giao bù phần còn lại.
+ * cancelled - PO đã bị hủy và không còn hiệu lực nhận hàng.
+ */
+export const purchaseOrderStatusEnum = pgEnum('purchase_order_status', [
+  'draft',
+  'pending_procurement_head',
+  'issued',
+  'partially_received',
+  'fully_received',
+  'closed_short',
   'cancelled',
 ]);
 
+/**
+ * pending_inspection - Đợt giao đã được ghi nhận nhưng chưa bắt đầu kiểm tra.
+ * inspecting - Một phần hoặc toàn bộ hàng trong đợt giao đang được kiểm tra.
+ * inspected - Tất cả dòng hàng và đơn vị theo dõi riêng đã có kết quả kiểm tra.
+ */
+export const purchaseReceiptStatusEnum = pgEnum('purchase_receipt_status', [
+  'pending_inspection',
+  'inspecting',
+  'inspected',
+]);
+
+/**
+ * pending - Chưa có kết luận kiểm tra.
+ * accepted - Hàng đạt yêu cầu và được chấp nhận nhập.
+ * rejected - Hàng không đạt yêu cầu và bị từ chối nhận.
+ */
+export const inspectionResultEnum = pgEnum('inspection_result', [
+  'pending',
+  'accepted',
+  'rejected',
+]);
+
+/**
+ * pending_confirmations - Đang chờ đủ xác nhận của Trưởng phòng và người nhận.
+ * confirmed - Cả Trưởng phòng và người nhận đã xác nhận cấp phát.
+ * rejected - Ít nhất một bên đã từ chối lần cấp phát này.
+ * superseded - Lần cấp phát đã được thay thế bằng một attempt mới.
+ */
+export const assetAllocationStatusEnum = pgEnum('asset_allocation_status', [
+  'pending_confirmations',
+  'confirmed',
+  'rejected',
+  'superseded',
+]);
+
+/**
+ * pending - Người có trách nhiệm chưa đưa ra quyết định.
+ * confirmed - Người có trách nhiệm đồng ý với thông tin cấp phát.
+ * rejected - Người có trách nhiệm từ chối thông tin cấp phát.
+ */
+export const allocationDecisionEnum = pgEnum('allocation_decision', [
+  'pending',
+  'confirmed',
+  'rejected',
+]);
+
+/**
+ * requested - Yêu cầu điều chuyển mới được tạo và đang chờ xử lý.
+ * dept_approved - Trưởng phòng đã duyệt yêu cầu điều chuyển.
+ * verified - Bộ phận quản lý tài sản đã kiểm tra và xác nhận thông tin.
+ * handoff_pending - Đang chờ bên giao và bên nhận hoàn tất bàn giao thực tế.
+ * completed - Điều chuyển đã hoàn tất và thông tin quản lý tài sản đã được cập nhật.
+ * cancelled - Yêu cầu điều chuyển đã bị hủy.
+ */
 export const transferStatusEnum = pgEnum('transfer_status', [
   'requested',
   'dept_approved',
@@ -37,6 +141,17 @@ export const transferStatusEnum = pgEnum('transfer_status', [
   'cancelled',
 ]);
 
+/**
+ * reported - Sự cố mới được báo cáo và chưa đánh giá.
+ * assessed - Sự cố đã được đánh giá về phương án và chi phí sửa chữa.
+ * approval_pending - Phương án sửa chữa đang chờ người có thẩm quyền duyệt.
+ * in_progress - Tài sản đang được sửa chữa.
+ * completed - Công việc sửa chữa đã hoàn thành, đang chờ xác nhận kết quả.
+ * confirmed - Người có trách nhiệm đã xác nhận kết quả sửa chữa đạt yêu cầu.
+ * rejected - Kết quả sửa chữa bị từ chối và cần xử lý tiếp.
+ * closed - Hồ sơ sửa chữa đã kết thúc và không còn hành động đang chờ.
+ * cancelled - Yêu cầu sửa chữa đã bị hủy.
+ */
 export const repairStatusEnum = pgEnum('repair_status', [
   'reported',
   'assessed',
@@ -100,19 +215,32 @@ export const employees = pgTable('employees', {
   updatedBy: updatedBy(),
 });
 
-export const assetCategories = pgTable('asset_categories', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  code: varchar('code', { length: 100 }).notNull().unique(),
-  name: varchar('name', { length: 255 }).notNull(),
-  parentCategoryId: uuid('parent_category_id').references(
-    (): AnyPgColumn => assetCategories.id,
-  ),
-  description: text('description'),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-  createdBy: createdBy(),
-  updatedBy: updatedBy(),
-});
+export const assetCategories = pgTable(
+  'asset_categories',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: varchar('code', { length: 100 }).notNull().unique(),
+    name: varchar('name', { length: 255 }).notNull(),
+    parentCategoryId: uuid('parent_category_id').references(
+      (): AnyPgColumn => assetCategories.id,
+    ),
+    description: text('description'),
+    managementOwner: assetManagementOwnerEnum('management_owner')
+      .notNull()
+      .default('procurement'),
+    trackingMode: assetTrackingModeEnum('tracking_mode')
+      .notNull()
+      .default('individual_asset'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    createdBy: createdBy(),
+    updatedBy: updatedBy(),
+  },
+  (table) => [
+    index('idx_asset_category_management_owner').on(table.managementOwner),
+    index('idx_asset_category_tracking_mode').on(table.trackingMode),
+  ],
+);
 
 export const suppliers = pgTable('suppliers', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -155,52 +283,139 @@ export const purchaseRequests = pgTable(
   'purchase_requests',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    requestCode: varchar('request_code', { length: 100 }).notNull().unique(),
+    status: purchaseRequestStatusEnum('status').notNull().default('draft'),
+    currentRevision: integer('current_revision').notNull().default(1),
     requesterId: uuid('requester_id')
       .notNull()
       .references(() => employees.id),
     departmentId: uuid('department_id')
       .notNull()
       .references(() => departments.id),
-    assetCategoryId: uuid('asset_category_id')
-      .notNull()
-      .references(() => assetCategories.id),
-    quantity: integer('quantity').notNull(),
-    requestDate: date('request_date', { mode: 'string' }).notNull(),
-    status: purchaseStatusEnum('status').notNull().default('draft'),
-    reason: text('reason').notNull(),
-    deptHeadId: uuid('dept_head_id').references(() => employees.id),
-    deptHeadApprovedAt: timestamp('dept_head_approved_at', {
-      withTimezone: true,
-    }),
-    financeReviewedBy: uuid('finance_reviewed_by').references(
-      () => employees.id,
-    ),
-    financeReviewedAt: timestamp('finance_reviewed_at', {
-      withTimezone: true,
-    }),
-    execApprovedBy: uuid('exec_approved_by').references(() => employees.id),
-    execApprovedAt: timestamp('exec_approved_at', { withTimezone: true }),
-    procurementBy: uuid('procurement_by').references(() => employees.id),
-    procuredAt: timestamp('procured_at', { withTimezone: true }),
-    supplierId: uuid('supplier_id').references(() => suppliers.id),
-    invoiceNumber: varchar('invoice_number', { length: 255 }),
-    receivedAt: timestamp('received_at', { withTimezone: true }),
-    receivedBy: uuid('received_by').references(() => employees.id),
-    receivedAssets: uuid('received_assets').array(),
-    allocatedTo: uuid('allocated_to').references(() => employees.id),
-    allocatedAt: timestamp('allocated_at', { withTimezone: true }),
-    allocationConfirmedBy: uuid('allocation_confirmed_by').references(
-      () => employees.id,
-    ),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     createdBy: createdBy(),
     updatedBy: updatedBy(),
   },
   (table) => [
-    index('idx_purchase_status').on(table.status),
+    index('idx_purchase_request_status').on(table.status),
     index('idx_purchase_department').on(table.departmentId),
     index('idx_purchase_requester').on(table.requesterId),
+  ],
+);
+
+export const purchaseRequestRevisions = pgTable(
+  'purchase_request_revisions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    purchaseRequestId: uuid('purchase_request_id')
+      .notNull()
+      .references(() => purchaseRequests.id),
+    revisionNumber: integer('revision_number').notNull(),
+    neededByDate: date('needed_by_date', { mode: 'string' }).notNull(),
+    purpose: text('purpose').notNull(),
+    note: text('note'),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    submittedBy: uuid('submitted_by').references(() => employees.id),
+    returnedAt: timestamp('returned_at', { withTimezone: true }),
+    returnedBy: uuid('returned_by').references(() => employees.id),
+    returnReason: text('return_reason'),
+    createdAt: createdAt(),
+    createdBy: createdBy(),
+  },
+  (table) => [
+    uniqueIndex('uq_purchase_request_revision').on(
+      table.purchaseRequestId,
+      table.revisionNumber,
+    ),
+    index('idx_purchase_request_revision_request').on(table.purchaseRequestId),
+    check(
+      'chk_purchase_request_revision_positive',
+      sql`${table.revisionNumber} > 0`,
+    ),
+  ],
+);
+
+export const purchaseRequestItems = pgTable(
+  'purchase_request_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    requestRevisionId: uuid('request_revision_id')
+      .notNull()
+      .references(() => purchaseRequestRevisions.id),
+    assetCategoryId: uuid('asset_category_id')
+      .notNull()
+      .references(() => assetCategories.id),
+    itemName: varchar('item_name', { length: 255 }).notNull(),
+    specifications: text('specifications').notNull(),
+    purpose: text('purpose'),
+    quantity: integer('quantity').notNull(),
+    unit: varchar('unit', { length: 50 }).notNull(),
+    managementOwnerSnapshot: assetManagementOwnerEnum(
+      'management_owner_snapshot',
+    ).notNull(),
+    trackingModeSnapshot: assetTrackingModeEnum(
+      'tracking_mode_snapshot',
+    ).notNull(),
+    sortOrder: integer('sort_order').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    createdBy: createdBy(),
+    updatedBy: updatedBy(),
+  },
+  (table) => [
+    uniqueIndex('uq_purchase_request_item_sort_order').on(
+      table.requestRevisionId,
+      table.sortOrder,
+    ),
+    index('idx_purchase_request_item_revision').on(table.requestRevisionId),
+    check('chk_purchase_request_item_quantity', sql`${table.quantity} > 0`),
+    check('chk_purchase_request_item_sort_order', sql`${table.sortOrder} > 0`),
+  ],
+);
+
+export const purchaseRequestQuotes = pgTable(
+  'purchase_request_quotes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    requestItemId: uuid('request_item_id')
+      .notNull()
+      .references(() => purchaseRequestItems.id),
+    supplierId: uuid('supplier_id')
+      .notNull()
+      .references(() => suppliers.id),
+    attachmentId: uuid('attachment_id')
+      .notNull()
+      .references((): AnyPgColumn => attachments.id),
+    unitPriceExclVat: numeric('unit_price_excl_vat', {
+      precision: 18,
+      scale: 0,
+    }).notNull(),
+    vatRate: numeric('vat_rate', { precision: 5, scale: 2 }).notNull(),
+    isSelected: boolean('is_selected').notNull().default(false),
+    note: text('note'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    createdBy: createdBy(),
+    updatedBy: updatedBy(),
+  },
+  (table) => [
+    uniqueIndex('uq_purchase_request_quote_supplier').on(
+      table.requestItemId,
+      table.supplierId,
+    ),
+    uniqueIndex('uq_purchase_request_quote_selected')
+      .on(table.requestItemId)
+      .where(sql`${table.isSelected} = true`),
+    index('idx_purchase_request_quote_item').on(table.requestItemId),
+    check(
+      'chk_purchase_request_quote_price',
+      sql`${table.unitPriceExclVat} >= 0`,
+    ),
+    check(
+      'chk_purchase_request_quote_vat',
+      sql`${table.vatRate} >= 0 AND ${table.vatRate} <= 100`,
+    ),
   ],
 );
 
@@ -223,58 +438,223 @@ export const purchaseContracts = pgTable('purchase_contracts', {
   updatedBy: updatedBy(),
 });
 
-export const purchaseOrders = pgTable('purchase_orders', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  purchaseOrderCode: varchar('purchase_order_code', { length: 100 })
-    .notNull()
-    .unique(),
-  contractId: uuid('contract_id').references(() => purchaseContracts.id),
-  supplierId: uuid('supplier_id')
-    .notNull()
-    .references(() => suppliers.id),
-  createdByEmployeeId: uuid('created_by_employee_id')
-    .notNull()
-    .references(() => employees.id),
-  orderDate: date('order_date', { mode: 'string' }).notNull(),
-  expectedDeliveryDate: date('expected_delivery_date', {
-    mode: 'string',
-  }).notNull(),
-  totalValue: numeric('total_value').notNull(),
-  status: varchar('status', { length: 100 }).notNull(),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-  createdBy: createdBy(),
-  updatedBy: updatedBy(),
-});
+export const purchaseOrders = pgTable(
+  'purchase_orders',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    purchaseOrderCode: varchar('purchase_order_code', { length: 100 })
+      .notNull()
+      .unique(),
+    purchaseRequestId: uuid('purchase_request_id')
+      .notNull()
+      .references(() => purchaseRequests.id),
+    requestRevisionId: uuid('request_revision_id')
+      .notNull()
+      .references(() => purchaseRequestRevisions.id),
+    contractId: uuid('contract_id').references(() => purchaseContracts.id),
+    supplierId: uuid('supplier_id')
+      .notNull()
+      .references(() => suppliers.id),
+    createdByEmployeeId: uuid('created_by_employee_id')
+      .notNull()
+      .references(() => employees.id),
+    orderDate: date('order_date', { mode: 'string' }).notNull(),
+    expectedDeliveryDate: date('expected_delivery_date', {
+      mode: 'string',
+    }).notNull(),
+    status: purchaseOrderStatusEnum('status').notNull().default('draft'),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    submittedBy: uuid('submitted_by').references(() => employees.id),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    approvedBy: uuid('approved_by').references(() => employees.id),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    cancelledBy: uuid('cancelled_by').references(() => employees.id),
+    cancellationReason: text('cancellation_reason'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    createdBy: createdBy(),
+    updatedBy: updatedBy(),
+  },
+  (table) => [
+    index('idx_purchase_order_request').on(table.purchaseRequestId),
+    index('idx_purchase_order_revision').on(table.requestRevisionId),
+    index('idx_purchase_order_status').on(table.status),
+  ],
+);
 
-export const purchaseOrderRequests = pgTable('purchase_order_requests', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  purchaseOrderId: uuid('purchase_order_id')
-    .notNull()
-    .references(() => purchaseOrders.id),
-  purchaseRequestId: uuid('purchase_request_id')
-    .notNull()
-    .references(() => purchaseRequests.id),
-  createdAt: createdAt(),
-});
+export const purchaseOrderItems = pgTable(
+  'purchase_order_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    purchaseOrderId: uuid('purchase_order_id')
+      .notNull()
+      .references(() => purchaseOrders.id),
+    purchaseRequestItemId: uuid('purchase_request_item_id')
+      .notNull()
+      .references(() => purchaseRequestItems.id),
+    selectedQuoteId: uuid('selected_quote_id')
+      .notNull()
+      .references(() => purchaseRequestQuotes.id),
+    itemNameSnapshot: varchar('item_name_snapshot', { length: 255 }).notNull(),
+    quantity: integer('quantity').notNull(),
+    unitPriceExclVat: numeric('unit_price_excl_vat', {
+      precision: 18,
+      scale: 0,
+    }).notNull(),
+    vatRate: numeric('vat_rate', { precision: 5, scale: 2 }).notNull(),
+    subtotalExclVat: numeric('subtotal_excl_vat', {
+      precision: 18,
+      scale: 0,
+    }).notNull(),
+    vatAmount: numeric('vat_amount', { precision: 18, scale: 0 }).notNull(),
+    totalInclVat: numeric('total_incl_vat', {
+      precision: 18,
+      scale: 0,
+    }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    createdBy: createdBy(),
+    updatedBy: updatedBy(),
+  },
+  (table) => [
+    index('idx_purchase_order_item_order').on(table.purchaseOrderId),
+    index('idx_purchase_order_item_request_item').on(
+      table.purchaseRequestItemId,
+    ),
+    check('chk_purchase_order_item_quantity', sql`${table.quantity} > 0`),
+  ],
+);
 
-export const purchaseOrderItems = pgTable('purchase_order_items', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  purchaseOrderId: uuid('purchase_order_id')
-    .notNull()
-    .references(() => purchaseOrders.id),
-  assetCategoryId: uuid('asset_category_id')
-    .notNull()
-    .references(() => assetCategories.id),
-  itemName: varchar('item_name', { length: 255 }).notNull(),
-  quantity: integer('quantity').notNull(),
-  unitPrice: numeric('unit_price').notNull(),
-  totalAmount: numeric('total_amount').notNull(),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-  createdBy: createdBy(),
-  updatedBy: updatedBy(),
-});
+export const purchaseReceipts = pgTable(
+  'purchase_receipts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    receiptCode: varchar('receipt_code', { length: 100 }).notNull().unique(),
+    purchaseOrderId: uuid('purchase_order_id')
+      .notNull()
+      .references(() => purchaseOrders.id),
+    status: purchaseReceiptStatusEnum('status')
+      .notNull()
+      .default('pending_inspection'),
+    deliveryDate: date('delivery_date', { mode: 'string' }).notNull(),
+    deliveryNoteNumber: varchar('delivery_note_number', {
+      length: 100,
+    }).notNull(),
+    deliveryNoteAttachmentId: uuid('delivery_note_attachment_id')
+      .notNull()
+      .references((): AnyPgColumn => attachments.id),
+    invoiceAttachmentId: uuid('invoice_attachment_id').references(
+      (): AnyPgColumn => attachments.id,
+    ),
+    warrantyAttachmentId: uuid('warranty_attachment_id').references(
+      (): AnyPgColumn => attachments.id,
+    ),
+    recordedBy: uuid('recorded_by')
+      .notNull()
+      .references(() => employees.id),
+    inspectedAt: timestamp('inspected_at', { withTimezone: true }),
+    inspectedBy: uuid('inspected_by').references(() => employees.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    createdBy: createdBy(),
+    updatedBy: updatedBy(),
+  },
+  (table) => [
+    index('idx_purchase_receipt_order').on(table.purchaseOrderId),
+    index('idx_purchase_receipt_status').on(table.status),
+  ],
+);
+
+export const purchaseReceiptItems = pgTable(
+  'purchase_receipt_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    purchaseReceiptId: uuid('purchase_receipt_id')
+      .notNull()
+      .references(() => purchaseReceipts.id),
+    purchaseOrderItemId: uuid('purchase_order_item_id')
+      .notNull()
+      .references(() => purchaseOrderItems.id),
+    deliveredQuantity: integer('delivered_quantity').notNull(),
+    acceptedQuantity: integer('accepted_quantity').notNull().default(0),
+    rejectedQuantity: integer('rejected_quantity').notNull().default(0),
+    managementOwnerSnapshot: assetManagementOwnerEnum(
+      'management_owner_snapshot',
+    ).notNull(),
+    trackingModeSnapshot: assetTrackingModeEnum(
+      'tracking_mode_snapshot',
+    ).notNull(),
+    inspectionResult: inspectionResultEnum('inspection_result')
+      .notNull()
+      .default('pending'),
+    inspectedBy: uuid('inspected_by').references(() => employees.id),
+    inspectedAt: timestamp('inspected_at', { withTimezone: true }),
+    rejectionReason: text('rejection_reason'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    createdBy: createdBy(),
+    updatedBy: updatedBy(),
+  },
+  (table) => [
+    uniqueIndex('uq_purchase_receipt_item_order_item').on(
+      table.purchaseReceiptId,
+      table.purchaseOrderItemId,
+    ),
+    index('idx_purchase_receipt_item_receipt').on(table.purchaseReceiptId),
+    check(
+      'chk_purchase_receipt_item_delivered_quantity',
+      sql`${table.deliveredQuantity} > 0`,
+    ),
+    check(
+      'chk_purchase_receipt_item_accepted_quantity',
+      sql`${table.acceptedQuantity} >= 0`,
+    ),
+    check(
+      'chk_purchase_receipt_item_rejected_quantity',
+      sql`${table.rejectedQuantity} >= 0`,
+    ),
+    check(
+      'chk_purchase_receipt_item_inspected_quantity',
+      sql`${table.acceptedQuantity} + ${table.rejectedQuantity} <= ${table.deliveredQuantity}`,
+    ),
+  ],
+);
+
+export const purchaseReceiptUnits = pgTable(
+  'purchase_receipt_units',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    purchaseReceiptItemId: uuid('purchase_receipt_item_id')
+      .notNull()
+      .references(() => purchaseReceiptItems.id),
+    sequenceNumber: integer('sequence_number').notNull(),
+    serialNumber: varchar('serial_number', { length: 255 }),
+    inspectionResult: inspectionResultEnum('inspection_result')
+      .notNull()
+      .default('pending'),
+    inspectedBy: uuid('inspected_by').references(() => employees.id),
+    inspectedAt: timestamp('inspected_at', { withTimezone: true }),
+    rejectionReason: text('rejection_reason'),
+    evidenceAttachmentId: uuid('evidence_attachment_id').references(
+      (): AnyPgColumn => attachments.id,
+    ),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    createdBy: createdBy(),
+    updatedBy: updatedBy(),
+  },
+  (table) => [
+    uniqueIndex('uq_purchase_receipt_unit_sequence').on(
+      table.purchaseReceiptItemId,
+      table.sequenceNumber,
+    ),
+    index('idx_purchase_receipt_unit_item').on(table.purchaseReceiptItemId),
+    check(
+      'chk_purchase_receipt_unit_sequence',
+      sql`${table.sequenceNumber} > 0`,
+    ),
+  ],
+);
 
 export const assets = pgTable('assets', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -293,6 +673,9 @@ export const assets = pgTable('assets', {
   purchaseOrderItemId: uuid('purchase_order_item_id').references(
     () => purchaseOrderItems.id,
   ),
+  purchaseReceiptUnitId: uuid('purchase_receipt_unit_id')
+    .unique()
+    .references(() => purchaseReceiptUnits.id),
   name: varchar('name', { length: 255 }),
   currentLocation: varchar('current_location', { length: 500 }),
   currentValue: numeric('current_value'),
@@ -305,6 +688,67 @@ export const assets = pgTable('assets', {
   createdBy: createdBy(),
   updatedBy: updatedBy(),
 });
+
+export const assetAllocations = pgTable(
+  'asset_allocations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    assetId: uuid('asset_id')
+      .notNull()
+      .references(() => assets.id),
+    attemptNumber: integer('attempt_number').notNull(),
+    initiatedBy: uuid('initiated_by')
+      .notNull()
+      .references(() => employees.id),
+    departmentId: uuid('department_id')
+      .notNull()
+      .references(() => departments.id),
+    recipientId: uuid('recipient_id')
+      .notNull()
+      .references(() => employees.id),
+    location: varchar('location', { length: 500 }).notNull(),
+    managementOwnerSnapshot: assetManagementOwnerEnum(
+      'management_owner_snapshot',
+    ).notNull(),
+    status: assetAllocationStatusEnum('status')
+      .notNull()
+      .default('pending_confirmations'),
+    departmentHeadDecision: allocationDecisionEnum('department_head_decision')
+      .notNull()
+      .default('pending'),
+    departmentHeadDecidedBy: uuid('department_head_decided_by').references(
+      () => employees.id,
+    ),
+    departmentHeadDecidedAt: timestamp('department_head_decided_at', {
+      withTimezone: true,
+    }),
+    departmentHeadNote: text('department_head_note'),
+    recipientDecision: allocationDecisionEnum('recipient_decision')
+      .notNull()
+      .default('pending'),
+    recipientDecidedAt: timestamp('recipient_decided_at', {
+      withTimezone: true,
+    }),
+    recipientNote: text('recipient_note'),
+    supersededAt: timestamp('superseded_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    createdBy: createdBy(),
+    updatedBy: updatedBy(),
+  },
+  (table) => [
+    uniqueIndex('uq_asset_allocation_attempt').on(
+      table.assetId,
+      table.attemptNumber,
+    ),
+    uniqueIndex('uq_asset_allocation_pending')
+      .on(table.assetId)
+      .where(sql`${table.status} = 'pending_confirmations'`),
+    index('idx_asset_allocation_recipient').on(table.recipientId),
+    index('idx_asset_allocation_department').on(table.departmentId),
+    check('chk_asset_allocation_attempt', sql`${table.attemptNumber} > 0`),
+  ],
+);
 
 export const assetHandoverHistory = pgTable('asset_handover_history', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -436,6 +880,7 @@ export const requestApprovals = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     requestType: varchar('request_type', { length: 50 }).notNull(),
     requestId: uuid('request_id').notNull(),
+    workflowRevision: integer('workflow_revision'),
     actionType: varchar('action_type', { length: 50 }).notNull(),
     approverRole: varchar('approver_role', { length: 50 }).notNull(),
     approvedBy: uuid('approved_by')
@@ -534,6 +979,31 @@ export const attachments = pgTable('attachments', {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    recipientId: uuid('recipient_id')
+      .notNull()
+      .references(() => employees.id),
+    notificationType: varchar('notification_type', { length: 100 }).notNull(),
+    title: varchar('title', { length: 255 }).notNull(),
+    message: text('message').notNull(),
+    entityType: varchar('entity_type', { length: 100 }),
+    entityId: uuid('entity_id'),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index('idx_notification_recipient').on(table.recipientId),
+    index('idx_notification_recipient_read').on(
+      table.recipientId,
+      table.readAt,
+    ),
+    index('idx_notification_entity').on(table.entityType, table.entityId),
+  ],
+);
 
 export const approvalHistory = pgTable('approval_history', {
   id: uuid('id').primaryKey().defaultRandom(),

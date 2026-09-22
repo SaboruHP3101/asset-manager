@@ -1,5 +1,5 @@
 {
-  "id": "128625b6-a161-437e-bb1b-5e7219943bc9",
+  "id": "80adeec8-89d4-4c50-9f3d-96ff51b20d79",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -100,6 +100,320 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.asset_allocations": {
+      "name": "asset_allocations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "asset_id": {
+          "name": "asset_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attempt_number": {
+          "name": "attempt_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "initiated_by": {
+          "name": "initiated_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "department_id": {
+          "name": "department_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recipient_id": {
+          "name": "recipient_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "location": {
+          "name": "location",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "management_owner_snapshot": {
+          "name": "management_owner_snapshot",
+          "type": "asset_management_owner",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "asset_allocation_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending_confirmations'"
+        },
+        "department_head_decision": {
+          "name": "department_head_decision",
+          "type": "allocation_decision",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "department_head_decided_by": {
+          "name": "department_head_decided_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "department_head_decided_at": {
+          "name": "department_head_decided_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "department_head_note": {
+          "name": "department_head_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recipient_decision": {
+          "name": "recipient_decision",
+          "type": "allocation_decision",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "recipient_decided_at": {
+          "name": "recipient_decided_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recipient_note": {
+          "name": "recipient_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "superseded_at": {
+          "name": "superseded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "uq_asset_allocation_attempt": {
+          "name": "uq_asset_allocation_attempt",
+          "columns": [
+            {
+              "expression": "asset_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "attempt_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_asset_allocation_pending": {
+          "name": "uq_asset_allocation_pending",
+          "columns": [
+            {
+              "expression": "asset_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"asset_allocations\".\"status\" = 'pending_confirmations'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_asset_allocation_recipient": {
+          "name": "idx_asset_allocation_recipient",
+          "columns": [
+            {
+              "expression": "recipient_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_asset_allocation_department": {
+          "name": "idx_asset_allocation_department",
+          "columns": [
+            {
+              "expression": "department_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "asset_allocations_asset_id_assets_id_fk": {
+          "name": "asset_allocations_asset_id_assets_id_fk",
+          "tableFrom": "asset_allocations",
+          "tableTo": "assets",
+          "columnsFrom": [
+            "asset_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "asset_allocations_initiated_by_employees_id_fk": {
+          "name": "asset_allocations_initiated_by_employees_id_fk",
+          "tableFrom": "asset_allocations",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "initiated_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "asset_allocations_department_id_departments_id_fk": {
+          "name": "asset_allocations_department_id_departments_id_fk",
+          "tableFrom": "asset_allocations",
+          "tableTo": "departments",
+          "columnsFrom": [
+            "department_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "asset_allocations_recipient_id_employees_id_fk": {
+          "name": "asset_allocations_recipient_id_employees_id_fk",
+          "tableFrom": "asset_allocations",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "recipient_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "asset_allocations_department_head_decided_by_employees_id_fk": {
+          "name": "asset_allocations_department_head_decided_by_employees_id_fk",
+          "tableFrom": "asset_allocations",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "department_head_decided_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "asset_allocations_created_by_employees_id_fk": {
+          "name": "asset_allocations_created_by_employees_id_fk",
+          "tableFrom": "asset_allocations",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "asset_allocations_updated_by_employees_id_fk": {
+          "name": "asset_allocations_updated_by_employees_id_fk",
+          "tableFrom": "asset_allocations",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "updated_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "chk_asset_allocation_attempt": {
+          "name": "chk_asset_allocation_attempt",
+          "value": "\"asset_allocations\".\"attempt_number\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.asset_categories": {
       "name": "asset_categories",
       "schema": "",
@@ -135,6 +449,22 @@
           "primaryKey": false,
           "notNull": false
         },
+        "management_owner": {
+          "name": "management_owner",
+          "type": "asset_management_owner",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'procurement'"
+        },
+        "tracking_mode": {
+          "name": "tracking_mode",
+          "type": "asset_tracking_mode",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'individual_asset'"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -162,7 +492,38 @@
           "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_asset_category_management_owner": {
+          "name": "idx_asset_category_management_owner",
+          "columns": [
+            {
+              "expression": "management_owner",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_asset_category_tracking_mode": {
+          "name": "idx_asset_category_tracking_mode",
+          "columns": [
+            {
+              "expression": "tracking_mode",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "asset_categories_parent_category_id_asset_categories_id_fk": {
           "name": "asset_categories_parent_category_id_asset_categories_id_fk",
@@ -971,6 +1332,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "purchase_receipt_unit_id": {
+          "name": "purchase_receipt_unit_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "name": {
           "name": "name",
           "type": "varchar(255)",
@@ -1107,6 +1474,19 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "assets_purchase_receipt_unit_id_purchase_receipt_units_id_fk": {
+          "name": "assets_purchase_receipt_unit_id_purchase_receipt_units_id_fk",
+          "tableFrom": "assets",
+          "tableTo": "purchase_receipt_units",
+          "columnsFrom": [
+            "purchase_receipt_unit_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "assets_created_by_employees_id_fk": {
           "name": "assets_created_by_employees_id_fk",
           "tableFrom": "assets",
@@ -1148,6 +1528,13 @@
           "nullsNotDistinct": false,
           "columns": [
             "qr_code"
+          ]
+        },
+        "assets_purchase_receipt_unit_id_unique": {
+          "name": "assets_purchase_receipt_unit_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "purchase_receipt_unit_id"
           ]
         }
       },
@@ -1591,6 +1978,147 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.notifications": {
+      "name": "notifications",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "recipient_id": {
+          "name": "recipient_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notification_type": {
+          "name": "notification_type",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_notification_recipient": {
+          "name": "idx_notification_recipient",
+          "columns": [
+            {
+              "expression": "recipient_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_notification_recipient_read": {
+          "name": "idx_notification_recipient_read",
+          "columns": [
+            {
+              "expression": "recipient_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "read_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_notification_entity": {
+          "name": "idx_notification_entity",
+          "columns": [
+            {
+              "expression": "entity_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "notifications_recipient_id_employees_id_fk": {
+          "name": "notifications_recipient_id_employees_id_fk",
+          "tableFrom": "notifications",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "recipient_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.purchase_contracts": {
       "name": "purchase_contracts",
       "schema": "",
@@ -1744,14 +2272,20 @@
           "primaryKey": false,
           "notNull": true
         },
-        "asset_category_id": {
-          "name": "asset_category_id",
+        "purchase_request_item_id": {
+          "name": "purchase_request_item_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "item_name": {
-          "name": "item_name",
+        "selected_quote_id": {
+          "name": "selected_quote_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "item_name_snapshot": {
+          "name": "item_name_snapshot",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
@@ -1762,15 +2296,33 @@
           "primaryKey": false,
           "notNull": true
         },
-        "unit_price": {
-          "name": "unit_price",
-          "type": "numeric",
+        "unit_price_excl_vat": {
+          "name": "unit_price_excl_vat",
+          "type": "numeric(18, 0)",
           "primaryKey": false,
           "notNull": true
         },
-        "total_amount": {
-          "name": "total_amount",
-          "type": "numeric",
+        "vat_rate": {
+          "name": "vat_rate",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subtotal_excl_vat": {
+          "name": "subtotal_excl_vat",
+          "type": "numeric(18, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vat_amount": {
+          "name": "vat_amount",
+          "type": "numeric(18, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_incl_vat": {
+          "name": "total_incl_vat",
+          "type": "numeric(18, 0)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1801,7 +2353,38 @@
           "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_purchase_order_item_order": {
+          "name": "idx_purchase_order_item_order",
+          "columns": [
+            {
+              "expression": "purchase_order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_purchase_order_item_request_item": {
+          "name": "idx_purchase_order_item_request_item",
+          "columns": [
+            {
+              "expression": "purchase_request_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "purchase_order_items_purchase_order_id_purchase_orders_id_fk": {
           "name": "purchase_order_items_purchase_order_id_purchase_orders_id_fk",
@@ -1816,12 +2399,25 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "purchase_order_items_asset_category_id_asset_categories_id_fk": {
-          "name": "purchase_order_items_asset_category_id_asset_categories_id_fk",
+        "purchase_order_items_purchase_request_item_id_purchase_request_items_id_fk": {
+          "name": "purchase_order_items_purchase_request_item_id_purchase_request_items_id_fk",
           "tableFrom": "purchase_order_items",
-          "tableTo": "asset_categories",
+          "tableTo": "purchase_request_items",
           "columnsFrom": [
-            "asset_category_id"
+            "purchase_request_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_order_items_selected_quote_id_purchase_request_quotes_id_fk": {
+          "name": "purchase_order_items_selected_quote_id_purchase_request_quotes_id_fk",
+          "tableFrom": "purchase_order_items",
+          "tableTo": "purchase_request_quotes",
+          "columnsFrom": [
+            "selected_quote_id"
           ],
           "columnsTo": [
             "id"
@@ -1859,73 +2455,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.purchase_order_requests": {
-      "name": "purchase_order_requests",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "purchase_order_id": {
-          "name": "purchase_order_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "purchase_request_id": {
-          "name": "purchase_request_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+      "checkConstraints": {
+        "chk_purchase_order_item_quantity": {
+          "name": "chk_purchase_order_item_quantity",
+          "value": "\"purchase_order_items\".\"quantity\" > 0"
         }
       },
-      "indexes": {},
-      "foreignKeys": {
-        "purchase_order_requests_purchase_order_id_purchase_orders_id_fk": {
-          "name": "purchase_order_requests_purchase_order_id_purchase_orders_id_fk",
-          "tableFrom": "purchase_order_requests",
-          "tableTo": "purchase_orders",
-          "columnsFrom": [
-            "purchase_order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "purchase_order_requests_purchase_request_id_purchase_requests_id_fk": {
-          "name": "purchase_order_requests_purchase_request_id_purchase_requests_id_fk",
-          "tableFrom": "purchase_order_requests",
-          "tableTo": "purchase_requests",
-          "columnsFrom": [
-            "purchase_request_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.purchase_orders": {
@@ -1942,6 +2477,18 @@
         "purchase_order_code": {
           "name": "purchase_order_code",
           "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purchase_request_id": {
+          "name": "purchase_request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "request_revision_id": {
+          "name": "request_revision_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -1975,17 +2522,55 @@
           "primaryKey": false,
           "notNull": true
         },
-        "total_value": {
-          "name": "total_value",
-          "type": "numeric",
-          "primaryKey": false,
-          "notNull": true
-        },
         "status": {
           "name": "status",
-          "type": "varchar(100)",
+          "type": "purchase_order_status",
+          "typeSchema": "public",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "submitted_at": {
+          "name": "submitted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "submitted_by": {
+          "name": "submitted_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approved_by": {
+          "name": "approved_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_by": {
+          "name": "cancelled_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancellation_reason": {
+          "name": "cancellation_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -2014,8 +2599,80 @@
           "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_purchase_order_request": {
+          "name": "idx_purchase_order_request",
+          "columns": [
+            {
+              "expression": "purchase_request_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_purchase_order_revision": {
+          "name": "idx_purchase_order_revision",
+          "columns": [
+            {
+              "expression": "request_revision_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_purchase_order_status": {
+          "name": "idx_purchase_order_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
+        "purchase_orders_purchase_request_id_purchase_requests_id_fk": {
+          "name": "purchase_orders_purchase_request_id_purchase_requests_id_fk",
+          "tableFrom": "purchase_orders",
+          "tableTo": "purchase_requests",
+          "columnsFrom": [
+            "purchase_request_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_orders_request_revision_id_purchase_request_revisions_id_fk": {
+          "name": "purchase_orders_request_revision_id_purchase_request_revisions_id_fk",
+          "tableFrom": "purchase_orders",
+          "tableTo": "purchase_request_revisions",
+          "columnsFrom": [
+            "request_revision_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "purchase_orders_contract_id_purchase_contracts_id_fk": {
           "name": "purchase_orders_contract_id_purchase_contracts_id_fk",
           "tableFrom": "purchase_orders",
@@ -2048,6 +2705,45 @@
           "tableTo": "employees",
           "columnsFrom": [
             "created_by_employee_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_orders_submitted_by_employees_id_fk": {
+          "name": "purchase_orders_submitted_by_employees_id_fk",
+          "tableFrom": "purchase_orders",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "submitted_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_orders_approved_by_employees_id_fk": {
+          "name": "purchase_orders_approved_by_employees_id_fk",
+          "tableFrom": "purchase_orders",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "approved_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_orders_cancelled_by_employees_id_fk": {
+          "name": "purchase_orders_cancelled_by_employees_id_fk",
+          "tableFrom": "purchase_orders",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "cancelled_by"
           ],
           "columnsTo": [
             "id"
@@ -2096,8 +2792,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.purchase_requests": {
-      "name": "purchase_requests",
+    "public.purchase_receipt_items": {
+      "name": "purchase_receipt_items",
       "schema": "",
       "columns": {
         "id": {
@@ -2107,142 +2803,290 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "requester_id": {
-          "name": "requester_id",
+        "purchase_receipt_id": {
+          "name": "purchase_receipt_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "department_id": {
-          "name": "department_id",
+        "purchase_order_item_id": {
+          "name": "purchase_order_item_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "asset_category_id": {
-          "name": "asset_category_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "quantity": {
-          "name": "quantity",
+        "delivered_quantity": {
+          "name": "delivered_quantity",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
-        "request_date": {
-          "name": "request_date",
-          "type": "date",
+        "accepted_quantity": {
+          "name": "accepted_quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "rejected_quantity": {
+          "name": "rejected_quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "management_owner_snapshot": {
+          "name": "management_owner_snapshot",
+          "type": "asset_management_owner",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
-        "status": {
-          "name": "status",
-          "type": "purchase_status",
+        "tracking_mode_snapshot": {
+          "name": "tracking_mode_snapshot",
+          "type": "asset_tracking_mode",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "inspection_result": {
+          "name": "inspection_result",
+          "type": "inspection_result",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'draft'"
+          "default": "'pending'"
         },
-        "reason": {
-          "name": "reason",
+        "inspected_by": {
+          "name": "inspected_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inspected_at": {
+          "name": "inspected_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rejection_reason": {
+          "name": "rejection_reason",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "uq_purchase_receipt_item_order_item": {
+          "name": "uq_purchase_receipt_item_order_item",
+          "columns": [
+            {
+              "expression": "purchase_receipt_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "purchase_order_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_purchase_receipt_item_receipt": {
+          "name": "idx_purchase_receipt_item_receipt",
+          "columns": [
+            {
+              "expression": "purchase_receipt_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "purchase_receipt_items_purchase_receipt_id_purchase_receipts_id_fk": {
+          "name": "purchase_receipt_items_purchase_receipt_id_purchase_receipts_id_fk",
+          "tableFrom": "purchase_receipt_items",
+          "tableTo": "purchase_receipts",
+          "columnsFrom": [
+            "purchase_receipt_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipt_items_purchase_order_item_id_purchase_order_items_id_fk": {
+          "name": "purchase_receipt_items_purchase_order_item_id_purchase_order_items_id_fk",
+          "tableFrom": "purchase_receipt_items",
+          "tableTo": "purchase_order_items",
+          "columnsFrom": [
+            "purchase_order_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipt_items_inspected_by_employees_id_fk": {
+          "name": "purchase_receipt_items_inspected_by_employees_id_fk",
+          "tableFrom": "purchase_receipt_items",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "inspected_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipt_items_created_by_employees_id_fk": {
+          "name": "purchase_receipt_items_created_by_employees_id_fk",
+          "tableFrom": "purchase_receipt_items",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipt_items_updated_by_employees_id_fk": {
+          "name": "purchase_receipt_items_updated_by_employees_id_fk",
+          "tableFrom": "purchase_receipt_items",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "updated_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "chk_purchase_receipt_item_delivered_quantity": {
+          "name": "chk_purchase_receipt_item_delivered_quantity",
+          "value": "\"purchase_receipt_items\".\"delivered_quantity\" > 0"
+        },
+        "chk_purchase_receipt_item_accepted_quantity": {
+          "name": "chk_purchase_receipt_item_accepted_quantity",
+          "value": "\"purchase_receipt_items\".\"accepted_quantity\" >= 0"
+        },
+        "chk_purchase_receipt_item_rejected_quantity": {
+          "name": "chk_purchase_receipt_item_rejected_quantity",
+          "value": "\"purchase_receipt_items\".\"rejected_quantity\" >= 0"
+        },
+        "chk_purchase_receipt_item_inspected_quantity": {
+          "name": "chk_purchase_receipt_item_inspected_quantity",
+          "value": "\"purchase_receipt_items\".\"accepted_quantity\" + \"purchase_receipt_items\".\"rejected_quantity\" <= \"purchase_receipt_items\".\"delivered_quantity\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.purchase_receipt_units": {
+      "name": "purchase_receipt_units",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "purchase_receipt_item_id": {
+          "name": "purchase_receipt_item_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "dept_head_id": {
-          "name": "dept_head_id",
-          "type": "uuid",
+        "sequence_number": {
+          "name": "sequence_number",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "dept_head_approved_at": {
-          "name": "dept_head_approved_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "finance_reviewed_by": {
-          "name": "finance_reviewed_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "finance_reviewed_at": {
-          "name": "finance_reviewed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "exec_approved_by": {
-          "name": "exec_approved_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "exec_approved_at": {
-          "name": "exec_approved_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "procurement_by": {
-          "name": "procurement_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "procured_at": {
-          "name": "procured_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "supplier_id": {
-          "name": "supplier_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "invoice_number": {
-          "name": "invoice_number",
+        "serial_number": {
+          "name": "serial_number",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
-        "received_at": {
-          "name": "received_at",
-          "type": "timestamp with time zone",
+        "inspection_result": {
+          "name": "inspection_result",
+          "type": "inspection_result",
+          "typeSchema": "public",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "'pending'"
         },
-        "received_by": {
-          "name": "received_by",
+        "inspected_by": {
+          "name": "inspected_by",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "received_assets": {
-          "name": "received_assets",
-          "type": "uuid[]",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "allocated_to": {
-          "name": "allocated_to",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "allocated_at": {
-          "name": "allocated_at",
+        "inspected_at": {
+          "name": "inspected_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
-        "allocation_confirmed_by": {
-          "name": "allocation_confirmed_by",
+        "rejection_reason": {
+          "name": "rejection_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "evidence_attachment_id": {
+          "name": "evidence_attachment_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -2275,8 +3119,1065 @@
         }
       },
       "indexes": {
-        "idx_purchase_status": {
-          "name": "idx_purchase_status",
+        "uq_purchase_receipt_unit_sequence": {
+          "name": "uq_purchase_receipt_unit_sequence",
+          "columns": [
+            {
+              "expression": "purchase_receipt_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "sequence_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_purchase_receipt_unit_item": {
+          "name": "idx_purchase_receipt_unit_item",
+          "columns": [
+            {
+              "expression": "purchase_receipt_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "purchase_receipt_units_purchase_receipt_item_id_purchase_receipt_items_id_fk": {
+          "name": "purchase_receipt_units_purchase_receipt_item_id_purchase_receipt_items_id_fk",
+          "tableFrom": "purchase_receipt_units",
+          "tableTo": "purchase_receipt_items",
+          "columnsFrom": [
+            "purchase_receipt_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipt_units_inspected_by_employees_id_fk": {
+          "name": "purchase_receipt_units_inspected_by_employees_id_fk",
+          "tableFrom": "purchase_receipt_units",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "inspected_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipt_units_evidence_attachment_id_attachments_id_fk": {
+          "name": "purchase_receipt_units_evidence_attachment_id_attachments_id_fk",
+          "tableFrom": "purchase_receipt_units",
+          "tableTo": "attachments",
+          "columnsFrom": [
+            "evidence_attachment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipt_units_created_by_employees_id_fk": {
+          "name": "purchase_receipt_units_created_by_employees_id_fk",
+          "tableFrom": "purchase_receipt_units",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipt_units_updated_by_employees_id_fk": {
+          "name": "purchase_receipt_units_updated_by_employees_id_fk",
+          "tableFrom": "purchase_receipt_units",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "updated_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "chk_purchase_receipt_unit_sequence": {
+          "name": "chk_purchase_receipt_unit_sequence",
+          "value": "\"purchase_receipt_units\".\"sequence_number\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.purchase_receipts": {
+      "name": "purchase_receipts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "receipt_code": {
+          "name": "receipt_code",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purchase_order_id": {
+          "name": "purchase_order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "purchase_receipt_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending_inspection'"
+        },
+        "delivery_date": {
+          "name": "delivery_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "delivery_note_number": {
+          "name": "delivery_note_number",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "delivery_note_attachment_id": {
+          "name": "delivery_note_attachment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "invoice_attachment_id": {
+          "name": "invoice_attachment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "warranty_attachment_id": {
+          "name": "warranty_attachment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorded_by": {
+          "name": "recorded_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "inspected_at": {
+          "name": "inspected_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inspected_by": {
+          "name": "inspected_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_purchase_receipt_order": {
+          "name": "idx_purchase_receipt_order",
+          "columns": [
+            {
+              "expression": "purchase_order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_purchase_receipt_status": {
+          "name": "idx_purchase_receipt_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "purchase_receipts_purchase_order_id_purchase_orders_id_fk": {
+          "name": "purchase_receipts_purchase_order_id_purchase_orders_id_fk",
+          "tableFrom": "purchase_receipts",
+          "tableTo": "purchase_orders",
+          "columnsFrom": [
+            "purchase_order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipts_delivery_note_attachment_id_attachments_id_fk": {
+          "name": "purchase_receipts_delivery_note_attachment_id_attachments_id_fk",
+          "tableFrom": "purchase_receipts",
+          "tableTo": "attachments",
+          "columnsFrom": [
+            "delivery_note_attachment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipts_invoice_attachment_id_attachments_id_fk": {
+          "name": "purchase_receipts_invoice_attachment_id_attachments_id_fk",
+          "tableFrom": "purchase_receipts",
+          "tableTo": "attachments",
+          "columnsFrom": [
+            "invoice_attachment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipts_warranty_attachment_id_attachments_id_fk": {
+          "name": "purchase_receipts_warranty_attachment_id_attachments_id_fk",
+          "tableFrom": "purchase_receipts",
+          "tableTo": "attachments",
+          "columnsFrom": [
+            "warranty_attachment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipts_recorded_by_employees_id_fk": {
+          "name": "purchase_receipts_recorded_by_employees_id_fk",
+          "tableFrom": "purchase_receipts",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "recorded_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipts_inspected_by_employees_id_fk": {
+          "name": "purchase_receipts_inspected_by_employees_id_fk",
+          "tableFrom": "purchase_receipts",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "inspected_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipts_created_by_employees_id_fk": {
+          "name": "purchase_receipts_created_by_employees_id_fk",
+          "tableFrom": "purchase_receipts",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_receipts_updated_by_employees_id_fk": {
+          "name": "purchase_receipts_updated_by_employees_id_fk",
+          "tableFrom": "purchase_receipts",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "updated_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "purchase_receipts_receipt_code_unique": {
+          "name": "purchase_receipts_receipt_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "receipt_code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.purchase_request_items": {
+      "name": "purchase_request_items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "request_revision_id": {
+          "name": "request_revision_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asset_category_id": {
+          "name": "asset_category_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "item_name": {
+          "name": "item_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "specifications": {
+          "name": "specifications",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit": {
+          "name": "unit",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "management_owner_snapshot": {
+          "name": "management_owner_snapshot",
+          "type": "asset_management_owner",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tracking_mode_snapshot": {
+          "name": "tracking_mode_snapshot",
+          "type": "asset_tracking_mode",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "uq_purchase_request_item_sort_order": {
+          "name": "uq_purchase_request_item_sort_order",
+          "columns": [
+            {
+              "expression": "request_revision_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "sort_order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_purchase_request_item_revision": {
+          "name": "idx_purchase_request_item_revision",
+          "columns": [
+            {
+              "expression": "request_revision_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "purchase_request_items_request_revision_id_purchase_request_revisions_id_fk": {
+          "name": "purchase_request_items_request_revision_id_purchase_request_revisions_id_fk",
+          "tableFrom": "purchase_request_items",
+          "tableTo": "purchase_request_revisions",
+          "columnsFrom": [
+            "request_revision_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_request_items_asset_category_id_asset_categories_id_fk": {
+          "name": "purchase_request_items_asset_category_id_asset_categories_id_fk",
+          "tableFrom": "purchase_request_items",
+          "tableTo": "asset_categories",
+          "columnsFrom": [
+            "asset_category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_request_items_created_by_employees_id_fk": {
+          "name": "purchase_request_items_created_by_employees_id_fk",
+          "tableFrom": "purchase_request_items",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_request_items_updated_by_employees_id_fk": {
+          "name": "purchase_request_items_updated_by_employees_id_fk",
+          "tableFrom": "purchase_request_items",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "updated_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "chk_purchase_request_item_quantity": {
+          "name": "chk_purchase_request_item_quantity",
+          "value": "\"purchase_request_items\".\"quantity\" > 0"
+        },
+        "chk_purchase_request_item_sort_order": {
+          "name": "chk_purchase_request_item_sort_order",
+          "value": "\"purchase_request_items\".\"sort_order\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.purchase_request_quotes": {
+      "name": "purchase_request_quotes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "request_item_id": {
+          "name": "request_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "supplier_id": {
+          "name": "supplier_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attachment_id": {
+          "name": "attachment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit_price_excl_vat": {
+          "name": "unit_price_excl_vat",
+          "type": "numeric(18, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vat_rate": {
+          "name": "vat_rate",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_selected": {
+          "name": "is_selected",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "uq_purchase_request_quote_supplier": {
+          "name": "uq_purchase_request_quote_supplier",
+          "columns": [
+            {
+              "expression": "request_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "supplier_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_purchase_request_quote_selected": {
+          "name": "uq_purchase_request_quote_selected",
+          "columns": [
+            {
+              "expression": "request_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"purchase_request_quotes\".\"is_selected\" = true",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_purchase_request_quote_item": {
+          "name": "idx_purchase_request_quote_item",
+          "columns": [
+            {
+              "expression": "request_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "purchase_request_quotes_request_item_id_purchase_request_items_id_fk": {
+          "name": "purchase_request_quotes_request_item_id_purchase_request_items_id_fk",
+          "tableFrom": "purchase_request_quotes",
+          "tableTo": "purchase_request_items",
+          "columnsFrom": [
+            "request_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_request_quotes_supplier_id_suppliers_id_fk": {
+          "name": "purchase_request_quotes_supplier_id_suppliers_id_fk",
+          "tableFrom": "purchase_request_quotes",
+          "tableTo": "suppliers",
+          "columnsFrom": [
+            "supplier_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_request_quotes_attachment_id_attachments_id_fk": {
+          "name": "purchase_request_quotes_attachment_id_attachments_id_fk",
+          "tableFrom": "purchase_request_quotes",
+          "tableTo": "attachments",
+          "columnsFrom": [
+            "attachment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_request_quotes_created_by_employees_id_fk": {
+          "name": "purchase_request_quotes_created_by_employees_id_fk",
+          "tableFrom": "purchase_request_quotes",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_request_quotes_updated_by_employees_id_fk": {
+          "name": "purchase_request_quotes_updated_by_employees_id_fk",
+          "tableFrom": "purchase_request_quotes",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "updated_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "chk_purchase_request_quote_price": {
+          "name": "chk_purchase_request_quote_price",
+          "value": "\"purchase_request_quotes\".\"unit_price_excl_vat\" >= 0"
+        },
+        "chk_purchase_request_quote_vat": {
+          "name": "chk_purchase_request_quote_vat",
+          "value": "\"purchase_request_quotes\".\"vat_rate\" >= 0 AND \"purchase_request_quotes\".\"vat_rate\" <= 100"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.purchase_request_revisions": {
+      "name": "purchase_request_revisions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "purchase_request_id": {
+          "name": "purchase_request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revision_number": {
+          "name": "revision_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "needed_by_date": {
+          "name": "needed_by_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "submitted_at": {
+          "name": "submitted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "submitted_by": {
+          "name": "submitted_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "returned_at": {
+          "name": "returned_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "returned_by": {
+          "name": "returned_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "return_reason": {
+          "name": "return_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "uq_purchase_request_revision": {
+          "name": "uq_purchase_request_revision",
+          "columns": [
+            {
+              "expression": "purchase_request_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "revision_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_purchase_request_revision_request": {
+          "name": "idx_purchase_request_revision_request",
+          "columns": [
+            {
+              "expression": "purchase_request_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "purchase_request_revisions_purchase_request_id_purchase_requests_id_fk": {
+          "name": "purchase_request_revisions_purchase_request_id_purchase_requests_id_fk",
+          "tableFrom": "purchase_request_revisions",
+          "tableTo": "purchase_requests",
+          "columnsFrom": [
+            "purchase_request_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_request_revisions_submitted_by_employees_id_fk": {
+          "name": "purchase_request_revisions_submitted_by_employees_id_fk",
+          "tableFrom": "purchase_request_revisions",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "submitted_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_request_revisions_returned_by_employees_id_fk": {
+          "name": "purchase_request_revisions_returned_by_employees_id_fk",
+          "tableFrom": "purchase_request_revisions",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "returned_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "purchase_request_revisions_created_by_employees_id_fk": {
+          "name": "purchase_request_revisions_created_by_employees_id_fk",
+          "tableFrom": "purchase_request_revisions",
+          "tableTo": "employees",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "chk_purchase_request_revision_positive": {
+          "name": "chk_purchase_request_revision_positive",
+          "value": "\"purchase_request_revisions\".\"revision_number\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.purchase_requests": {
+      "name": "purchase_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "request_code": {
+          "name": "request_code",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "purchase_request_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "current_revision": {
+          "name": "current_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "requester_id": {
+          "name": "requester_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "department_id": {
+          "name": "department_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_purchase_request_status": {
+          "name": "idx_purchase_request_status",
           "columns": [
             {
               "expression": "status",
@@ -2348,123 +4249,6 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "purchase_requests_asset_category_id_asset_categories_id_fk": {
-          "name": "purchase_requests_asset_category_id_asset_categories_id_fk",
-          "tableFrom": "purchase_requests",
-          "tableTo": "asset_categories",
-          "columnsFrom": [
-            "asset_category_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "purchase_requests_dept_head_id_employees_id_fk": {
-          "name": "purchase_requests_dept_head_id_employees_id_fk",
-          "tableFrom": "purchase_requests",
-          "tableTo": "employees",
-          "columnsFrom": [
-            "dept_head_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "purchase_requests_finance_reviewed_by_employees_id_fk": {
-          "name": "purchase_requests_finance_reviewed_by_employees_id_fk",
-          "tableFrom": "purchase_requests",
-          "tableTo": "employees",
-          "columnsFrom": [
-            "finance_reviewed_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "purchase_requests_exec_approved_by_employees_id_fk": {
-          "name": "purchase_requests_exec_approved_by_employees_id_fk",
-          "tableFrom": "purchase_requests",
-          "tableTo": "employees",
-          "columnsFrom": [
-            "exec_approved_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "purchase_requests_procurement_by_employees_id_fk": {
-          "name": "purchase_requests_procurement_by_employees_id_fk",
-          "tableFrom": "purchase_requests",
-          "tableTo": "employees",
-          "columnsFrom": [
-            "procurement_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "purchase_requests_supplier_id_suppliers_id_fk": {
-          "name": "purchase_requests_supplier_id_suppliers_id_fk",
-          "tableFrom": "purchase_requests",
-          "tableTo": "suppliers",
-          "columnsFrom": [
-            "supplier_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "purchase_requests_received_by_employees_id_fk": {
-          "name": "purchase_requests_received_by_employees_id_fk",
-          "tableFrom": "purchase_requests",
-          "tableTo": "employees",
-          "columnsFrom": [
-            "received_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "purchase_requests_allocated_to_employees_id_fk": {
-          "name": "purchase_requests_allocated_to_employees_id_fk",
-          "tableFrom": "purchase_requests",
-          "tableTo": "employees",
-          "columnsFrom": [
-            "allocated_to"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "purchase_requests_allocation_confirmed_by_employees_id_fk": {
-          "name": "purchase_requests_allocation_confirmed_by_employees_id_fk",
-          "tableFrom": "purchase_requests",
-          "tableTo": "employees",
-          "columnsFrom": [
-            "allocation_confirmed_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
         "purchase_requests_created_by_employees_id_fk": {
           "name": "purchase_requests_created_by_employees_id_fk",
           "tableFrom": "purchase_requests",
@@ -2493,7 +4277,15 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "purchase_requests_request_code_unique": {
+          "name": "purchase_requests_request_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "request_code"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2880,6 +4672,12 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "workflow_revision": {
+          "name": "workflow_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         },
         "action_type": {
           "name": "action_type",
@@ -3658,20 +5456,85 @@
     }
   },
   "enums": {
-    "public.purchase_status": {
-      "name": "purchase_status",
+    "public.allocation_decision": {
+      "name": "allocation_decision",
+      "schema": "public",
+      "values": [
+        "pending",
+        "confirmed",
+        "rejected"
+      ]
+    },
+    "public.asset_allocation_status": {
+      "name": "asset_allocation_status",
+      "schema": "public",
+      "values": [
+        "pending_confirmations",
+        "confirmed",
+        "rejected",
+        "superseded"
+      ]
+    },
+    "public.asset_management_owner": {
+      "name": "asset_management_owner",
+      "schema": "public",
+      "values": [
+        "it",
+        "procurement"
+      ]
+    },
+    "public.asset_tracking_mode": {
+      "name": "asset_tracking_mode",
+      "schema": "public",
+      "values": [
+        "individual_asset",
+        "consumable"
+      ]
+    },
+    "public.inspection_result": {
+      "name": "inspection_result",
+      "schema": "public",
+      "values": [
+        "pending",
+        "accepted",
+        "rejected"
+      ]
+    },
+    "public.purchase_order_status": {
+      "name": "purchase_order_status",
       "schema": "public",
       "values": [
         "draft",
-        "submitted",
-        "dept_approved",
-        "finance_approved",
-        "exec_approved",
-        "ordered",
-        "received",
-        "asset_created",
-        "allocated",
+        "pending_procurement_head",
+        "issued",
+        "partially_received",
+        "fully_received",
+        "closed_short",
         "cancelled"
+      ]
+    },
+    "public.purchase_receipt_status": {
+      "name": "purchase_receipt_status",
+      "schema": "public",
+      "values": [
+        "pending_inspection",
+        "inspecting",
+        "inspected"
+      ]
+    },
+    "public.purchase_request_status": {
+      "name": "purchase_request_status",
+      "schema": "public",
+      "values": [
+        "draft",
+        "pending_department_head",
+        "pending_procurement_enrichment",
+        "pending_procurement_head",
+        "pending_it_head",
+        "revision_required",
+        "approved",
+        "ordering",
+        "fully_ordered"
       ]
     },
     "public.repair_status": {

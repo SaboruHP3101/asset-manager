@@ -4,13 +4,6 @@
  * logic nghiệp vụ trong từng service.
  */
 export const WORKFLOW_ACTIONS = {
-  purchaseSubmit: 'purchase.submit',
-  purchaseApproveDepartment: 'purchase.approve_department',
-  purchaseApproveFinance: 'purchase.approve_finance',
-  purchaseApproveExecutive: 'purchase.approve_executive',
-  purchaseCreateOrder: 'purchase.create_order',
-  purchaseReceiveAssets: 'purchase.receive_assets',
-  purchaseAllocateAssets: 'purchase.allocate_assets',
   transferCreate: 'transfer.create',
   transferApproveDepartment: 'transfer.approve_department',
   transferVerify: 'transfer.verify',
@@ -31,7 +24,6 @@ export type WorkflowAction =
  * này giúp vai trò chuyên môn vẫn có thể tạo yêu cầu cá nhân mà không lặp cấu hình.
  */
 export const EMPLOYEE_ACTIONS: readonly WorkflowAction[] = [
-  WORKFLOW_ACTIONS.purchaseSubmit,
   WORKFLOW_ACTIONS.transferCreate,
   WORKFLOW_ACTIONS.transferConfirm,
   WORKFLOW_ACTIONS.repairReport,
@@ -45,12 +37,10 @@ export const EMPLOYEE_ACTIONS: readonly WorkflowAction[] = [
 export const ROLE_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
   {
     EMPLOYEE: [],
-    ACCOUNTING: [WORKFLOW_ACTIONS.purchaseApproveFinance],
-    EXECUTIVE: [WORKFLOW_ACTIONS.purchaseApproveExecutive],
-    PROCUREMENT: [WORKFLOW_ACTIONS.purchaseCreateOrder],
+    ACCOUNTING: [],
+    EXECUTIVE: [],
+    PROCUREMENT: [],
     IT: [
-      WORKFLOW_ACTIONS.purchaseReceiveAssets,
-      WORKFLOW_ACTIONS.purchaseAllocateAssets,
       WORKFLOW_ACTIONS.transferVerify,
       WORKFLOW_ACTIONS.repairAssess,
       WORKFLOW_ACTIONS.repairAssign,
@@ -59,7 +49,6 @@ export const ROLE_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
   };
 
 export const DEPARTMENT_HEAD_ACTIONS: readonly WorkflowAction[] = [
-  WORKFLOW_ACTIONS.purchaseApproveDepartment,
   WORKFLOW_ACTIONS.transferApproveDepartment,
   WORKFLOW_ACTIONS.repairApproveDepartment,
 ];

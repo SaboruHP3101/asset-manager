@@ -11,11 +11,7 @@ import { AssetCategoriesModule } from './asset-categories/asset-categories.modul
 import { SuppliersModule } from './suppliers/suppliers.module.js';
 import { SupplierContactsModule } from './supplier-contacts/supplier-contacts.module.js';
 import { SupplierAddressesModule } from './supplier-addresses/supplier-addresses.module.js';
-import { PurchaseRequestsModule } from './purchase-requests/purchase-requests.module.js';
 import { PurchaseContractsModule } from './purchase-contracts/purchase-contracts.module.js';
-import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module.js';
-import { PurchaseOrderRequestsModule } from './purchase-order-requests/purchase-order-requests.module.js';
-import { PurchaseOrderItemsModule } from './purchase-order-items/purchase-order-items.module.js';
 import { AssetsModule } from './assets/assets.module.js';
 import { AssetHandoverHistoryModule } from './asset-handover-history/asset-handover-history.module.js';
 import { RepairRequestsModule } from './repair-requests/repair-requests.module.js';
@@ -46,11 +42,7 @@ import { DashboardModule } from './dashboard/dashboard.module.js';
     SuppliersModule,
     SupplierContactsModule,
     SupplierAddressesModule,
-    PurchaseRequestsModule,
     PurchaseContractsModule,
-    PurchaseOrdersModule,
-    PurchaseOrderRequestsModule,
-    PurchaseOrderItemsModule,
     AssetsModule,
     AssetHandoverHistoryModule,
     RepairRequestsModule,

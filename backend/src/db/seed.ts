@@ -7,6 +7,26 @@ import * as schema from './schema.js';
 
 loadEnvFile();
 
+type CategorySeed = {
+  code: string;
+  name: string;
+  parentCode: string | null;
+  description: string;
+  managementOwner: (typeof schema.assetManagementOwnerEnum.enumValues)[number];
+  trackingMode: (typeof schema.assetTrackingModeEnum.enumValues)[number];
+};
+
+type PurchaseSampleItem = {
+  categoryCode: string;
+  itemName: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  supplierCode: string;
+  unitPriceExclVat: string;
+  vatRate: string;
+};
+
 // Tạo địa chỉ kết nối từ các biến riêng để hỗ trợ .env có biến lồng nhau
 const databaseUrl = `postgres://${encodeURIComponent(process.env.POSTGRES_USER ?? '')}:${encodeURIComponent(process.env.POSTGRES_PASSWORD ?? '')}@${process.env.POSTGRES_HOST ?? 'localhost'}:${process.env.POSTGRES_PORT ?? '5432'}/${process.env.POSTGRES_DB ?? ''}`;
 const pool = new Pool({ connectionString: databaseUrl });
@@ -40,63 +60,194 @@ async function seedRoles() {
 // Thêm cây danh mục và dùng danh mục cuối làm tên tài sản
 async function seedCategories() {
   const categories = [
-    ['MT', 'Máy tính', null, 'Nhóm máy tính phục vụ công việc'],
-    ['MT-APPLE', 'Apple', 'MT', 'Máy tính thương hiệu Apple'],
-    [
-      'MT-MBP14',
-      'MacBook Pro 14',
-      'MT-APPLE',
-      'Máy tính xách tay cho công việc chuyên môn',
-    ],
-    ['MT-DELL', 'Dell', 'MT', 'Máy tính thương hiệu Dell'],
-    [
-      'MT-LAT7440',
-      'Dell Latitude 7440',
-      'MT-DELL',
-      'Máy tính xách tay dành cho doanh nghiệp',
-    ],
-    ['MT-LENOVO', 'Lenovo', 'MT', 'Máy tính thương hiệu Lenovo'],
-    [
-      'MT-X1',
-      'Lenovo ThinkPad X1',
-      'MT-LENOVO',
-      'Máy tính xách tay gọn nhẹ cho văn phòng',
-    ],
-    ['VP', 'Thiết bị văn phòng', null, 'Thiết bị sử dụng trong văn phòng'],
-    ['VP-MAYIN', 'Máy in', 'VP', 'Nhóm thiết bị in ấn'],
-    [
-      'VP-CANON',
-      'Máy in Canon imageCLASS',
-      'VP-MAYIN',
-      'Máy in laser dùng chung trong phòng ban',
-    ],
-    ['VP-MANHINH', 'Màn hình', 'VP', 'Nhóm màn hình máy tính'],
-    [
-      'VP-DELL27',
-      'Màn hình Dell UltraSharp 27',
-      'VP-MANHINH',
-      'Màn hình làm việc độ phân giải cao',
-    ],
-    ['KHO', 'Thiết bị kho', null, 'Thiết bị hỗ trợ quản lý kho'],
-    ['KHO-QUET', 'Máy quét mã vạch', 'KHO', 'Nhóm máy quét mã vạch trong kho'],
-    [
-      'KHO-ZEBRA',
-      'Máy quét Zebra DS2208',
-      'KHO-QUET',
-      'Máy quét mã vạch cầm tay',
-    ],
-    ['MANG', 'Thiết bị mạng', null, 'Thiết bị phục vụ hệ thống mạng nội bộ'],
-    ['MANG-CISCO', 'Cisco', 'MANG', 'Thiết bị mạng thương hiệu Cisco'],
-    [
-      'MANG-ISR',
-      'Bộ định tuyến Cisco ISR',
-      'MANG-CISCO',
-      'Bộ định tuyến cho mạng văn phòng',
-    ],
-  ] as const;
+    {
+      code: 'MT',
+      name: 'Máy tính',
+      parentCode: null,
+      description: 'Nhóm máy tính phục vụ công việc',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'MT-APPLE',
+      name: 'Apple',
+      parentCode: 'MT',
+      description: 'Máy tính thương hiệu Apple',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'MT-MBP14',
+      name: 'MacBook Pro 14',
+      parentCode: 'MT-APPLE',
+      description: 'Máy tính xách tay cho công việc chuyên môn',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'MT-DELL',
+      name: 'Dell',
+      parentCode: 'MT',
+      description: 'Máy tính thương hiệu Dell',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'MT-LAT7440',
+      name: 'Dell Latitude 7440',
+      parentCode: 'MT-DELL',
+      description: 'Máy tính xách tay dành cho doanh nghiệp',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'MT-LENOVO',
+      name: 'Lenovo',
+      parentCode: 'MT',
+      description: 'Máy tính thương hiệu Lenovo',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'MT-X1',
+      name: 'Lenovo ThinkPad X1',
+      parentCode: 'MT-LENOVO',
+      description: 'Máy tính xách tay gọn nhẹ cho văn phòng',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'VP',
+      name: 'Thiết bị văn phòng',
+      parentCode: null,
+      description: 'Thiết bị sử dụng trong văn phòng',
+      managementOwner: 'procurement',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'VP-MAYIN',
+      name: 'Máy in',
+      parentCode: 'VP',
+      description: 'Nhóm thiết bị in ấn',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'VP-CANON',
+      name: 'Máy in Canon imageCLASS',
+      parentCode: 'VP-MAYIN',
+      description: 'Máy in laser dùng chung trong phòng ban',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'VP-MANHINH',
+      name: 'Màn hình',
+      parentCode: 'VP',
+      description: 'Nhóm màn hình máy tính',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'VP-DELL27',
+      name: 'Màn hình Dell UltraSharp 27',
+      parentCode: 'VP-MANHINH',
+      description: 'Màn hình làm việc độ phân giải cao',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'KHO',
+      name: 'Thiết bị kho',
+      parentCode: null,
+      description: 'Thiết bị hỗ trợ quản lý kho',
+      managementOwner: 'procurement',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'KHO-QUET',
+      name: 'Máy quét mã vạch',
+      parentCode: 'KHO',
+      description: 'Nhóm máy quét mã vạch trong kho',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'KHO-ZEBRA',
+      name: 'Máy quét Zebra DS2208',
+      parentCode: 'KHO-QUET',
+      description: 'Máy quét mã vạch cầm tay',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'MANG',
+      name: 'Thiết bị mạng',
+      parentCode: null,
+      description: 'Thiết bị phục vụ hệ thống mạng nội bộ',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'MANG-CISCO',
+      name: 'Cisco',
+      parentCode: 'MANG',
+      description: 'Thiết bị mạng thương hiệu Cisco',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'MANG-ISR',
+      name: 'Bộ định tuyến Cisco ISR',
+      parentCode: 'MANG-CISCO',
+      description: 'Bộ định tuyến cho mạng văn phòng',
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'NOITHAT',
+      name: 'Nội thất',
+      parentCode: null,
+      description: 'Tài sản nội thất do Thu mua quản lý',
+      managementOwner: 'procurement',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'NOITHAT-GHE',
+      name: 'Ghế công thái học',
+      parentCode: 'NOITHAT',
+      description: 'Ghế làm việc được theo dõi theo từng tài sản',
+      managementOwner: 'procurement',
+      trackingMode: 'individual_asset',
+    },
+    {
+      code: 'VPP',
+      name: 'Văn phòng phẩm',
+      parentCode: null,
+      description: 'Vật tư tiêu hao do Thu mua quản lý',
+      managementOwner: 'procurement',
+      trackingMode: 'consumable',
+    },
+    {
+      code: 'VPP-GIAY-A4',
+      name: 'Giấy in A4',
+      parentCode: 'VPP',
+      description: 'Giấy in tiêu hao, không tạo mã tài sản hoặc QR',
+      managementOwner: 'procurement',
+      trackingMode: 'consumable',
+    },
+  ] satisfies CategorySeed[];
 
   const categoryIds = new Map<string, string>();
-  for (const [code, name, parentCode, description] of categories) {
+  for (const category of categories) {
+    const {
+      code,
+      name,
+      parentCode,
+      description,
+      managementOwner,
+      trackingMode,
+    } = category;
     await db
       .insert(schema.assetCategories)
       .values({
@@ -104,8 +255,19 @@ async function seedCategories() {
         name,
         description,
         parentCategoryId: parentCode ? categoryIds.get(parentCode) : null,
+        managementOwner,
+        trackingMode,
       })
-      .onConflictDoNothing({ target: schema.assetCategories.code });
+      .onConflictDoUpdate({
+        target: schema.assetCategories.code,
+        set: {
+          name,
+          description,
+          parentCategoryId: parentCode ? categoryIds.get(parentCode) : null,
+          managementOwner,
+          trackingMode,
+        },
+      });
 
     const [row] = await db
       .select()
@@ -114,7 +276,8 @@ async function seedCategories() {
     categoryIds.set(code, row.id);
   }
 
-  return categoryIds;
+  const rows = await db.select().from(schema.assetCategories);
+  return new Map(rows.map((row) => [row.code, row]));
 }
 
 // Thêm các nhà cung cấp
@@ -155,7 +318,7 @@ async function seedSuppliers() {
   return new Map(rows.map((row) => [row.supplierCode, row.id]));
 }
 
-// Thêm sáu tài khoản đại diện cho các role và phòng ban trong môi trường phát triển
+// Thêm các tài khoản đại diện cho từng vai trò trong workflow và dữ liệu cũ
 async function seedEmployees(
   departmentIds: Map<string, string>,
   roleIds: Map<string, string>,
@@ -216,6 +379,24 @@ async function seedEmployees(
       'EXECUTIVE',
       false,
     ],
+    [
+      'NV007',
+      'Bùi Hải Yến',
+      'hai.yen@example.com',
+      '0901000007',
+      'PROCUREMENT',
+      'PROCUREMENT',
+      true,
+    ],
+    [
+      'NV008',
+      'Đỗ Gia Huy',
+      'gia.huy@example.com',
+      '0901000008',
+      'WAREHOUSE',
+      'EMPLOYEE',
+      false,
+    ],
   ] as const;
 
   for (const employee of employees) {
@@ -260,7 +441,7 @@ async function seedEmployees(
 // Thêm từ ba đến bốn tài sản cho mỗi nhân viên
 async function seedAssets(
   employees: Map<string, typeof schema.employees.$inferSelect>,
-  categoryIds: Map<string, string>,
+  categories: Map<string, typeof schema.assetCategories.$inferSelect>,
   supplierIds: Map<string, string>,
 ) {
   const assets = [
@@ -296,7 +477,7 @@ async function seedAssets(
       .values({
         assetCode,
         qrCode: `QR-${assetCode}`,
-        assetCategoryId: categoryIds.get(categoryCode)!,
+        assetCategoryId: categories.get(categoryCode)!.id,
         supplierId: supplierIds.get(supplierCode)!,
         currentUserId: employee.id,
         currentManagingDepartmentId: employee.departmentId,
@@ -317,6 +498,266 @@ async function seedAssets(
         assets.map((asset) => asset[0]),
       ),
     );
+}
+
+async function seedPurchaseRequestSample(
+  sample: {
+    requestCode: string;
+    status: (typeof schema.purchaseRequestStatusEnum.enumValues)[number];
+    reason: string;
+    items: readonly PurchaseSampleItem[];
+  },
+  requester: typeof schema.employees.$inferSelect,
+  categories: Map<string, typeof schema.assetCategories.$inferSelect>,
+  supplierIds: Map<string, string>,
+  procurementEmployeeId: string,
+) {
+  const requestValues = {
+    requestCode: sample.requestCode,
+    status: sample.status,
+    currentRevision: 1,
+    requesterId: requester.id,
+    departmentId: requester.departmentId,
+    createdBy: requester.id,
+    updatedBy: requester.id,
+  };
+
+  await db
+    .insert(schema.purchaseRequests)
+    .values(requestValues)
+    .onConflictDoUpdate({
+      target: schema.purchaseRequests.requestCode,
+      set: requestValues,
+    });
+
+  const [purchaseRequest] = await db
+    .select()
+    .from(schema.purchaseRequests)
+    .where(eq(schema.purchaseRequests.requestCode, sample.requestCode));
+
+  let [revision] = await db
+    .select()
+    .from(schema.purchaseRequestRevisions)
+    .where(
+      and(
+        eq(
+          schema.purchaseRequestRevisions.purchaseRequestId,
+          purchaseRequest.id,
+        ),
+        eq(schema.purchaseRequestRevisions.revisionNumber, 1),
+      ),
+    );
+
+  if (revision) {
+    [revision] = await db
+      .update(schema.purchaseRequestRevisions)
+      .set({
+        purpose: sample.reason,
+        neededByDate: '2026-10-15',
+        submittedAt: new Date('2026-09-22T02:00:00.000Z'),
+        submittedBy: requester.id,
+      })
+      .where(eq(schema.purchaseRequestRevisions.id, revision.id))
+      .returning();
+  } else {
+    [revision] = await db
+      .insert(schema.purchaseRequestRevisions)
+      .values({
+        purchaseRequestId: purchaseRequest.id,
+        revisionNumber: 1,
+        purpose: sample.reason,
+        neededByDate: '2026-10-15',
+        submittedAt: new Date('2026-09-22T02:00:00.000Z'),
+        submittedBy: requester.id,
+        createdBy: requester.id,
+      })
+      .returning();
+  }
+
+  for (const [itemIndex, item] of sample.items.entries()) {
+    const category = categories.get(item.categoryCode)!;
+    const sortOrder = itemIndex + 1;
+    const itemValues = {
+      assetCategoryId: category.id,
+      itemName: item.itemName,
+      specifications: item.description,
+      quantity: item.quantity,
+      unit: item.unit,
+      managementOwnerSnapshot: category.managementOwner,
+      trackingModeSnapshot: category.trackingMode,
+      sortOrder,
+      updatedBy: procurementEmployeeId,
+    };
+
+    let [requestItem] = await db
+      .select()
+      .from(schema.purchaseRequestItems)
+      .where(
+        and(
+          eq(schema.purchaseRequestItems.requestRevisionId, revision.id),
+          eq(schema.purchaseRequestItems.sortOrder, sortOrder),
+        ),
+      );
+
+    if (requestItem) {
+      [requestItem] = await db
+        .update(schema.purchaseRequestItems)
+        .set(itemValues)
+        .where(eq(schema.purchaseRequestItems.id, requestItem.id))
+        .returning();
+    } else {
+      [requestItem] = await db
+        .insert(schema.purchaseRequestItems)
+        .values({
+          requestRevisionId: revision.id,
+          ...itemValues,
+          createdBy: procurementEmployeeId,
+        })
+        .returning();
+    }
+
+    const fileName = `Báo giá ${sample.requestCode}-${sortOrder}.pdf`;
+    let [quoteAttachment] = await db
+      .select()
+      .from(schema.attachments)
+      .where(
+        and(
+          eq(schema.attachments.entityId, requestItem.id),
+          eq(schema.attachments.fileName, fileName),
+        ),
+      );
+
+    if (!quoteAttachment) {
+      [quoteAttachment] = await db
+        .insert(schema.attachments)
+        .values({
+          entityType: 'purchase_request_item_quote',
+          entityId: requestItem.id,
+          fileName,
+          url: `https://example.com/quotes/${sample.requestCode}-${sortOrder}.pdf`,
+          mimeType: 'application/pdf',
+          size: 32768,
+          uploadedByEmployeeId: procurementEmployeeId,
+        })
+        .returning();
+    }
+
+    const supplierId = supplierIds.get(item.supplierCode)!;
+    const [existingQuote] = await db
+      .select()
+      .from(schema.purchaseRequestQuotes)
+      .where(
+        and(
+          eq(schema.purchaseRequestQuotes.requestItemId, requestItem.id),
+          eq(schema.purchaseRequestQuotes.supplierId, supplierId),
+        ),
+      );
+    const quoteValues = {
+      attachmentId: quoteAttachment.id,
+      unitPriceExclVat: item.unitPriceExclVat,
+      vatRate: item.vatRate,
+      isSelected: true,
+      note: 'Nhà cung cấp thắng cho hạng mục này',
+      updatedBy: procurementEmployeeId,
+    };
+
+    if (existingQuote) {
+      await db
+        .update(schema.purchaseRequestQuotes)
+        .set(quoteValues)
+        .where(eq(schema.purchaseRequestQuotes.id, existingQuote.id));
+    } else {
+      await db.insert(schema.purchaseRequestQuotes).values({
+        requestItemId: requestItem.id,
+        supplierId,
+        ...quoteValues,
+        createdBy: procurementEmployeeId,
+      });
+    }
+  }
+}
+
+// Ba hồ sơ mẫu bao phủ nhánh điện tử, phi điện tử và đơn hỗn hợp.
+async function seedPurchaseWorkflowSamples(
+  employees: Map<string, typeof schema.employees.$inferSelect>,
+  categories: Map<string, typeof schema.assetCategories.$inferSelect>,
+  supplierIds: Map<string, string>,
+) {
+  const requester = employees.get('NV008')!;
+  const procurementEmployeeId = employees.get('NV004')!.id;
+  const samples = [
+    {
+      requestCode: 'PR-2026-001',
+      status: 'pending_it_head',
+      reason: 'Trang bị laptop cho nhân viên kho mới',
+      items: [
+        {
+          categoryCode: 'MT-LAT7440',
+          itemName: 'Dell Latitude 7440',
+          description: 'RAM 16 GB, SSD 512 GB',
+          quantity: 2,
+          unit: 'chiếc',
+          supplierCode: 'NCC-MINH-PHAT',
+          unitPriceExclVat: '24500000',
+          vatRate: '10',
+        },
+      ],
+    },
+    {
+      requestCode: 'PR-2026-002',
+      status: 'approved',
+      reason: 'Thay ghế làm việc đã xuống cấp',
+      items: [
+        {
+          categoryCode: 'NOITHAT-GHE',
+          itemName: 'Ghế công thái học',
+          description: 'Ghế lưng lưới có tựa đầu',
+          quantity: 4,
+          unit: 'chiếc',
+          supplierCode: 'NCC-AN-KHANG',
+          unitPriceExclVat: '4200000',
+          vatRate: '10',
+        },
+      ],
+    },
+    {
+      requestCode: 'PR-2026-003',
+      status: 'pending_it_head',
+      reason: 'Bổ sung màn hình và giấy in cho kho',
+      items: [
+        {
+          categoryCode: 'VP-DELL27',
+          itemName: 'Màn hình Dell UltraSharp 27',
+          description: 'Màn hình phục vụ đối soát hàng hóa',
+          quantity: 2,
+          unit: 'chiếc',
+          supplierCode: 'NCC-AN-KHANG',
+          unitPriceExclVat: '8900000',
+          vatRate: '10',
+        },
+        {
+          categoryCode: 'VPP-GIAY-A4',
+          itemName: 'Giấy in A4',
+          description: 'Định lượng 70 gsm, 500 tờ/ream',
+          quantity: 20,
+          unit: 'ream',
+          supplierCode: 'NCC-VIET-TIN',
+          unitPriceExclVat: '78000',
+          vatRate: '8',
+        },
+      ],
+    },
+  ] as const;
+
+  for (const sample of samples) {
+    await seedPurchaseRequestSample(
+      sample,
+      requester,
+      categories,
+      supplierIds,
+      procurementEmployeeId,
+    );
+  }
 }
 
 // Thêm một ảnh mẫu cho mỗi tài sản nếu chưa có
@@ -359,6 +800,7 @@ async function main() {
   const suppliers = await seedSuppliers();
   const employees = await seedEmployees(departments, roles);
   const assets = await seedAssets(employees, categories, suppliers);
+  await seedPurchaseWorkflowSamples(employees, categories, suppliers);
   await seedAttachments(assets, employees.get('NV001')!.id);
   console.log('Đã thêm dữ liệu mẫu còn thiếu thành công.');
 }
