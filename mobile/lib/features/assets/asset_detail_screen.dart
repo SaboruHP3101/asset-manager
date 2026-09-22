@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/network/api_client.dart';
+import '../../core/utils/department_labels.dart';
 import '../repair_requests/repair_request_form.dart';
 import '../repair_requests/repair_progress_screen.dart';
 
@@ -163,7 +164,10 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                 children: [
                   _detailRow('Mã tài sản', asset['assetCode']),
                   _detailRow('Danh mục', asset['category']),
-                  _detailRow('Phòng ban', asset['department']),
+                  _detailRow(
+                    'Phòng ban',
+                    departmentLabel(asset['department'] as String?),
+                  ),
                   _detailRow('Trạng thái', _statusText(asset['status'] ?? '')),
                   _detailRow('Ngày mua', asset['purchaseDate']),
                   _detailRow('Ngày sử dụng', asset['inServiceDate']),

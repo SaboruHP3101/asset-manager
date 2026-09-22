@@ -24,12 +24,12 @@ function guardFor(action: string) {
 describe('WorkflowActionGuard', () => {
   it('cho phép role thực hiện hành động đã cấu hình', () => {
     const guard = guardFor(WORKFLOW_ACTIONS.purchaseApproveFinance);
-    expect(guard.canActivate(contextFor('Kế toán'))).toBe(true);
+    expect(guard.canActivate(contextFor('ACCOUNTING'))).toBe(true);
   });
 
   it('từ chối role không có hành động tương ứng', () => {
     const guard = guardFor(WORKFLOW_ACTIONS.purchaseApproveExecutive);
-    expect(() => guard.canActivate(contextFor('Nhân viên'))).toThrow(
+    expect(() => guard.canActivate(contextFor('EMPLOYEE'))).toThrow(
       ForbiddenException,
     );
   });
@@ -42,7 +42,7 @@ describe('WorkflowActionGuard', () => {
   it('cho phép role chuyên môn sử dụng hành động tự phục vụ của nhân viên', () => {
     const guard = guardFor(WORKFLOW_ACTIONS.repairReport);
     expect(guard.canActivate(contextFor('IT'))).toBe(true);
-    expect(guard.canActivate(contextFor('Kế toán'))).toBe(true);
+    expect(guard.canActivate(contextFor('ACCOUNTING'))).toBe(true);
   });
 
   it('cho phép role mới hoặc role cũ tạo request nhưng không cấp quyền chuyên môn', () => {

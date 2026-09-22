@@ -44,10 +44,10 @@ export const EMPLOYEE_ACTIONS: readonly WorkflowAction[] = [
  */
 export const ROLE_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
   {
-    'Nhân viên': [],
-    'Kế toán': [WORKFLOW_ACTIONS.purchaseApproveFinance],
-    'Điều hành': [WORKFLOW_ACTIONS.purchaseApproveExecutive],
-    'Thu mua': [WORKFLOW_ACTIONS.purchaseCreateOrder],
+    EMPLOYEE: [],
+    ACCOUNTING: [WORKFLOW_ACTIONS.purchaseApproveFinance],
+    EXECUTIVE: [WORKFLOW_ACTIONS.purchaseApproveExecutive],
+    PROCUREMENT: [WORKFLOW_ACTIONS.purchaseCreateOrder],
     IT: [
       WORKFLOW_ACTIONS.purchaseReceiveAssets,
       WORKFLOW_ACTIONS.purchaseAllocateAssets,

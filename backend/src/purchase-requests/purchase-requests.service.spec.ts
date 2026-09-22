@@ -40,7 +40,7 @@ describe('PurchaseRequestsService', () => {
         id: 'actor-id',
         email: 'actor@example.com',
         roleId: 'role-id',
-        roleName: 'Nhân viên',
+        roleName: 'EMPLOYEE',
         departmentId: 'department-id',
         isDepartmentHead: false,
       }),

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/utils/department_labels.dart';
 import '../../core/storage/token_storage.dart';
 import '../login/login_screen.dart';
 import 'asset_detail_screen.dart';
@@ -432,7 +433,10 @@ class AssetCard extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 4),
-                    Text(asset['department'] ?? 'Chưa có phòng ban'),
+                    Text(
+                      departmentLabel(asset['department'] as String?) ??
+                          'Chưa có phòng ban',
+                    ),
                     const SizedBox(height: 8),
                     Chip(label: Text(_statusText(asset['status'] ?? ''))),
                   ],

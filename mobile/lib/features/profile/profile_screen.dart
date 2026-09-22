@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/storage/token_storage.dart';
+import '../../core/utils/department_labels.dart';
 import '../../core/widgets/app_text.dart';
 import '../login/login_screen.dart';
 
@@ -91,7 +92,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     final employee = _employee!;
-    final isHead = employee['isDepartmentHead'] == true ? 'Có' : 'Không';
+    final isHead = employee['isDepartmentHead'] == true;
+    final department = departmentLabel(employee['department']);
+    final departmentRole = employee['department'] != 'EMPLOYEE' && isHead
+        ? 'Trưởng phòng'
+        : 'Nhân viên';
 
     // Bố cục hồ sơ dạng danh sách
     return Scaffold(
@@ -127,17 +132,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     'Số điện thoại',
                     employee['phoneNumber'],
                   ),
-                  _infoRow(
-                    Icons.apartment_outlined,
-                    'Phòng ban',
-                    employee['department'],
-                  ),
-                  _infoRow(Icons.work_outline, 'Vai trò', employee['role']),
-                  _infoRow(
-                    Icons.supervisor_account_outlined,
-                    'Trưởng phòng',
-                    isHead,
-                  ),
+                  _infoRow(Icons.apartment_outlined, 'Phòng ban', department),
+                  _infoRow(Icons.work_outline, 'Vai trò', departmentRole),
                 ],
               ),
             ),

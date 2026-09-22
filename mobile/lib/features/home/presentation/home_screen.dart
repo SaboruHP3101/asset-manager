@@ -141,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AppText.fromTheme(
-                    'Chào buổi sáng, Bình!',
+                    'Xin chào!',
                     context: context,
                     type: AppTextType.h1,
                   ),

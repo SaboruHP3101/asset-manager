@@ -14,13 +14,7 @@ const db = drizzle(pool, { schema });
 
 // Thêm phòng ban còn thiếu và trả về dữ liệu để tạo nhân viên
 async function seedDepartments() {
-  const names = [
-    'Phòng Công nghệ thông tin',
-    'Phòng Kế toán',
-    'Phòng Kho vận',
-    'Phòng Thu mua',
-    'Ban Điều hành',
-  ];
+  const names = ['IT', 'ACCOUNTING', 'WAREHOUSE', 'PROCUREMENT', 'EXECUTIVE'];
 
   await db
     .insert(schema.departments)
@@ -33,46 +27,14 @@ async function seedDepartments() {
 
 // Tạo đúng các vai trò được khai báo trong workflow-actions.config.ts
 async function seedRoles() {
-  const names = ['Nhân viên', 'Kế toán', 'Điều hành', 'Thu mua', 'IT'];
+  const names = ['EMPLOYEE', 'ACCOUNTING', 'EXECUTIVE', 'PROCUREMENT', 'IT'];
   await db
     .insert(schema.roles)
     .values(names.map((name) => ({ name })))
     .onConflictDoNothing({ target: schema.roles.name });
 
   const rows = await db.select().from(schema.roles);
-  const roleIds = new Map(rows.map((row) => [row.name, row.id]));
-
-  /**
-   * Chuẩn hóa các role quản lý cũ về Nhân viên và giữ trách nhiệm trưởng phòng
-   * bằng isDepartmentHead. Cách này xử lý cả dữ liệu seed cũ dùng tên Quản lý.
-   */
-  const legacyHeadRoleIds = ['Quản lý', 'Trưởng bộ phận']
-    .map((name) => roleIds.get(name))
-    .filter((id): id is string => Boolean(id));
-
-  for (const legacyHeadRoleId of legacyHeadRoleIds) {
-    await db
-      .update(schema.employees)
-      .set({
-        roleId: roleIds.get('Nhân viên')!,
-        isDepartmentHead: true,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.employees.roleId, legacyHeadRoleId));
-    await db.delete(schema.roles).where(eq(schema.roles.id, legacyHeadRoleId));
-  }
-
-  const legacyItId = roleIds.get('Nhân viên IT');
-  if (legacyItId) {
-    await db
-      .update(schema.employees)
-      .set({ roleId: roleIds.get('IT')!, updatedAt: new Date() })
-      .where(eq(schema.employees.roleId, legacyItId));
-    await db.delete(schema.roles).where(eq(schema.roles.id, legacyItId));
-  }
-
-  const normalizedRows = await db.select().from(schema.roles);
-  return new Map(normalizedRows.map((row) => [row.name, row.id]));
+  return new Map(rows.map((row) => [row.name, row.id]));
 }
 
 // Thêm cây danh mục và dùng danh mục cuối làm tên tài sản
@@ -205,7 +167,7 @@ async function seedEmployees(
       'Nguyễn Minh Anh',
       'minh.anh@example.com',
       '0901000001',
-      'Phòng Công nghệ thông tin',
+      'IT',
       'IT',
       true,
     ],
@@ -214,8 +176,8 @@ async function seedEmployees(
       'Trần Thu Hà',
       'thu.ha@example.com',
       '0901000002',
-      'Phòng Kế toán',
-      'Kế toán',
+      'ACCOUNTING',
+      'ACCOUNTING',
       true,
     ],
     [
@@ -223,8 +185,8 @@ async function seedEmployees(
       'Lê Quốc Bảo',
       'quoc.bao@example.com',
       '0901000003',
-      'Phòng Kho vận',
-      'Nhân viên',
+      'WAREHOUSE',
+      'EMPLOYEE',
       true,
     ],
     [
@@ -232,8 +194,8 @@ async function seedEmployees(
       'Phạm Ngọc Lan',
       'ngoc.lan@example.com',
       '0901000004',
-      'Phòng Thu mua',
-      'Thu mua',
+      'PROCUREMENT',
+      'PROCUREMENT',
       false,
     ],
     [
@@ -241,8 +203,8 @@ async function seedEmployees(
       'Võ Hoàng Nam',
       'hoang.nam@example.com',
       '0901000005',
-      'Phòng Công nghệ thông tin',
-      'Nhân viên',
+      'IT',
+      'EMPLOYEE',
       false,
     ],
     [
@@ -250,8 +212,8 @@ async function seedEmployees(
       'Đặng Thanh Sơn',
       'thanh.son@example.com',
       '0901000006',
-      'Ban Điều hành',
-      'Điều hành',
+      'EXECUTIVE',
+      'EXECUTIVE',
       false,
     ],
   ] as const;

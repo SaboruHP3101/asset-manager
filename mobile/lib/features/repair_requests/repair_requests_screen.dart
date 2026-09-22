@@ -96,31 +96,43 @@ class _RepairRequestsScreenState extends State<RepairRequestsScreen> {
             ? const Center(child: CircularProgressIndicator())
             : RefreshIndicator(
                 onRefresh: _loadRequests,
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    if (_error != null)
-                      _RequestMessage(
-                        icon: Icons.cloud_off_outlined,
-                        message: _error!,
-                        buttonText: 'Thử lại',
-                        onPressed: _loadRequests,
-                      )
-                    else if (_requests.isEmpty)
-                      const _RequestMessage(
-                        icon: Icons.assignment_outlined,
-                        message: 'Bạn chưa có yêu cầu sửa chữa nào.',
-                      )
-                    else
-                      ..._requests.map(
-                        (request) => RepairRequestCard(
-                          request: request,
-                          onTap: () => _openProgress(request),
+                child: _error != null || _requests.isEmpty
+                    ? LayoutBuilder(
+                        builder: (context, constraints) => ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(
+                              height: constraints.maxHeight,
+                              child: Center(
+                                child: _error != null
+                                    ? _RequestMessage(
+                                        icon: Icons.cloud_off_outlined,
+                                        message: _error!,
+                                        buttonText: 'Thử lại',
+                                        onPressed: _loadRequests,
+                                      )
+                                    : const _RequestMessage(
+                                        icon: Icons.assignment_outlined,
+                                        message:
+                                            'Bạn chưa có yêu cầu sửa chữa nào.',
+                                      ),
+                              ),
+                            ),
+                          ],
                         ),
+                      )
+                    : ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(16),
+                        children: _requests
+                            .map(
+                              (request) => RepairRequestCard(
+                                request: request,
+                                onTap: () => _openProgress(request),
+                              ),
+                            )
+                            .toList(),
                       ),
-                  ],
-                ),
               ),
       ),
     );
@@ -229,19 +241,17 @@ class _RequestMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 72),
-      child: Column(
-        children: [
-          Icon(icon, size: 48, color: Theme.of(context).colorScheme.outline),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 48, color: Theme.of(context).colorScheme.outline),
+        const SizedBox(height: 12),
+        Text(message, textAlign: TextAlign.center),
+        if (buttonText != null) ...[
           const SizedBox(height: 12),
-          Text(message, textAlign: TextAlign.center),
-          if (buttonText != null) ...[
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: onPressed, child: Text(buttonText!)),
-          ],
+          OutlinedButton(onPressed: onPressed, child: Text(buttonText!)),
         ],
-      ),
+      ],
     );
   }
 }
