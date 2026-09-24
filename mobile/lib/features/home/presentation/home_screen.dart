@@ -5,6 +5,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/widgets/app_text.dart';
 import '../../../core/widgets/requirement_grid.dart';
 import '../../../core/widgets/status_card.dart';
+import '../../purchase_requests/purchase_requests_screen.dart';
 
 class _RequirementGrid extends StatelessWidget {
   const _RequirementGrid();
@@ -30,18 +31,10 @@ class _RequirementGrid extends StatelessWidget {
         title: 'Đề nghị mua mới',
         icon: Icons.shopping_bag,
         onTap: () {
-          // Mở hộp thoại
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Đề nghị mua mới'),
-              content: const Text('Dialog content here'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Đóng'),
-                ),
-              ],
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const PurchaseRequestsScreen(),
             ),
           );
         },

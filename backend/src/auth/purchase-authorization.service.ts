@@ -117,9 +117,13 @@ export class PurchaseAuthorizationService {
 
     if (
       actor.departmentName === 'IT' &&
-      ['pending_it_head', 'approved', 'ordering', 'fully_ordered'].includes(
-        request.status,
-      )
+      [
+        'pending_it_head',
+        'revision_required',
+        'approved',
+        'ordering',
+        'fully_ordered',
+      ].includes(request.status)
     ) {
       const [itItem] = await this.db
         .select({ id: schema.purchaseRequestItems.id })

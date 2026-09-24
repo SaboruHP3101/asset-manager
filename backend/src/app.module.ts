@@ -26,6 +26,7 @@ import { RequestAuditModule } from './request-audit/request-audit.module.js';
 import { TransferRequestsModule } from './transfer-requests/transfer-requests.module.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
+import { PurchaseRequestsModule } from './purchase-requests/purchase-requests.module.js';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { NotificationsModule } from './notifications/notifications.module.js';
     DrizzleModule,
     RequestAuditModule,
     NotificationsModule,
+    PurchaseRequestsModule,
     EmployeesModule,
     DepartmentsModule,
     RolesModule,
