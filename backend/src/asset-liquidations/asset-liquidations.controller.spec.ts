@@ -4,11 +4,13 @@ import { AssetLiquidationsService } from './asset-liquidations.service.js';
 
 describe('AssetLiquidationsController', () => {
   let controller: AssetLiquidationsController;
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AssetLiquidationsController],
       providers: [{ provide: AssetLiquidationsService, useValue: {} }],
     }).compile();
+
     controller = module.get<AssetLiquidationsController>(
       AssetLiquidationsController,
     );

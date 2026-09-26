@@ -55,6 +55,7 @@ export function calculateOrderLineTotals(
   const subtotal = BigInt(unitPriceExclVat) * BigInt(quantity);
   const vatHundredths = BigInt(Math.round(Number(vatRate) * 100));
   const vatAmount = (subtotal * vatHundredths + 5000n) / 10000n;
+
   return {
     subtotalExclVat: subtotal.toString(),
     vatAmount: vatAmount.toString(),
@@ -76,6 +77,7 @@ export function deriveRequestOrderStatus(
   if (quantities.every((item) => item.issued === item.approved)) {
     return 'fully_ordered';
   }
+
   return hasActiveOrder ? 'ordering' : 'approved';
 }
 
@@ -134,6 +136,7 @@ export class PurchaseOrdersService {
         entityType: 'order',
         entityId: order.id,
       });
+
       return order.id;
     });
 
@@ -202,11 +205,14 @@ export class PurchaseOrdersService {
     await this.db.transaction(async (transaction) => {
       const tx = transaction as unknown as Database;
       const candidate = await this.requireOrder(tx, id);
+
       await this.lockRequest(tx, candidate.purchaseRequestId);
       // Đọc lại sau khóa để update/submit cạnh tranh chỉ có một thao tác thắng.
       const order = await this.requireOrder(tx, id, ['draft']);
+
       this.assertOrderCreator(order, actor);
       const now = new Date();
+
       await tx
         .update(schema.purchaseOrders)
         .set({
@@ -218,6 +224,7 @@ export class PurchaseOrdersService {
         })
         .where(eq(schema.purchaseOrders.id, id));
       const request = await this.requireRequest(tx, order.purchaseRequestId);
+
       await this.audit.logPurchase(tx, {
         requestId: request.id,
         revision: request.currentRevision,
@@ -236,6 +243,7 @@ export class PurchaseOrdersService {
         body: `${order.purchaseOrderCode} đang chờ Trưởng Thu mua xử lý.`,
       });
     });
+
     return this.findOne(id, actor);
   }
 
@@ -249,6 +257,7 @@ export class PurchaseOrdersService {
     await this.db.transaction(async (transaction) => {
       const tx = transaction as unknown as Database;
       const candidate = await this.requireOrder(tx, id);
+
       await this.lockRequest(tx, candidate.purchaseRequestId);
       const order = await this.requireOrder(tx, id, [
         'pending_procurement_head',
@@ -256,6 +265,7 @@ export class PurchaseOrdersService {
       const request = await this.requireRequest(tx, order.purchaseRequestId);
       const now = new Date();
       const nextStatus: PurchaseOrderStatus = dto.approved ? 'issued' : 'draft';
+
       await tx
         .update(schema.purchaseOrders)
         .set({
@@ -299,6 +309,7 @@ export class PurchaseOrdersService {
         metadata: { purchaseRequestId: request.id },
       });
     });
+
     return this.findOne(id, actor);
   }
 
@@ -312,6 +323,7 @@ export class PurchaseOrdersService {
     await this.db.transaction(async (transaction) => {
       const tx = transaction as unknown as Database;
       const candidate = await this.requireOrder(tx, id);
+
       await this.lockRequest(tx, candidate.purchaseRequestId);
       const order = await this.requireOrder(tx, id, ['issued']);
 
@@ -328,6 +340,7 @@ export class PurchaseOrdersService {
           ),
         )
         .where(eq(schema.purchaseOrderItems.purchaseOrderId, id));
+
       if ((receipt?.acceptedQuantity ?? 0) > 0) {
         throw new ConflictException(
           'PO đã có hàng đạt; hãy dùng thao tác đóng thiếu thay vì hủy.',
@@ -335,6 +348,7 @@ export class PurchaseOrdersService {
       }
 
       const now = new Date();
+
       await tx
         .update(schema.purchaseOrders)
         .set({
@@ -347,6 +361,7 @@ export class PurchaseOrdersService {
         })
         .where(eq(schema.purchaseOrders.id, id));
       const request = await this.requireRequest(tx, order.purchaseRequestId);
+
       await this.recalculateRequestStatus(tx, request.id, actor.id);
       await this.audit.logPurchase(tx, {
         requestId: request.id,
@@ -370,6 +385,7 @@ export class PurchaseOrdersService {
         metadata: { purchaseRequestId: request.id, cancelled: true },
       });
     });
+
     return this.findOne(id, actor);
   }
 
@@ -404,6 +420,7 @@ export class PurchaseOrdersService {
       ), 0)
       order by pr.updated_at asc, pri.sort_order asc
     `);
+
     return rows.rows;
   }
 
@@ -412,12 +429,15 @@ export class PurchaseOrdersService {
     filters: { requestId?: string; supplierId?: string; status?: string },
   ) {
     const conditions = [];
+
     if (filters.requestId)
       conditions.push(
         eq(schema.purchaseOrders.purchaseRequestId, filters.requestId),
       );
+
     if (filters.supplierId)
       conditions.push(eq(schema.purchaseOrders.supplierId, filters.supplierId));
+
     if (filters.status) {
       if (
         !schema.purchaseOrderStatusEnum.enumValues.includes(
@@ -426,6 +446,7 @@ export class PurchaseOrdersService {
       ) {
         throw new BadRequestException('Trạng thái PO không hợp lệ.');
       }
+
       conditions.push(
         eq(schema.purchaseOrders.status, filters.status as PurchaseOrderStatus),
       );
@@ -442,6 +463,7 @@ export class PurchaseOrdersService {
         )!,
       );
     }
+
     return this.db
       .select({
         id: schema.purchaseOrders.id,
@@ -471,6 +493,7 @@ export class PurchaseOrdersService {
   /** Trả các đơn mua pending cho Trưởng Thu mua. */
   async findApprovalQueue(actor: AuthenticatedEmployee) {
     this.assertProcurementAction(actor, WORKFLOW_ACTIONS.purchaseOrderApprove);
+
     return this.findAll(actor, { status: 'pending_procurement_head' });
   }
 
@@ -500,6 +523,7 @@ export class PurchaseOrdersService {
       .where(eq(schema.purchaseOrders.id, id));
 
     if (!order) throw new NotFoundException('Không tìm thấy đơn đặt mua.');
+
     await this.authorization.assertCanViewRequest(
       order.order.purchaseRequestId,
       actor,
@@ -797,6 +821,7 @@ export class PurchaseOrdersService {
       })),
       hasActiveOrder.length > 0,
     );
+
     await db
       .update(schema.purchaseRequests)
       .set({ status: nextStatus, updatedAt: new Date(), updatedBy: actorId })
@@ -813,12 +838,15 @@ export class PurchaseOrdersService {
       .select()
       .from(schema.purchaseRequests)
       .where(eq(schema.purchaseRequests.id, id));
+
     if (!request) throw new NotFoundException('Không tìm thấy đề nghị mua.');
+
     if (statuses && !statuses.includes(request.status)) {
       throw new ConflictException(
         `Không thể lập đơn mua khi đề nghị ở trạng thái ${request.status}.`,
       );
     }
+
     return request;
   }
 
@@ -832,12 +860,15 @@ export class PurchaseOrdersService {
       .select()
       .from(schema.purchaseOrders)
       .where(eq(schema.purchaseOrders.id, id));
+
     if (!order) throw new NotFoundException('Không tìm thấy đơn đặt mua.');
+
     if (statuses && !statuses.includes(order.status)) {
       throw new ConflictException(
         `Không thể thực hiện khi PO ở trạng thái ${order.status}.`,
       );
     }
+
     return order;
   }
 
@@ -875,6 +906,7 @@ export class PurchaseOrdersService {
   ) {
     const sum = (field: 'subtotalExclVat' | 'vatAmount' | 'totalInclVat') =>
       items.reduce((total, item) => total + BigInt(item[field]), 0n).toString();
+
     return {
       subtotalExclVat: sum('subtotalExclVat'),
       vatAmount: sum('vatAmount'),
@@ -885,8 +917,10 @@ export class PurchaseOrdersService {
   /** Trả action kế tiếp ở cấp workflow, không thay thế allowedActions theo actor. */
   private pendingAction(status: PurchaseOrderStatus): WorkflowAction | null {
     if (status === 'draft') return WORKFLOW_ACTIONS.purchaseOrderSubmit;
+
     if (status === 'pending_procurement_head')
       return WORKFLOW_ACTIONS.purchaseOrderApprove;
+
     return null;
   }
 
@@ -898,16 +932,20 @@ export class PurchaseOrdersService {
       actor.departmentName,
     );
     const candidates: WorkflowAction[] = [];
+
     if (order.status === 'draft' && order.createdByEmployeeId === actor.id) {
       candidates.push(
         WORKFLOW_ACTIONS.purchaseOrderCreate,
         WORKFLOW_ACTIONS.purchaseOrderSubmit,
       );
     }
+
     if (order.status === 'pending_procurement_head')
       candidates.push(WORKFLOW_ACTIONS.purchaseOrderApprove);
+
     if (order.status === 'issued')
       candidates.push(WORKFLOW_ACTIONS.purchaseOrderCancel);
+
     return candidates.filter((action) => configured.includes(action));
   }
 
@@ -935,6 +973,7 @@ export class PurchaseOrdersService {
           eq(schema.employees.isActive, true),
         ),
       );
+
     await this.notifications.createMany(
       db,
       recipients.map((recipient) => ({
@@ -952,6 +991,7 @@ export class PurchaseOrdersService {
   /** Sinh mã đơn mua */
   private createOrderCode(): string {
     const year = new Date().getUTCFullYear();
+
     return `PO-${year}-${randomUUID().slice(0, 8).toUpperCase()}`;
   }
 }

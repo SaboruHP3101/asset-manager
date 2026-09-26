@@ -4,6 +4,7 @@ import { AssetLiquidationItemsService } from './asset-liquidation-items.service.
 
 describe('AssetLiquidationItemsService', () => {
   let service: AssetLiquidationItemsService;
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -11,6 +12,7 @@ describe('AssetLiquidationItemsService', () => {
         { provide: DRIZZLE, useValue: {} },
       ],
     }).compile();
+
     service = module.get<AssetLiquidationItemsService>(
       AssetLiquidationItemsService,
     );

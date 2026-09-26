@@ -107,10 +107,12 @@ export class AuthService {
 
   async checkEmail(email: string) {
     let employee;
+
     try {
       employee = await this.employeesService.findOneByEmail(email);
     } catch (error) {
       if (!(error instanceof NotFoundException)) throw error;
+
       return { exists: false };
     }
 
@@ -184,6 +186,7 @@ export class AuthService {
 
     try {
       const payload = await this.jwtService.verifyAsync<{ sub: string }>(token);
+
       return payload.sub;
     } catch {
       throw new UnauthorizedException('Access token is invalid or expired.');

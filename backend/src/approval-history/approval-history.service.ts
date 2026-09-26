@@ -80,11 +80,13 @@ export class ApprovalHistoryService {
       return new ApprovalHistory(updatedRecord);
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Dữ liệu lịch sử phê duyệt đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
+
       throw new InternalServerErrorException(
         'Không thể cập nhật lịch sử phê duyệt',
       );
@@ -107,11 +109,13 @@ export class ApprovalHistoryService {
       return { deleted: true };
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Không thể xóa lịch sử phê duyệt vì dữ liệu đang được tham chiếu',
         );
       }
+
       throw new InternalServerErrorException('Không thể xóa lịch sử phê duyệt');
     }
   }

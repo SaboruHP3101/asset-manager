@@ -65,6 +65,7 @@ const repairUpload = AnyFilesInterceptor({
       file.mimetype.startsWith('image/') ||
       file.mimetype.startsWith('video/') ||
       mediaExtension.test(file.originalname);
+
     callback(
       allowed ? null : new Error('Chỉ chấp nhận ảnh hoặc video.'),
       allowed,

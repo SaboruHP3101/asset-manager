@@ -79,11 +79,13 @@ export class ChangeHistoryService {
       return new ChangeHistory(updatedRecord);
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Dữ liệu lịch sử thay đổi đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
+
       throw new InternalServerErrorException(
         'Không thể cập nhật lịch sử thay đổi',
       );
@@ -106,11 +108,13 @@ export class ChangeHistoryService {
       return { deleted: true };
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Không thể xóa lịch sử thay đổi vì dữ liệu đang được tham chiếu',
         );
       }
+
       throw new InternalServerErrorException('Không thể xóa lịch sử thay đổi');
     }
   }

@@ -14,6 +14,7 @@ import {
 import type { AuthenticatedEmployee } from './workflow-auth.types.js';
 
 const WORKFLOW_ACTION_KEY = 'workflow-action';
+
 type AuthenticatedRequest = Request & { user?: AuthenticatedEmployee };
 
 /** Gắn hành động bắt buộc lên route để cấu hình quyền độc lập với controller. */

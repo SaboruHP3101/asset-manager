@@ -79,8 +79,10 @@ export class AssetsService {
         .from(schema.assetCategories);
       const categoryIds = new Set<string>([categoryId]);
       let foundChild = true;
+
       while (foundChild) {
         foundChild = false;
+
         for (const category of categories) {
           if (
             category.parentId &&
@@ -92,6 +94,7 @@ export class AssetsService {
           }
         }
       }
+
       conditions.push(inArray(schema.assets.assetCategoryId, [...categoryIds]));
     }
 
@@ -172,11 +175,14 @@ export class AssetsService {
 
     const categoryById = new Map(categories.map((item) => [item.id, item]));
     const rootIds = new Set<string>();
+
     for (const owned of ownedCategories) {
       let current = categoryById.get(owned.categoryId);
+
       while (current?.parentId) {
         current = categoryById.get(current.parentId);
       }
+
       if (current) rootIds.add(current.id);
     }
 
@@ -271,11 +277,13 @@ export class AssetsService {
       return new Asset(updatedRecord);
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Dữ liệu tài sản đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
+
       throw new InternalServerErrorException('Không thể cập nhật tài sản');
     }
   }
@@ -294,11 +302,13 @@ export class AssetsService {
       return { deleted: true };
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Không thể xóa tài sản vì dữ liệu đang được tham chiếu',
         );
       }
+
       throw new InternalServerErrorException('Không thể xóa tài sản');
     }
   }

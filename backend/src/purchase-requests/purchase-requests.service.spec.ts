@@ -44,9 +44,11 @@ function serviceFor(owner: 'it' | 'procurement') {
     const promise = Object.assign(Promise.resolve(result), {
       orderBy: query.orderBy,
     });
+
     query.from.mockReturnValue(query);
     query.innerJoin.mockReturnValue(query);
     query.where.mockReturnValue(promise);
+
     return query;
   });
   const where = vi.fn().mockResolvedValue(undefined);
@@ -70,7 +72,9 @@ function serviceFor(owner: 'it' | 'procurement') {
     audit as unknown as RequestAuditService,
     notifications as unknown as NotificationsService,
   );
+
   vi.spyOn(service, 'findOne').mockResolvedValue({ id: request.id } as never);
+
   return { service, audit, notifications };
 }
 

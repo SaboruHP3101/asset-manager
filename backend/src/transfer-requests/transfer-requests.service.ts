@@ -36,6 +36,7 @@ export class TransferRequestsService {
           fromDepartmentId: actor.departmentId,
         })
         .returning();
+
       await this.audit.log(db, {
         requestType: 'transfer',
         requestId: request.id,
@@ -44,12 +45,14 @@ export class TransferRequestsService {
         approverRole: actor.roleName,
         status: 'approved',
       });
+
       return new TransferRequest(request);
     });
   }
 
   async findAll() {
     const requests = await this.db.select().from(schema.transferRequests);
+
     return requests.map((request) => new TransferRequest(request));
   }
 
@@ -58,10 +61,12 @@ export class TransferRequestsService {
       .select()
       .from(schema.transferRequests)
       .where(eq(schema.transferRequests.id, id));
+
     if (!request)
       throw new NotFoundException(
         `Không tìm thấy yêu cầu điều chuyển có ID ${id}`,
       );
+
     return new TransferRequest(request);
   }
 
@@ -74,15 +79,18 @@ export class TransferRequestsService {
       .select()
       .from(schema.transferRequests)
       .where(eq(schema.transferRequests.id, id));
+
     if (!request)
       throw new NotFoundException(
         `Không tìm thấy yêu cầu điều chuyển có ID ${id}`,
       );
+
     if (request.status !== expected) {
       throw new BadRequestException(
         `Yêu cầu phải ở trạng thái ${expected}, trạng thái hiện tại là ${request.status}`,
       );
     }
+
     return request;
   }
 
@@ -95,11 +103,13 @@ export class TransferRequestsService {
     return this.db.transaction(async (tx) => {
       const db = tx as unknown as NodePgDatabase<typeof schema>;
       const current = await this.requireStatus(db, id, 'requested');
+
       if (current.fromDepartmentId !== actor.departmentId) {
         throw new BadRequestException(
           'Không thể duyệt điều chuyển của phòng ban khác',
         );
       }
+
       const status = dto.approved ? 'dept_approved' : 'cancelled';
       const [request] = await db
         .update(schema.transferRequests)
@@ -115,6 +125,7 @@ export class TransferRequestsService {
         })
         .where(eq(schema.transferRequests.id, id))
         .returning();
+
       await this.audit.log(db, {
         requestType: 'transfer',
         requestId: id,
@@ -124,6 +135,7 @@ export class TransferRequestsService {
         status: dto.approved ? 'approved' : 'rejected',
         notes: dto.note,
       });
+
       return new TransferRequest(request);
     });
   }
@@ -132,6 +144,7 @@ export class TransferRequestsService {
   async verify(id: string, actor: AuthenticatedEmployee) {
     return this.db.transaction(async (tx) => {
       const db = tx as unknown as NodePgDatabase<typeof schema>;
+
       await this.requireStatus(db, id, 'dept_approved');
       const [request] = await db
         .update(schema.transferRequests)
@@ -143,6 +156,7 @@ export class TransferRequestsService {
         })
         .where(eq(schema.transferRequests.id, id))
         .returning();
+
       await this.audit.log(db, {
         requestType: 'transfer',
         requestId: id,
@@ -151,6 +165,7 @@ export class TransferRequestsService {
         approverRole: actor.roleName,
         status: 'approved',
       });
+
       return new TransferRequest(request);
     });
   }
@@ -169,17 +184,21 @@ export class TransferRequestsService {
           : current.toUserId === actor.id
             ? 'receiver'
             : null;
+
       if (!role) {
         throw new BadRequestException(
           'Chỉ bên giao hoặc bên nhận mới được xác nhận',
         );
       }
+
       if (role === 'sender' && current.senderConfirmedAt) {
         throw new BadRequestException('Bên giao đã xác nhận yêu cầu này');
       }
+
       if (role === 'receiver' && current.receiverConfirmedAt) {
         throw new BadRequestException('Bên nhận đã xác nhận yêu cầu này');
       }
+
       const [signed] = await db
         .update(schema.transferRequests)
         .set({
@@ -195,6 +214,7 @@ export class TransferRequestsService {
         .returning();
 
       let result = signed;
+
       if (signed.senderConfirmedAt && signed.receiverConfirmedAt) {
         await db
           .update(schema.assets)
@@ -232,6 +252,7 @@ export class TransferRequestsService {
           status: 'approved',
         });
       }
+
       return new TransferRequest(result);
     });
   }

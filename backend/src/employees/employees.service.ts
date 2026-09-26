@@ -29,6 +29,7 @@ export class EmployeesService {
       return new Employee(newEmployee);
     } catch (error: any) {
       console.log(error);
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException();
       }

@@ -22,6 +22,7 @@ export const purchaseQuoteUpload = FileInterceptor('file', {
     const allowed =
       file.mimetype.startsWith('image/') &&
       imageExtension.test(file.originalname);
+
     callback(
       allowed ? null : new Error('Chỉ chấp nhận tệp ảnh báo giá.'),
       allowed,

@@ -85,11 +85,13 @@ export class AssetLiquidationsService {
       return new AssetLiquidation(updatedRecord);
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Dữ liệu đề nghị thanh lý tài sản đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
+
       throw new InternalServerErrorException(
         'Không thể cập nhật đề nghị thanh lý tài sản',
       );
@@ -112,11 +114,13 @@ export class AssetLiquidationsService {
       return { deleted: true };
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Không thể xóa đề nghị thanh lý tài sản vì dữ liệu đang được tham chiếu',
         );
       }
+
       throw new InternalServerErrorException(
         'Không thể xóa đề nghị thanh lý tài sản',
       );

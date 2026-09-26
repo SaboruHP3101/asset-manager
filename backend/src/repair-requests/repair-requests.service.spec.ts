@@ -5,6 +5,7 @@ import { RequestAuditService } from '../request-audit/request-audit.service.js';
 
 describe('RepairRequestsService', () => {
   let service: RepairRequestsService;
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -13,6 +14,7 @@ describe('RepairRequestsService', () => {
         { provide: RequestAuditService, useValue: { log: vi.fn() } },
       ],
     }).compile();
+
     service = module.get<RepairRequestsService>(RepairRequestsService);
   });
   it('should be defined', () => expect(service).toBeDefined());

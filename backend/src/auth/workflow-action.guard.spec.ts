@@ -24,17 +24,20 @@ function guardFor(action: string) {
   const reflector = {
     getAllAndOverride: () => action,
   } as unknown as Reflector;
+
   return new WorkflowActionGuard(reflector);
 }
 
 describe('WorkflowActionGuard', () => {
   it('cho phép role thực hiện hành động đã cấu hình', () => {
     const guard = guardFor(WORKFLOW_ACTIONS.repairAssess);
+
     expect(guard.canActivate(contextFor('IT'))).toBe(true);
   });
 
   it('từ chối role không có hành động tương ứng', () => {
     const guard = guardFor(WORKFLOW_ACTIONS.repairAssess);
+
     expect(() => guard.canActivate(contextFor('EMPLOYEE'))).toThrow(
       ForbiddenException,
     );
@@ -42,11 +45,13 @@ describe('WorkflowActionGuard', () => {
 
   it('cấp hành động duyệt phòng ban theo cờ isDepartmentHead', () => {
     const guard = guardFor(WORKFLOW_ACTIONS.repairApproveDepartment);
+
     expect(guard.canActivate(contextFor('IT', true))).toBe(true);
   });
 
   it('cho phép role chuyên môn sử dụng hành động tự phục vụ của nhân viên', () => {
     const guard = guardFor(WORKFLOW_ACTIONS.repairReport);
+
     expect(guard.canActivate(contextFor('IT'))).toBe(true);
     expect(guard.canActivate(contextFor('ACCOUNTING'))).toBe(true);
   });

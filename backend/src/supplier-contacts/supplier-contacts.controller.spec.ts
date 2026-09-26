@@ -4,11 +4,13 @@ import { SupplierContactsService } from './supplier-contacts.service.js';
 
 describe('SupplierContactsController', () => {
   let controller: SupplierContactsController;
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SupplierContactsController],
       providers: [{ provide: SupplierContactsService, useValue: {} }],
     }).compile();
+
     controller = module.get<SupplierContactsController>(
       SupplierContactsController,
     );

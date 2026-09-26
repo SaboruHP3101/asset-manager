@@ -4,6 +4,7 @@ import { AssetHandoverHistoryService } from './asset-handover-history.service.js
 
 describe('AssetHandoverHistoryService', () => {
   let service: AssetHandoverHistoryService;
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -11,6 +12,7 @@ describe('AssetHandoverHistoryService', () => {
         { provide: DRIZZLE, useValue: {} },
       ],
     }).compile();
+
     service = module.get<AssetHandoverHistoryService>(
       AssetHandoverHistoryService,
     );

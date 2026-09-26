@@ -85,11 +85,13 @@ export class AssetHandoverHistoryService {
       return new AssetHandoverHistory(updatedRecord);
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Dữ liệu lịch sử bàn giao tài sản đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
+
       throw new InternalServerErrorException(
         'Không thể cập nhật lịch sử bàn giao tài sản',
       );
@@ -112,11 +114,13 @@ export class AssetHandoverHistoryService {
       return { deleted: true };
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Không thể xóa lịch sử bàn giao tài sản vì dữ liệu đang được tham chiếu',
         );
       }
+
       throw new InternalServerErrorException(
         'Không thể xóa lịch sử bàn giao tài sản',
       );

@@ -76,11 +76,13 @@ export class SuppliersService {
       return new Supplier(updatedRecord);
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Dữ liệu nhà cung cấp đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
+
       throw new InternalServerErrorException('Không thể cập nhật nhà cung cấp');
     }
   }
@@ -99,11 +101,13 @@ export class SuppliersService {
       return { deleted: true };
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Không thể xóa nhà cung cấp vì dữ liệu đang được tham chiếu',
         );
       }
+
       throw new InternalServerErrorException('Không thể xóa nhà cung cấp');
     }
   }

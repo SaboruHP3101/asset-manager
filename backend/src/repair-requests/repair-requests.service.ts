@@ -56,6 +56,7 @@ export class RepairRequestsService {
             status: 'reported',
           })
           .returning();
+
         await this.audit.log(db, {
           requestType: 'repair',
           requestId: newRecord.id,
@@ -64,6 +65,7 @@ export class RepairRequestsService {
           approverRole: actor.roleName,
           status: 'approved',
         });
+
         return new RepairRequest(newRecord);
       });
     } catch (error: unknown) {
@@ -109,6 +111,7 @@ export class RepairRequestsService {
           notInArray(schema.repairRequests.status, ['closed', 'cancelled']),
         ),
       );
+
     if (activeRequest) {
       throw new ConflictException(
         'Tài sản đang có một yêu cầu sửa chữa chưa hoàn tất.',
@@ -170,6 +173,7 @@ export class RepairRequestsService {
           eq(schema.assets.currentUserId, employeeId),
         ),
       );
+
     if (!asset) {
       throw new NotFoundException('Không tìm thấy tài sản được quản lý.');
     }
@@ -238,6 +242,7 @@ export class RepairRequestsService {
       )
       .orderBy(asc(schema.attachments.createdAt));
     const images = new Map<string, string>();
+
     for (const attachment of attachments) {
       if (!images.has(attachment.entityId)) {
         images.set(attachment.entityId, attachment.url);
@@ -261,6 +266,7 @@ export class RepairRequestsService {
           eq(schema.repairRequests.reporterId, employeeId),
         ),
       );
+
     if (!request) {
       throw new NotFoundException('Không tìm thấy yêu cầu sửa chữa.');
     }
@@ -281,16 +287,19 @@ export class RepairRequestsService {
       .select()
       .from(schema.repairRequests)
       .where(eq(schema.repairRequests.id, id));
+
     if (!request) {
       throw new NotFoundException(
         `Không tìm thấy yêu cầu sửa chữa có ID ${id}`,
       );
     }
+
     if (request.status !== expected) {
       throw new BadRequestException(
         `Yêu cầu phải ở trạng thái ${expected}, trạng thái hiện tại là ${request.status}`,
       );
     }
+
     return request;
   }
 
@@ -301,6 +310,7 @@ export class RepairRequestsService {
   async assess(id: string, dto: AssessRepairDto, actor: AuthenticatedEmployee) {
     return this.db.transaction(async (tx) => {
       const db = tx as unknown as NodePgDatabase<typeof schema>;
+
       await this.requireStatus(db, id, 'reported');
       const status = dto.needsApproval ? 'approval_pending' : 'in_progress';
       const [request] = await db
@@ -316,6 +326,7 @@ export class RepairRequestsService {
         })
         .where(eq(schema.repairRequests.id, id))
         .returning();
+
       await this.audit.log(db, {
         requestType: 'repair',
         requestId: id,
@@ -328,6 +339,7 @@ export class RepairRequestsService {
           estimatedCost: dto.estimatedCost,
         },
       });
+
       return new RepairRequest(request);
     });
   }
@@ -341,11 +353,13 @@ export class RepairRequestsService {
     return this.db.transaction(async (tx) => {
       const db = tx as unknown as NodePgDatabase<typeof schema>;
       const current = await this.requireStatus(db, id, 'approval_pending');
+
       if (current.departmentId !== actor.departmentId) {
         throw new BadRequestException(
           'Không thể duyệt sửa chữa của phòng ban khác',
         );
       }
+
       const status = dto.approved ? 'in_progress' : 'closed';
       const [request] = await db
         .update(schema.repairRequests)
@@ -358,6 +372,7 @@ export class RepairRequestsService {
         })
         .where(eq(schema.repairRequests.id, id))
         .returning();
+
       await this.audit.log(db, {
         requestType: 'repair',
         requestId: id,
@@ -367,6 +382,7 @@ export class RepairRequestsService {
         status: dto.approved ? 'approved' : 'rejected',
         notes: dto.note,
       });
+
       return new RepairRequest(request);
     });
   }
@@ -375,6 +391,7 @@ export class RepairRequestsService {
   async assign(id: string, dto: AssignRepairDto, actor: AuthenticatedEmployee) {
     return this.db.transaction(async (tx) => {
       const db = tx as unknown as NodePgDatabase<typeof schema>;
+
       await this.requireStatus(db, id, 'in_progress');
       const [request] = await db
         .update(schema.repairRequests)
@@ -385,6 +402,7 @@ export class RepairRequestsService {
         })
         .where(eq(schema.repairRequests.id, id))
         .returning();
+
       await this.audit.log(db, {
         requestType: 'repair',
         requestId: id,
@@ -394,6 +412,7 @@ export class RepairRequestsService {
         status: 'approved',
         metadata: { assignedTo: dto.assignedTo },
       });
+
       return new RepairRequest(request);
     });
   }
@@ -406,6 +425,7 @@ export class RepairRequestsService {
   ) {
     return this.db.transaction(async (tx) => {
       const db = tx as unknown as NodePgDatabase<typeof schema>;
+
       await this.requireStatus(db, id, 'in_progress');
       const [request] = await db
         .update(schema.repairRequests)
@@ -418,6 +438,7 @@ export class RepairRequestsService {
         })
         .where(eq(schema.repairRequests.id, id))
         .returning();
+
       await this.audit.log(db, {
         requestType: 'repair',
         requestId: id,
@@ -427,6 +448,7 @@ export class RepairRequestsService {
         status: 'approved',
         metadata: { actualCost: dto.actualCost },
       });
+
       return new RepairRequest(request);
     });
   }
@@ -443,11 +465,13 @@ export class RepairRequestsService {
     return this.db.transaction(async (tx) => {
       const db = tx as unknown as NodePgDatabase<typeof schema>;
       const current = await this.requireStatus(db, id, 'completed');
+
       if (current.reporterId !== actor.id) {
         throw new BadRequestException(
           'Chỉ người báo hỏng mới được nghiệm thu kết quả',
         );
       }
+
       const now = new Date();
       const status = dto.accepted ? 'closed' : 'in_progress';
       const [request] = await db
@@ -463,6 +487,7 @@ export class RepairRequestsService {
         })
         .where(eq(schema.repairRequests.id, id))
         .returning();
+
       await this.audit.log(db, {
         requestType: 'repair',
         requestId: id,
@@ -472,6 +497,7 @@ export class RepairRequestsService {
         status: dto.accepted ? 'approved' : 'rejected',
         notes: dto.note,
       });
+
       return new RepairRequest(request);
     });
   }
@@ -517,11 +543,13 @@ export class RepairRequestsService {
       return new RepairRequest(updatedRecord);
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Dữ liệu yêu cầu sửa chữa đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
+
       throw new InternalServerErrorException(
         'Không thể cập nhật yêu cầu sửa chữa',
       );
@@ -544,11 +572,13 @@ export class RepairRequestsService {
       return { deleted: true };
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Không thể xóa yêu cầu sửa chữa vì dữ liệu đang được tham chiếu',
         );
       }
+
       throw new InternalServerErrorException('Không thể xóa yêu cầu sửa chữa');
     }
   }

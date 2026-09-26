@@ -63,6 +63,7 @@ export class AssetsController {
   @Get('mine/categories')
   async findMyParentCategories(@Headers('authorization') authHeader: string) {
     const employeeId = await this.authService.getEmployeeId(authHeader);
+
     return this.assetsService.findMyParentCategories(employeeId);
   }
 

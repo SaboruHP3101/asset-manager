@@ -68,6 +68,7 @@ export class PurchaseRequestsService {
           createdBy: actor.id,
         })
         .returning();
+
       await this.insertItems(tx, revision.id, dto, categories, actor.id);
       await this.audit.logPurchase(tx, {
         requestId: request.id,
@@ -80,6 +81,7 @@ export class PurchaseRequestsService {
         entityType: 'request',
         entityId: request.id,
       });
+
       return request.id;
     });
 
@@ -96,12 +98,14 @@ export class PurchaseRequestsService {
       WORKFLOW_ACTIONS.purchaseRequestUpdate,
     );
     const categories = await this.loadCategories(dto);
+
     await this.db.transaction(async (transaction) => {
       const tx = transaction as unknown as Database;
       const request = await this.requireRequest(tx, id, [
         'draft',
         'revision_required',
       ]);
+
       this.authorization.assertOwnRequest(actor, request);
       const revision = await this.requireCurrentRevision(tx, request);
 
@@ -148,14 +152,17 @@ export class PurchaseRequestsService {
         'draft',
         'revision_required',
       ]);
+
       this.authorization.assertOwnRequest(actor, request);
       const revision = await this.requireCurrentRevision(tx, request);
       const items = await this.loadRevisionItems(tx, revision.id);
+
       if (items.length === 0) {
         throw new BadRequestException('Đề nghị phải có ít nhất một hạng mục.');
       }
 
       const now = new Date();
+
       await tx
         .update(schema.purchaseRequestRevisions)
         .set({ submittedAt: now, submittedBy: actor.id })
@@ -197,9 +204,12 @@ export class PurchaseRequestsService {
       const request = await this.requireRequest(tx, id, [
         'pending_department_head',
       ]);
+
       this.authorization.assertDepartmentRequest(actor, request);
+
       if (!dto.approved) {
         await this.returnForRevision(tx, request, actor, dto.reason!);
+
         return;
       }
 
@@ -237,6 +247,7 @@ export class PurchaseRequestsService {
       WORKFLOW_ACTIONS.purchaseRequestEnrichProcurement,
     );
     this.authorization.assertDepartment(actor, 'PROCUREMENT');
+
     if (!file) throw new BadRequestException('Ảnh báo giá là bắt buộc.');
 
     try {
@@ -255,15 +266,18 @@ export class PurchaseRequestsService {
               eq(schema.purchaseRequestItems.requestRevisionId, revision.id),
             ),
           );
+
         if (!item) {
           throw new BadRequestException(
             'Hạng mục không thuộc revision hiện tại.',
           );
         }
+
         const [supplier] = await tx
           .select({ id: schema.suppliers.id })
           .from(schema.suppliers)
           .where(eq(schema.suppliers.id, dto.supplierId));
+
         if (!supplier)
           throw new BadRequestException('Nhà cung cấp không tồn tại.');
 
@@ -276,6 +290,7 @@ export class PurchaseRequestsService {
               eq(schema.purchaseRequestQuotes.supplierId, dto.supplierId),
             ),
           );
+
         if (existingQuote) {
           throw new ConflictException(
             'Hạng mục đã có báo giá của nhà cung cấp này.',
@@ -292,6 +307,7 @@ export class PurchaseRequestsService {
             })
             .where(eq(schema.purchaseRequestQuotes.requestItemId, item.id));
         }
+
         const [attachment] = await tx
           .insert(schema.attachments)
           .values({
@@ -304,6 +320,7 @@ export class PurchaseRequestsService {
             uploadedByEmployeeId: actor.id,
           })
           .returning();
+
         await tx.insert(schema.purchaseRequestQuotes).values({
           requestItemId: item.id,
           supplierId: dto.supplierId,
@@ -347,6 +364,7 @@ export class PurchaseRequestsService {
       const request = await this.requireRequest(tx, id, [
         'pending_procurement_enrichment',
       ]);
+
       await this.requireCommercialData(tx, request);
       await this.setStatus(tx, id, 'pending_procurement_head', actor.id);
       await this.audit.logPurchase(tx, {
@@ -386,9 +404,12 @@ export class PurchaseRequestsService {
       const request = await this.requireRequest(tx, id, [
         'pending_procurement_head',
       ]);
+
       await this.requireCommercialData(tx, request);
+
       if (!dto.approved) {
         await this.returnForRevision(tx, request, actor, dto.reason!);
+
         return;
       }
 
@@ -398,6 +419,7 @@ export class PurchaseRequestsService {
         (item) => item.managementOwnerSnapshot === 'it',
       );
       const nextStatus = hasItItems ? 'pending_it_head' : 'approved';
+
       await this.setStatus(tx, id, nextStatus, actor.id);
       await this.audit.logPurchase(tx, {
         requestId: id,
@@ -410,6 +432,7 @@ export class PurchaseRequestsService {
         entityType: 'request',
         entityId: id,
       });
+
       if (hasItItems) {
         await this.notifyDepartmentHeadsByName(tx, 'IT', {
           eventType: 'purchase_request_ready_for_it_head',
@@ -440,11 +463,14 @@ export class PurchaseRequestsService {
       const request = await this.requireRequest(tx, id, ['pending_it_head']);
       const revision = await this.requireCurrentRevision(tx, request);
       const items = await this.loadRevisionItems(tx, revision.id);
+
       if (!items.some((item) => item.managementOwnerSnapshot === 'it')) {
         throw new ConflictException('Đề nghị không có hạng mục do IT quản lý.');
       }
+
       if (!dto.approved) {
         await this.returnForRevision(tx, request, actor, dto.reason!);
+
         return;
       }
 
@@ -482,6 +508,7 @@ export class PurchaseRequestsService {
 
   async findQueue(actor: AuthenticatedEmployee) {
     const conditions = [];
+
     if (actor.isDepartmentHead) {
       conditions.push(
         and(
@@ -490,19 +517,23 @@ export class PurchaseRequestsService {
         ),
       );
     }
+
     if (actor.departmentName === 'PROCUREMENT') {
       conditions.push(
         eq(schema.purchaseRequests.status, 'pending_procurement_enrichment'),
       );
+
       if (actor.isDepartmentHead) {
         conditions.push(
           eq(schema.purchaseRequests.status, 'pending_procurement_head'),
         );
       }
     }
+
     if (actor.departmentName === 'IT' && actor.isDepartmentHead) {
       conditions.push(eq(schema.purchaseRequests.status, 'pending_it_head'));
     }
+
     if (conditions.length === 0) return [];
 
     return this.db
@@ -525,6 +556,7 @@ export class PurchaseRequestsService {
 
   async findOne(id: string, actor: AuthenticatedEmployee) {
     await this.authorization.assertCanViewRequest(id, actor);
+
     return this.buildDetail(id, actor);
   }
 
@@ -552,6 +584,7 @@ export class PurchaseRequestsService {
         eq(schema.purchaseRequests.departmentId, schema.departments.id),
       )
       .where(eq(schema.purchaseRequests.id, id));
+
     if (!request) throw new NotFoundException('Không tìm thấy đề nghị mua.');
 
     const [revision] = await this.db
@@ -664,9 +697,11 @@ export class PurchaseRequestsService {
       })
       .from(schema.assetCategories)
       .where(inArray(schema.assetCategories.id, ids));
+
     if (categories.length !== ids.length) {
       throw new BadRequestException('Có danh mục tài sản không tồn tại.');
     }
+
     return new Map(categories.map((category) => [category.id, category]));
   }
 
@@ -680,6 +715,7 @@ export class PurchaseRequestsService {
     await db.insert(schema.purchaseRequestItems).values(
       dto.items.map((item, index) => {
         const category = categories.get(item.assetCategoryId)!;
+
         return {
           requestRevisionId: revisionId,
           assetCategoryId: item.assetCategoryId,
@@ -707,12 +743,15 @@ export class PurchaseRequestsService {
       .select()
       .from(schema.purchaseRequests)
       .where(eq(schema.purchaseRequests.id, id));
+
     if (!request) throw new NotFoundException('Không tìm thấy đề nghị mua.');
+
     if (statuses && !statuses.includes(request.status)) {
       throw new ConflictException(
         `Không thể thực hiện hành động khi đề nghị ở trạng thái ${request.status}.`,
       );
     }
+
     return request;
   }
 
@@ -732,8 +771,10 @@ export class PurchaseRequestsService {
           ),
         ),
       );
+
     if (!revision)
       throw new ConflictException('Revision hiện tại không tồn tại.');
+
     return revision;
   }
 
@@ -767,10 +808,12 @@ export class PurchaseRequestsService {
       const itemQuotes = quotes.filter(
         (quote) => quote.requestItemId === item.id,
       );
+
       return (
         itemQuotes.length === 0 || !itemQuotes.some((quote) => quote.isSelected)
       );
     });
+
     if (incomplete) {
       throw new BadRequestException(
         'Mỗi hạng mục phải có ít nhất một báo giá và một báo giá được chọn.',
@@ -788,6 +831,7 @@ export class PurchaseRequestsService {
     const items = await this.loadRevisionItems(db, revision.id);
     const nextRevisionNumber = request.currentRevision + 1;
     const now = new Date();
+
     await db
       .update(schema.purchaseRequestRevisions)
       .set({ returnedAt: now, returnedBy: actor.id, returnReason: reason })
@@ -804,6 +848,7 @@ export class PurchaseRequestsService {
         createdBy: request.requesterId,
       })
       .returning();
+
     await db.insert(schema.purchaseRequestItems).values(
       items.map((item) => ({
         requestRevisionId: nextRevision.id,
@@ -885,6 +930,7 @@ export class PurchaseRequestsService {
           eq(schema.employees.isActive, true),
         ),
       );
+
     await this.notifications.createMany(
       db,
       recipients.map((recipient) => ({
@@ -913,6 +959,7 @@ export class PurchaseRequestsService {
       departmentName,
       false,
     );
+
     await this.notifications.createMany(
       db,
       recipients.map((recipient) => ({
@@ -943,6 +990,7 @@ export class PurchaseRequestsService {
       departmentName,
       true,
     );
+
     await this.notifications.createMany(
       db,
       recipients.map((recipient) => ({
@@ -1004,6 +1052,7 @@ export class PurchaseRequestsService {
         WORKFLOW_ACTIONS.purchaseRequestApproveProcurement,
       pending_it_head: WORKFLOW_ACTIONS.purchaseRequestApproveIt,
     };
+
     return actions[status] ?? null;
   }
 
@@ -1026,6 +1075,7 @@ export class PurchaseRequestsService {
     if (['approved', 'ordering'].includes(request.status)) {
       candidates.push(WORKFLOW_ACTIONS.purchaseOrderCreate);
     }
+
     if (
       request.requesterId === actor.id &&
       ['draft', 'revision_required'].includes(request.status)
@@ -1035,8 +1085,11 @@ export class PurchaseRequestsService {
         WORKFLOW_ACTIONS.purchaseRequestSubmit,
       );
     }
+
     const pending = this.pendingAction(request.status);
+
     if (pending) candidates.push(pending);
+
     return [...new Set(candidates)].filter((action) =>
       configured.includes(action),
     );
@@ -1044,6 +1097,7 @@ export class PurchaseRequestsService {
 
   private createRequestCode() {
     const year = new Date().getUTCFullYear();
+
     return `PR-${year}-${randomUUID().slice(0, 8).toUpperCase()}`;
   }
 }

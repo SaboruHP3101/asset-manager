@@ -42,18 +42,21 @@ async function seedDepartments() {
     .onConflictDoNothing({ target: schema.departments.name });
 
   const rows = await db.select().from(schema.departments);
+
   return new Map(rows.map((row) => [row.name, row.id]));
 }
 
 // Tạo đúng các vai trò được khai báo trong workflow-actions.config.ts
 async function seedRoles() {
   const names = ['EMPLOYEE', 'ACCOUNTING', 'EXECUTIVE', 'PROCUREMENT', 'IT'];
+
   await db
     .insert(schema.roles)
     .values(names.map((name) => ({ name })))
     .onConflictDoNothing({ target: schema.roles.name });
 
   const rows = await db.select().from(schema.roles);
+
   return new Map(rows.map((row) => [row.name, row.id]));
 }
 
@@ -239,6 +242,7 @@ async function seedCategories() {
   ] satisfies CategorySeed[];
 
   const categoryIds = new Map<string, string>();
+
   for (const category of categories) {
     const {
       code,
@@ -248,6 +252,7 @@ async function seedCategories() {
       managementOwner,
       trackingMode,
     } = category;
+
     await db
       .insert(schema.assetCategories)
       .values({
@@ -273,10 +278,12 @@ async function seedCategories() {
       .select()
       .from(schema.assetCategories)
       .where(eq(schema.assetCategories.code, code));
+
     categoryIds.set(code, row.id);
   }
 
   const rows = await db.select().from(schema.assetCategories);
+
   return new Map(rows.map((row) => [row.code, row]));
 }
 
@@ -315,6 +322,7 @@ async function seedSuppliers() {
     .onConflictDoNothing({ target: schema.suppliers.supplierCode });
 
   const rows = await db.select().from(schema.suppliers);
+
   return new Map(rows.map((row) => [row.supplierCode, row.id]));
 }
 
@@ -409,6 +417,7 @@ async function seedEmployees(
       role,
       isHead,
     ] = employee;
+
     await db
       .insert(schema.employees)
       .values({
@@ -435,6 +444,7 @@ async function seedEmployees(
   }
 
   const rows = await db.select().from(schema.employees);
+
   return new Map(rows.map((row) => [row.employeeCode, row]));
 }
 
@@ -472,6 +482,7 @@ async function seedAssets(
     status,
   ] of assets) {
     const employee = employees.get(employeeCode)!;
+
     await db
       .insert(schema.assets)
       .values({
@@ -780,6 +791,7 @@ async function seedAttachments(
       );
 
     if (existing) continue;
+
     await db.insert(schema.attachments).values({
       entityType: 'asset',
       entityId: asset.id,
@@ -800,6 +812,7 @@ async function main() {
   const suppliers = await seedSuppliers();
   const employees = await seedEmployees(departments, roles);
   const assets = await seedAssets(employees, categories, suppliers);
+
   await seedPurchaseWorkflowSamples(employees, categories, suppliers);
   await seedAttachments(assets, employees.get('NV001')!.id);
   console.log('Đã thêm dữ liệu mẫu còn thiếu thành công.');

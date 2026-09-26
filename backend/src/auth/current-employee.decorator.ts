@@ -8,6 +8,7 @@ type AuthenticatedRequest = Request & { user?: AuthenticatedEmployee };
 export const CurrentEmployee = createParamDecorator(
   (_data: unknown, context: ExecutionContext): AuthenticatedEmployee => {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+
     return request.user!;
   },
 );

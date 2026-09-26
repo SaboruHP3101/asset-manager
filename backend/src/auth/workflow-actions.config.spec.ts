@@ -19,6 +19,7 @@ describe('seed account purchase actions', () => {
     '%s luôn có action tự phục vụ',
     (_code, role, department, isHead) => {
       const actions = getAllowedWorkflowActions(role, isHead, department);
+
       expect(actions).toEqual(
         expect.arrayContaining([
           WORKFLOW_ACTIONS.purchaseRequestCreate,
@@ -57,6 +58,7 @@ describe('seed account purchase actions', () => {
       ['EXECUTIVE', 'EXECUTIVE', false],
     ] as const) {
       const actions = getAllowedWorkflowActions(role, isHead, department);
+
       expect(actions).not.toContain(
         WORKFLOW_ACTIONS.purchaseRequestApproveProcurement,
       );

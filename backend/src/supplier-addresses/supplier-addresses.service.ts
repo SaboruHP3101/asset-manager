@@ -81,11 +81,13 @@ export class SupplierAddressesService {
       return new SupplierAddress(updatedRecord);
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Dữ liệu địa chỉ nhà cung cấp đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
+
       throw new InternalServerErrorException(
         'Không thể cập nhật địa chỉ nhà cung cấp',
       );
@@ -108,11 +110,13 @@ export class SupplierAddressesService {
       return { deleted: true };
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Không thể xóa địa chỉ nhà cung cấp vì dữ liệu đang được tham chiếu',
         );
       }
+
       throw new InternalServerErrorException(
         'Không thể xóa địa chỉ nhà cung cấp',
       );

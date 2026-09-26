@@ -14,6 +14,7 @@ describe('TransferRequestsService', () => {
         { provide: RequestAuditService, useValue: { log: vi.fn() } },
       ],
     }).compile();
+
     service = module.get(TransferRequestsService);
   });
 

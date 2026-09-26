@@ -83,11 +83,13 @@ export class PurchaseContractsService {
       return new PurchaseContract(updatedRecord);
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Dữ liệu hợp đồng mua sắm đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
+
       throw new InternalServerErrorException(
         'Không thể cập nhật hợp đồng mua sắm',
       );
@@ -110,11 +112,13 @@ export class PurchaseContractsService {
       return { deleted: true };
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
+
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
           'Không thể xóa hợp đồng mua sắm vì dữ liệu đang được tham chiếu',
         );
       }
+
       throw new InternalServerErrorException('Không thể xóa hợp đồng mua sắm');
     }
   }
