@@ -27,6 +27,7 @@ import { TransferRequestsModule } from './transfer-requests/transfer-requests.mo
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { PurchaseRequestsModule } from './purchase-requests/purchase-requests.module.js';
+import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module.js';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { PurchaseRequestsModule } from './purchase-requests/purchase-requests.mo
     RequestAuditModule,
     NotificationsModule,
     PurchaseRequestsModule,
+    PurchaseOrdersModule,
     EmployeesModule,
     DepartmentsModule,
     RolesModule,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../purchase_orders/purchase_orders_screen.dart';
 import 'purchase_request_detail_screen.dart';
 import 'purchase_request_form.dart';
 import 'purchase_request_models.dart';
@@ -86,6 +87,14 @@ class _PurchaseRequestsScreenState extends State<PurchaseRequestsScreen> {
           ),
           centerTitle: true,
           actions: [
+            IconButton(
+              tooltip: 'Đơn đặt mua',
+              onPressed: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(builder: (_) => const PurchaseOrdersScreen()),
+              ),
+              icon: const Icon(Icons.shopping_cart_checkout),
+            ),
             IconButton(
               tooltip: 'Tải lại',
               onPressed: _mine == null && _error == null ? null : _load,

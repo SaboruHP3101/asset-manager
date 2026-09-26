@@ -1021,6 +1021,11 @@ export class PurchaseRequestsService {
       actor.departmentName,
     );
     const candidates: WorkflowAction[] = [];
+
+    // Đề nghị đã duyệt hoặc đang đặt dở cho phép nhân viên Thu mua mở form đơn mua;
+    if (['approved', 'ordering'].includes(request.status)) {
+      candidates.push(WORKFLOW_ACTIONS.purchaseOrderCreate);
+    }
     if (
       request.requesterId === actor.id &&
       ['draft', 'revision_required'].includes(request.status)

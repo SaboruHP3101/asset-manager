@@ -41,17 +41,12 @@ export interface PurchaseAuditEntry {
 }
 
 @Injectable()
-/** Ghi và truy vấn dấu vết kiểm toán dùng chung để ba workflow có cùng cấu trúc log. */
 export class RequestAuditService {
   constructor(
     @Inject(DRIZZLE)
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
-  /**
-   * Ghi nhật ký trong cùng transaction với thay đổi nghiệp vụ. Cách này bảo đảm
-   * trạng thái yêu cầu và dấu vết kiểm toán không thể bị lệch nhau khi có lỗi DB.
-   */
   async log(
     db: NodePgDatabase<typeof schema>,
     entry: AuditEntry,
@@ -62,7 +57,6 @@ export class RequestAuditService {
     });
   }
 
-  /** Purchase audit luôn chụp đủ actor, revision và ranh giới trạng thái. */
   async logPurchase(
     db: NodePgDatabase<typeof schema>,
     entry: PurchaseAuditEntry,

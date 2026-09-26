@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../purchase_orders/purchase_order_form.dart';
 import 'purchase_request_form.dart';
 import 'purchase_request_models.dart';
 import 'purchase_requests_repository.dart';
@@ -96,6 +97,7 @@ class _PurchaseRequestDetailScreenState
                     disabled: _acting,
                     onAction: _handleAction,
                     onAddQuote: _openQuoteDialog,
+                    onCreateOrder: _openPurchaseOrderForm,
                   ),
                   const SizedBox(height: 20),
                   const Text(
@@ -285,6 +287,17 @@ class _PurchaseRequestDetailScreenState
           .showSnackBar(SnackBar(content: Text(purchaseApiError(error))));
     }
   }
+
+  /// Mở form PO đã cố định request hiện tại rồi tải lại detail khi lưu thành công.
+  Future<void> _openPurchaseOrderForm() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PurchaseOrderFormScreen(initialRequestId: _detail!.id),
+      ),
+    );
+    if (changed == true) await _load();
+  }
 }
 
 class _Header extends StatelessWidget {
@@ -360,12 +373,14 @@ class _ActionPanel extends StatelessWidget {
     required this.disabled,
     required this.onAction,
     required this.onAddQuote,
+    required this.onCreateOrder,
   });
 
   final PurchaseRequestDetail detail;
   final bool disabled;
   final ValueChanged<String> onAction;
   final ValueChanged<Map<String, dynamic>> onAddQuote;
+  final VoidCallback onCreateOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -421,6 +436,15 @@ class _ActionPanel extends StatelessWidget {
         FilledButton(
           onPressed: disabled ? null : () => onAction('it'),
           child: const Text('Duyệt chuyên môn IT'),
+        ),
+      );
+    }
+    if (detail.allows('purchase.order.create')) {
+      buttons.add(
+        FilledButton.icon(
+          onPressed: disabled ? null : onCreateOrder,
+          icon: const Icon(Icons.add_shopping_cart),
+          label: const Text('Tạo đơn đặt mua'),
         ),
       );
     }
