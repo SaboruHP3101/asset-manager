@@ -164,5 +164,8 @@ String purchaseHistoryActionLabel(String actionType) => switch (actionType) {
   'purchase.request.approve_procurement' => 'Duyệt thương mại',
   'purchase.request.approve_it' => 'Duyệt chuyên môn IT',
   'purchase.request.reject' => 'Trả về điều chỉnh',
+  'purchase.order.create' => 'Tạo đơn mua',
+  'purchase.order.submit' => 'Gửi đơn mua',
+  'purchase.order.approve' => 'Duyệt đơn mua',
   _ => actionType,
 };

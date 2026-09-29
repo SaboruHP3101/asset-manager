@@ -5,6 +5,7 @@ import 'purchase_order_detail_screen.dart';
 import 'purchase_order_form.dart';
 import 'purchase_order_models.dart';
 import 'purchase_orders_repository.dart';
+import '../purchase_receipts/purchase_inspection_queue_screen.dart';
 
 class PurchaseOrdersScreen extends StatefulWidget {
   const PurchaseOrdersScreen({super.key, this.repository});
@@ -93,7 +94,7 @@ class _PurchaseOrdersScreenState extends State<PurchaseOrdersScreen> {
   Widget build(BuildContext context) {
     final loading = _orders == null && _error == null;
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Đơn đặt mua'),
@@ -101,11 +102,22 @@ class _PurchaseOrdersScreenState extends State<PurchaseOrdersScreen> {
             isScrollable: true,
             tabs: [
               Tab(text: 'Cần đặt'),
-              Tab(text: 'Tất cả PO'),
+              Tab(text: 'Chờ giao'),
+              Tab(text: 'Tất cả Đơn mua'),
               Tab(text: 'Chờ duyệt'),
             ],
           ),
           actions: [
+            IconButton(
+              tooltip: 'Hàng chờ kiểm tra',
+              onPressed: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PurchaseInspectionQueueScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.fact_check_outlined),
+            ),
             IconButton(
               tooltip: 'Tải lại',
               onPressed: loading ? null : _load,
@@ -120,6 +132,19 @@ class _PurchaseOrdersScreenState extends State<PurchaseOrdersScreen> {
             : TabBarView(
                 children: [
                   _EligibleList(items: _eligible!, onCreate: _create),
+                  _OrderList(
+                    items: _orders!
+                        .where(
+                          (item) => [
+                            'issued',
+                            'partially_received',
+                          ].contains(item.status),
+                        )
+                        .toList(),
+                    onOpen: _open,
+                    onRefresh: _load,
+                    emptyMessage: 'Không có đơn mua nào đang chờ giao.',
+                  ),
                   _OrderList(items: _orders!, onOpen: _open, onRefresh: _load),
                   _OrderList(items: _queue!, onOpen: _open, onRefresh: _load),
                 ],
@@ -181,21 +206,23 @@ class _OrderList extends StatelessWidget {
     required this.items,
     required this.onOpen,
     required this.onRefresh,
+    this.emptyMessage = 'Không có đơn đặt mua.',
   });
   final List<PurchaseOrderSummary> items;
   final ValueChanged<String> onOpen;
   final Future<void> Function() onRefresh;
+  final String emptyMessage;
 
   @override
   Widget build(BuildContext context) => RefreshIndicator(
     onRefresh: onRefresh,
     child: items.isEmpty
         ? ListView(
-            children: const [
-              SizedBox(height: 120),
-              Icon(Icons.inbox_outlined, size: 56),
-              SizedBox(height: 12),
-              Text('Không có đơn đặt mua.', textAlign: TextAlign.center),
+            children: [
+              const SizedBox(height: 120),
+              const Icon(Icons.inbox_outlined, size: 56),
+              const SizedBox(height: 12),
+              Text(emptyMessage, textAlign: TextAlign.center),
             ],
           )
         : ListView.separated(

@@ -239,7 +239,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.save_outlined),
-                    label: const Text('Lưu PO nháp'),
+                    label: const Text('Lưu Đơn mua nháp'),
                   ),
                 ],
               ),

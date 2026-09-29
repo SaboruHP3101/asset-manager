@@ -28,6 +28,7 @@ import { DashboardModule } from './dashboard/dashboard.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { PurchaseRequestsModule } from './purchase-requests/purchase-requests.module.js';
 import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module.js';
+import { PurchaseReceiptsModule } from './purchase-receipts/purchase-receipts.module.js';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module.j
     NotificationsModule,
     PurchaseRequestsModule,
     PurchaseOrdersModule,
+    PurchaseReceiptsModule,
     EmployeesModule,
     DepartmentsModule,
     RolesModule,

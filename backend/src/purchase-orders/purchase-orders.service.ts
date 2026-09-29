@@ -921,6 +921,9 @@ export class PurchaseOrdersService {
     if (status === 'pending_procurement_head')
       return WORKFLOW_ACTIONS.purchaseOrderApprove;
 
+    if (status === 'issued' || status === 'partially_received')
+      return WORKFLOW_ACTIONS.purchaseReceiptRecord;
+
     return null;
   }
 
@@ -943,8 +946,20 @@ export class PurchaseOrdersService {
     if (order.status === 'pending_procurement_head')
       candidates.push(WORKFLOW_ACTIONS.purchaseOrderApprove);
 
-    if (order.status === 'issued')
-      candidates.push(WORKFLOW_ACTIONS.purchaseOrderCancel);
+    if (order.status === 'issued') {
+      candidates.push(
+        WORKFLOW_ACTIONS.purchaseOrderCancel,
+        WORKFLOW_ACTIONS.purchaseReceiptRecord,
+        WORKFLOW_ACTIONS.purchaseReceiptCloseShort,
+      );
+    }
+
+    if (order.status === 'partially_received') {
+      candidates.push(
+        WORKFLOW_ACTIONS.purchaseReceiptRecord,
+        WORKFLOW_ACTIONS.purchaseReceiptCloseShort,
+      );
+    }
 
     return candidates.filter((action) => configured.includes(action));
   }

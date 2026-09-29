@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'purchase_order_form.dart';
 import 'purchase_order_models.dart';
 import 'purchase_orders_repository.dart';
+import '../purchase_receipts/purchase_receipt_form.dart';
+import '../purchase_receipts/purchase_receipt_models.dart';
+import '../purchase_receipts/purchase_receipts_repository.dart';
 
 class PurchaseOrderDetailScreen extends StatefulWidget {
   const PurchaseOrderDetailScreen({
@@ -22,7 +25,9 @@ class PurchaseOrderDetailScreen extends StatefulWidget {
 
 class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
   late final PurchaseOrdersRepository _repository;
+  late final PurchaseReceiptsRepository _receiptsRepository;
   PurchaseOrderDetail? _detail;
+  List<PurchaseReceiptProgress> _progress = const [];
   String? _error;
   bool _acting = false;
 
@@ -31,6 +36,7 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
   void initState() {
     super.initState();
     _repository = widget.repository ?? PurchaseOrdersRepository();
+    _receiptsRepository = PurchaseReceiptsRepository();
     _load();
   }
 
@@ -41,8 +47,20 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
     });
     try {
       final detail = await _repository.findOne(widget.orderId);
+      final progress =
+          [
+            'issued',
+            'partially_received',
+            'fully_received',
+            'closed_short',
+          ].contains(detail.status)
+          ? await _receiptsRepository.findOrderProgress(widget.orderId)
+          : <PurchaseReceiptProgress>[];
       if (!mounted) return;
-      setState(() => _detail = detail);
+      setState(() {
+        _detail = detail;
+        _progress = progress;
+      });
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = purchaseOrderApiError(error));
@@ -71,7 +89,10 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
                       color: Theme.of(context).colorScheme.errorContainer,
                       child: Padding(
                         padding: const EdgeInsets.all(12),
-                        child: Text('Lý do hủy: ${detail.cancellationReason}'),
+                        child: Text(
+                          '${detail.status == 'closed_short' ? 'Lý do đóng thiếu' : 'Lý do hủy'}: '
+                          '${detail.cancellationReason}',
+                        ),
                       ),
                     ),
                   const SizedBox(height: 16),
@@ -80,6 +101,24 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   for (final item in detail.items) _OrderItem(item: item),
+                  if (_progress.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Tiến độ giao và kiểm tra',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    for (final line in _progress)
+                      Card(
+                        child: ListTile(
+                          title: Text(line.itemName),
+                          subtitle: Text(
+                            'Đặt ${line.ordered} • Đã giao ${line.delivered} • '
+                            'Đạt ${line.accepted} • Không đạt ${line.rejected}\n'
+                            'Chờ kiểm tra ${line.pending} • Còn có thể giao ${line.remaining}',
+                          ),
+                        ),
+                      ),
+                  ],
                   const SizedBox(height: 8),
                   _Totals(totals: detail.totals),
                   const SizedBox(height: 16),
@@ -151,6 +190,23 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
         ),
       );
     }
+    if (detail.allows('purchase.receipt.record')) {
+      buttons.add(
+        FilledButton.icon(
+          onPressed: _acting ? null : _recordReceipt,
+          icon: const Icon(Icons.local_shipping_outlined),
+          label: const Text('Ghi nhận giao hàng'),
+        ),
+      );
+    }
+    if (detail.allows('purchase.receipt.close_short')) {
+      buttons.add(
+        OutlinedButton(
+          onPressed: _acting ? null : _closeShort,
+          child: const Text('Đóng thiếu'),
+        ),
+      );
+    }
     if (buttons.isEmpty) return const SizedBox.shrink();
     return Semantics(
       label: 'Hành động đơn đặt mua',
@@ -167,6 +223,25 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
       ),
     );
     if (changed == true) await _load();
+  }
+
+  Future<void> _recordReceipt() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PurchaseReceiptFormScreen(
+          orderId: widget.orderId,
+          repository: _receiptsRepository,
+        ),
+      ),
+    );
+    if (changed == true) await _load();
+  }
+
+  Future<void> _closeShort() async {
+    final reason = await _showReasonDialog('Xác nhận đóng thiếu');
+    if (reason == null) return;
+    await _run(() => _receiptsRepository.closeShort(widget.orderId, reason));
   }
 
   /// Hỏi duyệt/từ chối, bắt buộc lý do khi từ chối rồi gọi API
