@@ -45,13 +45,6 @@ class _PurchaseInspectionQueueScreenState
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Hàng chờ kiểm tra'),
-      actions: [
-        IconButton(
-          tooltip: 'Tải lại',
-          onPressed: _units == null ? null : _load,
-          icon: const Icon(Icons.refresh),
-        ),
-      ],
     ),
     body: _error != null
         ? _Message(message: _error!, onRetry: _load)

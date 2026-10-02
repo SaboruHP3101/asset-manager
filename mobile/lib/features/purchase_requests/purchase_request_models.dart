@@ -151,8 +151,31 @@ String purchaseStatusLabel(String status) => switch (status) {
   'approved' => 'Đã duyệt',
   'ordering' => 'Đang đặt mua',
   'fully_ordered' => 'Đã đặt đủ',
+  'issued' => 'Đã phát hành',
+  'partially_received' => 'Đã nhận một phần',
+  'fully_received' => 'Đã nhận đủ',
+  'closed_short' => 'Đóng thiếu',
+  'cancelled' => 'Đã hủy',
+  'pending_inspection' => 'Chờ kiểm tra',
+  'inspecting' => 'Đang kiểm tra',
+  'inspected' => 'Đã kiểm tra',
+  'awaiting_allocation' => 'Chờ cấp phát',
+  'awaiting_reallocation' => 'Chờ phân bổ lại',
+  'awaiting_allocation_confirmation' => 'Chờ xác nhận cấp phát',
+  'pending_confirmations' => 'Chờ các bên xác nhận',
+  'confirmed' => 'Đã xác nhận',
+  'rejected' => 'Đã từ chối',
+  'superseded' => 'Đã được thay thế',
+  'active' => 'Đang sử dụng',
   _ => status,
 };
+
+String purchaseHistoryStatusTransitionLabel(String previous, String next) {
+  if (previous.isEmpty) return purchaseStatusLabel(next);
+  if (next.isEmpty || previous == next) return purchaseStatusLabel(previous);
+
+  return '${purchaseStatusLabel(previous)} → ${purchaseStatusLabel(next)}';
+}
 
 String purchaseHistoryActionLabel(String actionType) => switch (actionType) {
   'purchase.request.create' => 'Tạo đề nghị',
@@ -167,5 +190,15 @@ String purchaseHistoryActionLabel(String actionType) => switch (actionType) {
   'purchase.order.create' => 'Tạo đơn mua',
   'purchase.order.submit' => 'Gửi đơn mua',
   'purchase.order.approve' => 'Duyệt đơn mua',
+  'purchase.receipt.record' => 'Ghi nhận đợt giao hàng',
+  'purchase.receipt.accept_unit' => 'Kiểm tra hàng đạt yêu cầu',
+  'purchase.receipt.reject_unit' => 'Ghi nhận hàng không đạt',
+  'purchase.receipt.close_short' => 'Đóng đơn do giao thiếu',
+  'purchase.allocation.create_initial' => 'Tạo cấp phát tài sản',
+  'purchase.allocation.reallocate' => 'Phân bổ lại tài sản',
+  'purchase.allocation.confirm_department' => 'Trưởng phòng xác nhận cấp phát',
+  'purchase.allocation.confirm_recipient' => 'Người nhận xác nhận cấp phát',
+  'purchase.allocation.reject' => 'Từ chối cấp phát',
+  'purchase.allocation.activate' => 'Kích hoạt cấp phát tài sản',
   _ => actionType,
 };

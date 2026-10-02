@@ -121,8 +121,6 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
                   ],
                   const SizedBox(height: 8),
                   _Totals(totals: detail.totals),
-                  const SizedBox(height: 16),
-                  _actions(detail),
                   const SizedBox(height: 20),
                   Text(
                     'Lịch sử',
@@ -141,76 +139,25 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
                           ),
                         ),
                         subtitle: Text(
-                          '${purchaseOrderStatusLabel(event['previousStatus']?.toString() ?? '')} → '
-                          '${purchaseOrderStatusLabel(event['newStatus']?.toString() ?? '')}'
+                          '${purchaseOrderHistoryStatusTransitionLabel(event['previousStatus']?.toString() ?? '', event['newStatus']?.toString() ?? '')}'
                           '${event['reason'] == null ? '' : '\n${event['reason']}'}',
                         ),
                       ),
                 ],
               ),
             ),
-    );
-  }
-
-  /// Dựng nhóm nút edit/submit/approve/cancel từ allowedActions của API
-  Widget _actions(PurchaseOrderDetail detail) {
-    final buttons = <Widget>[];
-    if (detail.allows('purchase.order.create')) {
-      buttons.add(
-        OutlinedButton.icon(
-          onPressed: _acting ? null : _edit,
-          icon: const Icon(Icons.edit_outlined),
-          label: const Text('Chỉnh sửa'),
-        ),
-      );
-    }
-    if (detail.allows('purchase.order.submit')) {
-      buttons.add(
-        FilledButton(
-          onPressed: _acting
-              ? null
-              : () => _run(() => _repository.submit(detail.id)),
-          child: const Text('Trình duyệt'),
-        ),
-      );
-    }
-    if (detail.allows('purchase.order.approve')) {
-      buttons.add(
-        FilledButton(
-          onPressed: _acting ? null : _decide,
-          child: const Text('Xử lý đơn mua'),
-        ),
-      );
-    }
-    if (detail.allows('purchase.order.cancel')) {
-      buttons.add(
-        OutlinedButton(
-          onPressed: _acting ? null : _cancel,
-          child: const Text('Hủy đơn mua'),
-        ),
-      );
-    }
-    if (detail.allows('purchase.receipt.record')) {
-      buttons.add(
-        FilledButton.icon(
-          onPressed: _acting ? null : _recordReceipt,
-          icon: const Icon(Icons.local_shipping_outlined),
-          label: const Text('Ghi nhận giao hàng'),
-        ),
-      );
-    }
-    if (detail.allows('purchase.receipt.close_short')) {
-      buttons.add(
-        OutlinedButton(
-          onPressed: _acting ? null : _closeShort,
-          child: const Text('Đóng thiếu'),
-        ),
-      );
-    }
-    if (buttons.isEmpty) return const SizedBox.shrink();
-    return Semantics(
-      label: 'Hành động đơn đặt mua',
-      child: Wrap(spacing: 8, runSpacing: 8, children: buttons),
+      bottomNavigationBar: detail == null || _error != null
+          ? null
+          : _OrderActionBar(
+              detail: detail,
+              disabled: _acting,
+              onEdit: _edit,
+              onSubmit: () => _run(() => _repository.submit(detail.id)),
+              onDecide: _decide,
+              onRecordReceipt: _recordReceipt,
+              onCancel: _cancel,
+              onCloseShort: _closeShort,
+            ),
     );
   }
 
@@ -340,6 +287,116 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
     return result;
   }
 }
+
+class _OrderActionBar extends StatelessWidget {
+  const _OrderActionBar({
+    required this.detail,
+    required this.disabled,
+    required this.onEdit,
+    required this.onSubmit,
+    required this.onDecide,
+    required this.onRecordReceipt,
+    required this.onCancel,
+    required this.onCloseShort,
+  });
+
+  final PurchaseOrderDetail detail;
+  final bool disabled;
+  final VoidCallback onEdit;
+  final VoidCallback onSubmit;
+  final VoidCallback onDecide;
+  final VoidCallback onRecordReceipt;
+  final VoidCallback onCancel;
+  final VoidCallback onCloseShort;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget? primary;
+    if (detail.allows('purchase.order.submit')) {
+      primary = FilledButton(
+        onPressed: disabled ? null : onSubmit,
+        child: const Text('Trình duyệt'),
+      );
+    }
+    if (detail.allows('purchase.order.approve')) {
+      primary = FilledButton(
+        onPressed: disabled ? null : onDecide,
+        child: const Text('Xử lý đơn mua'),
+      );
+    }
+    if (detail.allows('purchase.receipt.record')) {
+      primary = FilledButton.icon(
+        onPressed: disabled ? null : onRecordReceipt,
+        icon: const Icon(Icons.local_shipping_outlined),
+        label: const Text('Ghi nhận giao hàng'),
+      );
+    }
+
+    final canEdit = detail.allows('purchase.order.create');
+    final canCancel = detail.allows('purchase.order.cancel');
+    final canCloseShort = detail.allows('purchase.receipt.close_short');
+    if (primary == null && !canEdit && !canCancel && !canCloseShort) {
+      return const SizedBox.shrink();
+    }
+
+    return Semantics(
+      label: 'Hành động đơn đặt mua',
+      child: Material(
+        elevation: 8,
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+            child: Row(
+              children: [
+                if (canEdit) ...[
+                  OutlinedButton.icon(
+                    onPressed: disabled ? null : onEdit,
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Chỉnh sửa'),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (primary != null) Expanded(child: primary),
+                if (canCancel || canCloseShort) ...[
+                  const SizedBox(width: 4),
+                  PopupMenuButton<_OrderOverflowAction>(
+                    tooltip: 'Thêm hành động',
+                    enabled: !disabled,
+                    onSelected: (value) {
+                      switch (value) {
+                        case _OrderOverflowAction.cancel:
+                          onCancel();
+                          return;
+                        case _OrderOverflowAction.closeShort:
+                          onCloseShort();
+                          return;
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      if (canCancel)
+                        const PopupMenuItem(
+                          value: _OrderOverflowAction.cancel,
+                          child: Text('Hủy đơn mua'),
+                        ),
+                      if (canCloseShort)
+                        const PopupMenuItem(
+                          value: _OrderOverflowAction.closeShort,
+                          child: Text('Đóng thiếu'),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+enum _OrderOverflowAction { cancel, closeShort }
 
 class _OrderHeader extends StatelessWidget {
   const _OrderHeader({required this.detail});

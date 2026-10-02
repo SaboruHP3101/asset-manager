@@ -46,4 +46,18 @@ void main() {
     expect(item.remainingQuantity, 2);
     expect(item.supplierName, 'Nhà cung cấp A');
   });
+
+  test('lịch sử PO hiển thị nhãn đóng đơn do giao thiếu', () {
+    expect(
+      purchaseOrderHistoryLabel('purchase.receipt.close_short'),
+      'Đóng đơn do giao thiếu',
+    );
+  });
+
+  test('lịch sử PO không lặp trạng thái giống nhau', () {
+    expect(
+      purchaseOrderHistoryStatusTransitionLabel('issued', 'issued'),
+      'Đã phát hành',
+    );
+  });
 }

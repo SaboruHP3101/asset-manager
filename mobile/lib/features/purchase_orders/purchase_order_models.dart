@@ -140,6 +140,16 @@ String purchaseOrderStatusLabel(String status) => switch (status) {
   _ => status,
 };
 
+String purchaseOrderHistoryStatusTransitionLabel(String previous, String next) {
+  if (previous.isEmpty) return purchaseOrderStatusLabel(next);
+  if (next.isEmpty || previous == next) {
+    return purchaseOrderStatusLabel(previous);
+  }
+
+  return '${purchaseOrderStatusLabel(previous)} → '
+      '${purchaseOrderStatusLabel(next)}';
+}
+
 String purchaseOrderHistoryLabel(String action) => switch (action) {
   'purchase.order.create' => 'Tạo đơn đặt mua',
   'purchase.order.update' => 'Cập nhật đơn đặt mua',
@@ -147,5 +157,9 @@ String purchaseOrderHistoryLabel(String action) => switch (action) {
   'purchase.order.approve' => 'Duyệt và phát hành',
   'purchase.order.reject' => 'Trả về chỉnh sửa',
   'purchase.order.cancel' => 'Hủy đơn đặt mua',
+  'purchase.receipt.record' => 'Ghi nhận đợt giao hàng',
+  'purchase.receipt.accept_unit' => 'Kiểm tra hàng đạt yêu cầu',
+  'purchase.receipt.reject_unit' => 'Ghi nhận hàng không đạt',
+  'purchase.receipt.close_short' => 'Đóng đơn do giao thiếu',
   _ => action,
 };

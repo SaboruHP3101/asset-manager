@@ -185,19 +185,22 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('Thêm báo giá: Laptop doanh nghiệp'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('Thêm báo giá: Laptop doanh nghiệp'));
+    await tester.tap(find.text('Thêm báo giá'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Laptop doanh nghiệp').last);
     await tester.pumpAndSettle();
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text(supplierName).last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Thêm báo giá'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Thêm báo giá'),
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 }

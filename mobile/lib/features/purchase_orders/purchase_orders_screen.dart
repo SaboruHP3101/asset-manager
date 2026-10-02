@@ -1,15 +1,15 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/auth/auth_session.dart';
 import 'purchase_order_detail_screen.dart';
 import 'purchase_order_form.dart';
 import 'purchase_order_models.dart';
 import 'purchase_orders_repository.dart';
-import '../purchase_receipts/purchase_inspection_queue_screen.dart';
 
 class PurchaseOrdersScreen extends StatefulWidget {
-  const PurchaseOrdersScreen({super.key, this.repository});
+  const PurchaseOrdersScreen({super.key, this.repository, this.allowedActions});
   final PurchaseOrdersRepository? repository;
+  final Set<String>? allowedActions;
 
   /// Tạo state
   @override
@@ -23,6 +23,14 @@ class _PurchaseOrdersScreenState extends State<PurchaseOrdersScreen> {
   List<PurchaseOrderSummary>? _queue;
   String? _error;
 
+  Set<String> get _actions =>
+      widget.allowedActions ??
+      AuthSession.instance.profile?.allowedActions ??
+      const {};
+
+  bool get _canCreate => _actions.contains('purchase.order.create');
+  bool get _canApprove => _actions.contains('purchase.order.approve');
+  bool get _canRecord => _actions.contains('purchase.receipt.record');
   /// Khởi tạo repository rồi tải đồng thời các tab đơn mua
   @override
   void initState() {
@@ -40,9 +48,15 @@ class _PurchaseOrdersScreenState extends State<PurchaseOrdersScreen> {
     });
     try {
       final results = await Future.wait([
-        _withoutForbidden(_repository.findEligibleRequests()),
+        if (_canCreate)
+          _repository.findEligibleRequests()
+        else
+          Future.value(<EligiblePurchaseOrderItem>[]),
         _repository.findAll(),
-        _withoutForbidden(_repository.findApprovalQueue()),
+        if (_canApprove)
+          _repository.findApprovalQueue()
+        else
+          Future.value(<PurchaseOrderSummary>[]),
       ]);
       if (!mounted) return;
       setState(() {
@@ -53,16 +67,6 @@ class _PurchaseOrdersScreenState extends State<PurchaseOrdersScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = purchaseOrderApiError(error));
-    }
-  }
-
-  /// Biến riêng HTTP 403 thành list rỗng để user không thấy tab/action ngoài quyền
-  Future<List<T>> _withoutForbidden<T>(Future<List<T>> request) async {
-    try {
-      return await request;
-    } on DioException catch (error) {
-      if (error.response?.statusCode == 403) return [];
-      rethrow;
     }
   }
 
@@ -93,63 +97,54 @@ class _PurchaseOrdersScreenState extends State<PurchaseOrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final loading = _orders == null && _error == null;
+    final tabs = <Tab>[];
+    final views = <Widget>[];
+
+    if (_canCreate || _canApprove) {
+      tabs.add(const Tab(text: 'Cần xử lý'));
+      views.add(
+        _PurchaseOrderWorkList(
+          eligible: _eligible ?? [],
+          approvals: _queue ?? [],
+          onCreate: _create,
+          onOpen: _open,
+          onRefresh: _load,
+        ),
+      );
+    }
+    if (_canRecord) {
+      tabs.add(const Tab(text: 'Đang thực hiện'));
+      views.add(
+        _OrderList(
+          items: (_orders ?? [])
+              .where(
+                (item) =>
+                    ['issued', 'partially_received'].contains(item.status),
+              )
+              .toList(),
+          onOpen: _open,
+          onRefresh: _load,
+          emptyMessage: 'Không có đơn mua nào đang chờ giao.',
+        ),
+      );
+    }
+    tabs.add(const Tab(text: 'Tất cả'));
+    views.add(
+      _OrderList(items: _orders ?? [], onOpen: _open, onRefresh: _load),
+    );
     return DefaultTabController(
-      length: 4,
+      length: tabs.length,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Đơn đặt mua'),
-          bottom: const TabBar(
-            isScrollable: true,
-            tabs: [
-              Tab(text: 'Cần đặt'),
-              Tab(text: 'Chờ giao'),
-              Tab(text: 'Tất cả Đơn mua'),
-              Tab(text: 'Chờ duyệt'),
-            ],
-          ),
-          actions: [
-            IconButton(
-              tooltip: 'Hàng chờ kiểm tra',
-              onPressed: () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const PurchaseInspectionQueueScreen(),
-                ),
-              ),
-              icon: const Icon(Icons.fact_check_outlined),
-            ),
-            IconButton(
-              tooltip: 'Tải lại',
-              onPressed: loading ? null : _load,
-              icon: const Icon(Icons.refresh),
-            ),
-          ],
+          bottom: TabBar(isScrollable: true, tabs: tabs),
         ),
         body: _error != null
             ? _ScreenMessage(message: _error!, onRetry: _load)
             : loading
             ? const Center(child: CircularProgressIndicator())
-            : TabBarView(
-                children: [
-                  _EligibleList(items: _eligible!, onCreate: _create),
-                  _OrderList(
-                    items: _orders!
-                        .where(
-                          (item) => [
-                            'issued',
-                            'partially_received',
-                          ].contains(item.status),
-                        )
-                        .toList(),
-                    onOpen: _open,
-                    onRefresh: _load,
-                    emptyMessage: 'Không có đơn mua nào đang chờ giao.',
-                  ),
-                  _OrderList(items: _orders!, onOpen: _open, onRefresh: _load),
-                  _OrderList(items: _queue!, onOpen: _open, onRefresh: _load),
-                ],
-              ),
-        floatingActionButton: (_eligible?.isNotEmpty ?? false)
+            : TabBarView(children: views),
+        floatingActionButton: _canCreate && (_eligible?.isNotEmpty ?? false)
             ? FloatingActionButton.extended(
                 onPressed: _create,
                 icon: const Icon(Icons.add),
@@ -161,44 +156,111 @@ class _PurchaseOrdersScreenState extends State<PurchaseOrdersScreen> {
   }
 }
 
-class _EligibleList extends StatelessWidget {
-  const _EligibleList({required this.items, required this.onCreate});
+class _PurchaseOrderWorkList extends StatelessWidget {
+  const _PurchaseOrderWorkList({
+    required this.eligible,
+    required this.approvals,
+    required this.onCreate,
+    required this.onOpen,
+    required this.onRefresh,
+  });
+
+  final List<EligiblePurchaseOrderItem> eligible;
+  final List<PurchaseOrderSummary> approvals;
+  final void Function({String? requestId}) onCreate;
+  final ValueChanged<String> onOpen;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final requestIds = eligible.map((item) => item.requestId).toSet().toList();
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: requestIds.isEmpty && approvals.isEmpty
+          ? ListView(
+              children: const [
+                SizedBox(height: 120),
+                Icon(Icons.inbox_outlined, size: 56),
+                SizedBox(height: 12),
+                Text(
+                  'Không có đơn mua nào cần xử lý.',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            )
+          : ListView(
+              padding: const EdgeInsets.all(12),
+              children: [
+                if (requestIds.isNotEmpty) ...[
+                  Text(
+                    'Cần tạo đơn',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  for (final requestId in requestIds)
+                    _EligibleCard(
+                      items: eligible
+                          .where((item) => item.requestId == requestId)
+                          .toList(),
+                      onCreate: onCreate,
+                    ),
+                ],
+                if (approvals.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Chờ duyệt',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  for (final item in approvals)
+                    _OrderCard(item: item, onOpen: onOpen),
+                ],
+              ],
+            ),
+    );
+  }
+}
+
+class _EligibleCard extends StatelessWidget {
+  const _EligibleCard({required this.items, required this.onCreate});
+
   final List<EligiblePurchaseOrderItem> items;
   final void Function({String? requestId}) onCreate;
 
   @override
-  Widget build(BuildContext context) {
-    final requestIds = items.map((item) => item.requestId).toSet().toList();
-    if (requestIds.isEmpty) {
-      return const _ScreenMessage(
-        message: 'Không có đề nghị đã duyệt nào cần đặt thêm.',
-      );
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: requestIds.length,
-      itemBuilder: (context, index) {
-        final requestItems = items
-            .where((item) => item.requestId == requestIds[index])
-            .toList();
-        return Card(
-          child: ListTile(
-            title: Text(requestItems.first.requestCode),
-            subtitle: Text(
-              requestItems
-                  .map(
-                    (item) =>
-                        '${item.itemName}: còn ${item.remainingQuantity} (${item.supplierName})',
-                  )
-                  .join('\n'),
-            ),
-            trailing: const Icon(Icons.add_shopping_cart),
-            onTap: () => onCreate(requestId: requestItems.first.requestId),
-          ),
-        );
-      },
-    );
-  }
+  Widget build(BuildContext context) => Card(
+    child: ListTile(
+      title: Text(items.first.requestCode),
+      subtitle: Text(
+        items
+            .map(
+              (item) =>
+                  '${item.itemName}: còn ${item.remainingQuantity} (${item.supplierName})',
+            )
+            .join('\n'),
+      ),
+      trailing: const Icon(Icons.add_shopping_cart),
+      onTap: () => onCreate(requestId: items.first.requestId),
+    ),
+  );
+}
+
+class _OrderCard extends StatelessWidget {
+  const _OrderCard({required this.item, required this.onOpen});
+
+  final PurchaseOrderSummary item;
+  final ValueChanged<String> onOpen;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: ListTile(
+      title: Text(item.purchaseOrderCode),
+      subtitle: Text(
+        '${purchaseOrderStatusLabel(item.status)} • ${item.supplierName}\n'
+        '${item.requestCode} • Giao ${item.expectedDeliveryDate}',
+      ),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => onOpen(item.id),
+    ),
+  );
 }
 
 class _OrderList extends StatelessWidget {

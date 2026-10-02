@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/auth/auth_session.dart';
 import '../../core/storage/token_storage.dart';
 import '../../core/utils/department_labels.dart';
 import '../../core/widgets/app_text.dart';
@@ -43,6 +44,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // Xóa token và quay về màn hình đăng nhập
   Future<void> _logout() async {
+    AuthSession.instance.clear();
     await _tokenStorage.clearAccessToken();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(

@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 
-import '../purchase_orders/purchase_orders_screen.dart';
+import '../../core/auth/auth_session.dart';
 import 'purchase_request_detail_screen.dart';
 import 'purchase_request_form.dart';
 import 'purchase_request_models.dart';
 import 'purchase_requests_repository.dart';
 
+enum PurchaseRequestInitialTab { mine, queue }
+
 class PurchaseRequestsScreen extends StatefulWidget {
-  const PurchaseRequestsScreen({super.key, this.repository});
+  const PurchaseRequestsScreen({
+    super.key,
+    this.repository,
+    this.allowedActions,
+    this.initialTab = PurchaseRequestInitialTab.mine,
+  });
 
   final PurchaseRequestsRepository? repository;
+  final Set<String>? allowedActions;
+  final PurchaseRequestInitialTab initialTab;
 
   @override
   State<PurchaseRequestsScreen> createState() => _PurchaseRequestsScreenState();
@@ -20,6 +29,20 @@ class _PurchaseRequestsScreenState extends State<PurchaseRequestsScreen> {
   List<PurchaseRequestSummary>? _mine;
   List<PurchaseRequestSummary>? _queue;
   String? _error;
+
+  Set<String> get _actions =>
+      widget.allowedActions ??
+      AuthSession.instance.profile?.allowedActions ??
+      const {};
+
+  bool get _canProcessRequests => _actions.any(
+    {
+      'purchase.request.approve_department',
+      'purchase.request.enrich_procurement',
+      'purchase.request.approve_procurement',
+      'purchase.request.approve_it',
+    }.contains,
+  );
 
   @override
   void initState() {
@@ -35,15 +58,14 @@ class _PurchaseRequestsScreenState extends State<PurchaseRequestsScreen> {
       _error = null;
     });
     try {
-      // Lấy 2 list request
-      final results = await Future.wait([
-        _repository.findMine(),
-        _repository.findQueue(),
-      ]);
+      final mine = await _repository.findMine();
+      final queue = _canProcessRequests
+          ? await _repository.findQueue()
+          : <PurchaseRequestSummary>[];
       if (!mounted) return;
       setState(() {
-        _mine = results[0];
-        _queue = results[1];
+        _mine = mine;
+        _queue = queue;
       });
     } catch (error) {
       if (!mounted) return;
@@ -74,33 +96,25 @@ class _PurchaseRequestsScreenState extends State<PurchaseRequestsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tabCount = _canProcessRequests ? 2 : 1;
+
     return DefaultTabController(
-      length: 2,
+      length: tabCount,
+      initialIndex:
+          widget.initialTab == PurchaseRequestInitialTab.queue &&
+              _canProcessRequests
+          ? 1
+          : 0,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Đề nghị mua'),
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
-              Tab(text: 'Của tôi'),
-              Tab(text: 'Chờ xử lý'),
+              const Tab(text: 'Của tôi'),
+              if (_canProcessRequests) const Tab(text: 'Chờ xử lý'),
             ],
           ),
           centerTitle: true,
-          actions: [
-            IconButton(
-              tooltip: 'Đơn đặt mua',
-              onPressed: () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(builder: (_) => const PurchaseOrdersScreen()),
-              ),
-              icon: const Icon(Icons.shopping_cart_checkout),
-            ),
-            IconButton(
-              tooltip: 'Tải lại',
-              onPressed: _mine == null && _error == null ? null : _load,
-              icon: const Icon(Icons.refresh),
-            ),
-          ],
         ),
         body: _error != null
             ? _ListError(message: _error!, onRetry: _load)
@@ -116,21 +130,25 @@ class _PurchaseRequestsScreenState extends State<PurchaseRequestsScreen> {
                       onOpen: _open,
                     ),
                   ),
-                  Center(
-                    child: PurchaseRequestList(
-                      items: _queue!,
-                      emptyMessage: 'Không có đề nghị nào đang chờ bạn xử lý.',
-                      onRefresh: _load,
-                      onOpen: _open,
+                  if (_canProcessRequests)
+                    Center(
+                      child: PurchaseRequestList(
+                        items: _queue!,
+                        emptyMessage:
+                            'Không có đề nghị nào đang chờ bạn xử lý.',
+                        onRefresh: _load,
+                        onOpen: _open,
+                      ),
                     ),
-                  ),
                 ],
               ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _create,
-          icon: const Icon(Icons.add),
-          label: const Text('Tạo đề nghị'),
-        ),
+        floatingActionButton: _actions.contains('purchase.request.create')
+            ? FloatingActionButton.extended(
+                onPressed: _create,
+                icon: const Icon(Icons.add),
+                label: const Text('Tạo đề nghị'),
+              )
+            : null,
       ),
     );
   }

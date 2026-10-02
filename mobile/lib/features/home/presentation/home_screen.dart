@@ -1,14 +1,21 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/auth/auth_session.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/app_text.dart';
 import '../../../core/widgets/requirement_grid.dart';
 import '../../../core/widgets/status_card.dart';
-import '../../purchase_requests/purchase_requests_screen.dart';
+import '../../purchases/purchase_hub_screen.dart';
 
 class _RequirementGrid extends StatelessWidget {
-  const _RequirementGrid();
+  const _RequirementGrid({
+    required this.profile,
+    required this.showPurchaseHub,
+  });
+
+  final AuthenticatedProfile profile;
+  final bool showPurchaseHub;
 
   @override
   Widget build(BuildContext context) {
@@ -27,18 +34,19 @@ class _RequirementGrid extends StatelessWidget {
           );
         },
       ),
-      RequirementCard(
-        title: 'Đề nghị mua mới',
-        icon: Icons.shopping_bag,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const PurchaseRequestsScreen(),
-            ),
-          );
-        },
-      ),
+      if (showPurchaseHub)
+        RequirementCard(
+          title: 'Mua sắm tài sản',
+          icon: Icons.shopping_bag,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PurchaseHubScreen(profile: profile),
+              ),
+            );
+          },
+        ),
       RequirementCard(
         title: 'Báo hỏng / Sửa chữa',
         icon: Icons.info_outline,
@@ -62,7 +70,9 @@ class _RequirementGrid extends StatelessWidget {
 }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({required this.profile, super.key});
+
+  final AuthenticatedProfile profile;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -74,6 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int? _assignedAssets;
   int? _activeRequests;
   bool _loading = true;
+  bool _hasAllocationTask = false;
 
   @override
   void initState() {
@@ -86,11 +97,17 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() => _loading = true);
 
     try {
-      final response = await _dio.get<Map<String, dynamic>>('/dashboard/mine');
+      final responses = await Future.wait([
+        _dio.get<Map<String, dynamic>>('/dashboard/mine'),
+        _dio.get<List<dynamic>>('/asset-allocations/queue'),
+      ]);
       if (!mounted) return;
+      final summary = responses[0] as Response<Map<String, dynamic>>;
+      final allocationQueue = responses[1] as Response<List<dynamic>>;
       setState(() {
-        _assignedAssets = response.data?['assignedAssets'] as int? ?? 0;
-        _activeRequests = response.data?['activeRequests'] as int? ?? 0;
+        _assignedAssets = summary.data?['assignedAssets'] as int? ?? 0;
+        _activeRequests = summary.data?['activeRequests'] as int? ?? 0;
+        _hasAllocationTask = allocationQueue.data?.isNotEmpty ?? false;
         _loading = false;
       });
     } on DioException catch (error) {
@@ -106,6 +123,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final showPurchaseHub =
+        widget.profile.allowedActions.any(
+          (action) =>
+              action.startsWith('purchase.') &&
+              action != 'purchase.allocation.confirm_recipient',
+        ) ||
+        _hasAllocationTask;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Trang chủ'),
@@ -169,7 +194,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 context: context,
                 type: AppTextType.h2,
               ),
-              _RequirementGrid(),
+              _RequirementGrid(
+                profile: widget.profile,
+                showPurchaseHub: showPurchaseHub,
+              ),
             ],
           ),
         ),

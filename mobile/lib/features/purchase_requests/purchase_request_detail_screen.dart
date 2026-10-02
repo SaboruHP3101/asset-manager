@@ -91,14 +91,6 @@ class _PurchaseRequestDetailScreenState
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   for (final item in detail.items) _ItemCard(item: item),
-                  const SizedBox(height: 16),
-                  _ActionPanel(
-                    detail: detail,
-                    disabled: _acting,
-                    onAction: _handleAction,
-                    onAddQuote: _openQuoteDialog,
-                    onCreateOrder: _openPurchaseOrderForm,
-                  ),
                   const SizedBox(height: 20),
                   const Text(
                     'Lịch sử xử lý',
@@ -120,15 +112,52 @@ class _PurchaseRequestDetailScreenState
                           ),
                         ),
                         subtitle: Text(
-                          '${purchaseStatusLabel(event['previousStatus']?.toString() ?? '')} → '
-                          '${purchaseStatusLabel(event['newStatus']?.toString() ?? '')}'
+                          '${purchaseHistoryStatusTransitionLabel(event['previousStatus']?.toString() ?? '', event['newStatus']?.toString() ?? '')}'
                           '${event['reason'] == null ? '' : '\n${event['reason']}'}',
                         ),
                       ),
                 ],
               ),
             ),
+      bottomNavigationBar: !_loading && _error == null && detail != null
+          ? _RequestActionBar(
+              detail: detail,
+              disabled: _acting,
+              onAction: _handleAction,
+              onChooseQuote: _chooseQuoteItem,
+              onCreateOrder: _openPurchaseOrderForm,
+            )
+          : null,
     );
+  }
+
+  Future<void> _chooseQuoteItem() async {
+    final item = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.only(bottom: 12),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Chọn hạng mục thêm báo giá',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            for (final item in _detail!.items)
+              ListTile(
+                title: Text(item['itemName'] as String),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.pop(context, item),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (item != null) await _openQuoteDialog(item);
   }
 
   Future<void> _handleAction(String action) async {
@@ -367,91 +396,116 @@ class _ItemCard extends StatelessWidget {
   }
 }
 
-class _ActionPanel extends StatelessWidget {
-  const _ActionPanel({
+class _RequestActionBar extends StatelessWidget {
+  const _RequestActionBar({
     required this.detail,
     required this.disabled,
     required this.onAction,
-    required this.onAddQuote,
+    required this.onChooseQuote,
     required this.onCreateOrder,
   });
 
   final PurchaseRequestDetail detail;
   final bool disabled;
   final ValueChanged<String> onAction;
-  final ValueChanged<Map<String, dynamic>> onAddQuote;
+  final VoidCallback onChooseQuote;
   final VoidCallback onCreateOrder;
 
   @override
   Widget build(BuildContext context) {
-    final buttons = <Widget>[];
+    Widget? primary;
     if (detail.allows('purchase.request.update')) {
-      buttons.add(
-        OutlinedButton.icon(
-          onPressed: disabled ? null : () => onAction('edit'),
-          icon: const Icon(Icons.edit),
-          label: const Text('Chỉnh sửa'),
-        ),
+      primary = OutlinedButton.icon(
+        onPressed: disabled ? null : () => onAction('edit'),
+        icon: const Icon(Icons.edit),
+        label: const Text('Chỉnh sửa'),
       );
     }
     if (detail.allows('purchase.request.submit')) {
-      buttons.add(
-        FilledButton(
-          onPressed: disabled ? null : () => onAction('submit'),
-          child: const Text('Gửi trình ký'),
-        ),
+      primary = FilledButton(
+        onPressed: disabled ? null : () => onAction('submit'),
+        child: const Text('Gửi trình ký'),
       );
     }
     if (detail.allows('purchase.request.approve_department')) {
-      buttons.add(
-        FilledButton(
-          onPressed: disabled ? null : () => onAction('department'),
-          child: const Text('Xử lý cấp phòng'),
-        ),
+      primary = FilledButton(
+        onPressed: disabled ? null : () => onAction('department'),
+        child: const Text('Xử lý cấp phòng'),
       );
     }
     if (detail.allows('purchase.request.enrich_procurement')) {
-      buttons.addAll([
-        for (final item in detail.items)
-          OutlinedButton(
-            onPressed: disabled ? null : () => onAddQuote(item),
-            child: Text('Thêm báo giá: ${item['itemName']}'),
-          ),
-        FilledButton(
-          onPressed: disabled ? null : () => onAction('submit_procurement'),
-          child: const Text('Trình Trưởng Thu mua'),
-        ),
-      ]);
+      primary = FilledButton(
+        onPressed: disabled ? null : () => onAction('submit_procurement'),
+        child: const Text('Trình Trưởng Thu mua'),
+      );
     }
     if (detail.allows('purchase.request.approve_procurement')) {
-      buttons.add(
-        FilledButton(
-          onPressed: disabled ? null : () => onAction('procurement'),
-          child: const Text('Duyệt thương mại'),
-        ),
+      primary = FilledButton(
+        onPressed: disabled ? null : () => onAction('procurement'),
+        child: const Text('Duyệt thương mại'),
       );
     }
     if (detail.allows('purchase.request.approve_it')) {
-      buttons.add(
-        FilledButton(
-          onPressed: disabled ? null : () => onAction('it'),
-          child: const Text('Duyệt chuyên môn IT'),
-        ),
+      primary = FilledButton(
+        onPressed: disabled ? null : () => onAction('it'),
+        child: const Text('Duyệt chuyên môn IT'),
       );
     }
     if (detail.allows('purchase.order.create')) {
-      buttons.add(
-        FilledButton.icon(
-          onPressed: disabled ? null : onCreateOrder,
-          icon: const Icon(Icons.add_shopping_cart),
-          label: const Text('Tạo đơn đặt mua'),
-        ),
+      primary = FilledButton.icon(
+        onPressed: disabled ? null : onCreateOrder,
+        icon: const Icon(Icons.add_shopping_cart),
+        label: const Text('Tạo đơn đặt mua'),
       );
     }
-    if (buttons.isEmpty) return const SizedBox.shrink();
+    final canEdit =
+        detail.allows('purchase.request.update') &&
+        detail.allows('purchase.request.submit');
+    final canAddQuote = detail.allows('purchase.request.enrich_procurement');
+    if (primary == null && !canAddQuote) return const SizedBox.shrink();
+
     return Semantics(
       label: 'Hành động có thể thực hiện',
-      child: Wrap(spacing: 8, runSpacing: 8, children: buttons),
+      child: Material(
+        elevation: 8,
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ?primary,
+                if (canEdit || canAddQuote) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      if (canEdit)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: disabled ? null : () => onAction('edit'),
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('Chỉnh sửa'),
+                          ),
+                        ),
+                      if (canEdit && canAddQuote) const SizedBox(width: 8),
+                      if (canAddQuote)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: disabled ? null : onChooseQuote,
+                            icon: const Icon(Icons.request_quote_outlined),
+                            label: const Text('Thêm báo giá'),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

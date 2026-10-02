@@ -365,22 +365,6 @@ export class PurchaseReceiptsService {
           dto.accepted &&
           context.trackingModeSnapshot === 'individual_asset'
         ) {
-          const [managingDepartment] = await tx
-            .select({ id: schema.departments.id })
-            .from(schema.departments)
-            .where(
-              eq(
-                schema.departments.name,
-                context.managementOwnerSnapshot.toUpperCase(),
-              ),
-            );
-
-          if (!managingDepartment) {
-            throw new ConflictException(
-              'Không tìm thấy bộ phận quản lý tài sản.',
-            );
-          }
-
           const assetId = randomUUID();
           const assetCode = this.createAssetCode(assetId);
           const [createdAsset] = await tx
@@ -391,7 +375,6 @@ export class PurchaseReceiptsService {
               qrCode: `asset:${assetId}`,
               assetCategoryId: context.assetCategoryId,
               supplierId: context.supplierId,
-              currentManagingDepartmentId: managingDepartment.id,
               purchaseOrderItemId: context.purchaseOrderItemId,
               purchaseReceiptUnitId: unitId,
               name: context.itemNameSnapshot,
@@ -439,15 +422,29 @@ export class PurchaseReceiptsService {
         });
 
         if (asset) {
-          await this.notifications.create(tx, {
-            recipientId: context.requesterId,
-            eventType: 'asset_pending_initial_allocation',
-            entityType: 'asset',
-            entityId: asset.id,
-            title: 'Tài sản chờ cấp phát',
-            body: `${asset.assetCode} đã kiểm tra đạt và đang chờ cấp phát.`,
-            metadata: { purchaseRequestId: context.purchaseRequestId },
-          });
+          const departmentHeads = await tx
+            .select({ id: schema.employees.id })
+            .from(schema.employees)
+            .where(
+              and(
+                eq(schema.employees.departmentId, context.requestDepartmentId),
+                eq(schema.employees.isDepartmentHead, true),
+                eq(schema.employees.isActive, true),
+              ),
+            );
+
+          await this.notifications.createMany(
+            tx,
+            departmentHeads.map((head) => ({
+              recipientId: head.id,
+              eventType: 'asset_pending_initial_allocation' as const,
+              entityType: 'asset' as const,
+              entityId: asset.id,
+              title: 'Tài sản chờ cấp phát',
+              body: `${asset.assetCode} đã kiểm tra đạt và đang chờ cấp phát.`,
+              metadata: { purchaseRequestId: context.purchaseRequestId },
+            })),
+          );
         }
 
         if (receiptStatus === 'inspected') {
@@ -723,7 +720,7 @@ export class PurchaseReceiptsService {
         itemNameSnapshot: schema.purchaseOrderItems.itemNameSnapshot,
         unitPriceExclVat: schema.purchaseOrderItems.unitPriceExclVat,
         assetCategoryId: schema.purchaseRequestItems.assetCategoryId,
-        requesterId: schema.purchaseRequests.requesterId,
+        requestDepartmentId: schema.purchaseRequests.departmentId,
       })
       .from(schema.purchaseReceiptUnits)
       .innerJoin(

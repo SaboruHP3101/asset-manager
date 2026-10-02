@@ -204,6 +204,8 @@ export class AssetsService {
         department: schema.departments.name,
         supplier: schema.suppliers.legalName,
         status: schema.assets.status,
+        currentLocation: schema.assets.currentLocation,
+        assignedTo: schema.employees.fullName,
         purchaseDate: schema.assets.purchaseDate,
         inServiceDate: schema.assets.inServiceDate,
         initialValue: schema.assets.initialValue,
@@ -220,6 +222,10 @@ export class AssetsService {
       .leftJoin(
         schema.departments,
         eq(schema.assets.currentManagingDepartmentId, schema.departments.id),
+      )
+      .leftJoin(
+        schema.employees,
+        eq(schema.assets.currentUserId, schema.employees.id),
       )
       .where(
         and(
@@ -243,7 +249,39 @@ export class AssetsService {
       )
       .orderBy(asc(schema.attachments.createdAt));
 
-    return { ...record, imageUrl: attachment?.url ?? null };
+    const handoverHistory = await this.db
+      .select({
+        id: schema.assetHandoverHistory.id,
+        handoverType: schema.assetHandoverHistory.handoverType,
+        handoverDate: schema.assetHandoverHistory.handoverDate,
+        status: schema.assetHandoverHistory.status,
+        note: schema.assetHandoverHistory.note,
+        recipientName: schema.employees.fullName,
+        departmentName: schema.departments.name,
+      })
+      .from(schema.assetHandoverHistory)
+      .leftJoin(
+        schema.employees,
+        eq(
+          schema.assetHandoverHistory.receivedByEmployeeId,
+          schema.employees.id,
+        ),
+      )
+      .leftJoin(
+        schema.departments,
+        eq(
+          schema.assetHandoverHistory.receivedByDepartmentId,
+          schema.departments.id,
+        ),
+      )
+      .where(eq(schema.assetHandoverHistory.assetId, assetId))
+      .orderBy(desc(schema.assetHandoverHistory.handoverDate));
+
+    return {
+      ...record,
+      imageUrl: attachment?.url ?? null,
+      handoverHistory,
+    };
   }
 
   async findOne(id: string) {
