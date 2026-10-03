@@ -124,6 +124,11 @@ export const allocationDecisionEnum = pgEnum('allocation_decision', [
   'rejected',
 ]);
 
+export const assetAllocationTargetTypeEnum = pgEnum(
+  'asset_allocation_target_type',
+  ['individual', 'shared_location'],
+);
+
 /**
  * requested - Yêu cầu điều chuyển mới được tạo và đang chờ xử lý.
  * dept_approved - Trưởng phòng đã duyệt yêu cầu điều chuyển.
@@ -708,9 +713,10 @@ export const assetAllocations = pgTable(
     departmentId: uuid('department_id')
       .notNull()
       .references(() => departments.id),
-    recipientId: uuid('recipient_id')
+    targetType: assetAllocationTargetTypeEnum('target_type')
       .notNull()
-      .references(() => employees.id),
+      .default('individual'),
+    recipientId: uuid('recipient_id').references(() => employees.id),
     location: varchar('location', { length: 500 }).notNull(),
     managementOwnerSnapshot: assetManagementOwnerEnum(
       'management_owner_snapshot',
@@ -728,9 +734,7 @@ export const assetAllocations = pgTable(
       withTimezone: true,
     }),
     departmentHeadNote: text('department_head_note'),
-    recipientDecision: allocationDecisionEnum('recipient_decision')
-      .notNull()
-      .default('pending'),
+    recipientDecision: allocationDecisionEnum('recipient_decision'),
     recipientDecidedAt: timestamp('recipient_decided_at', {
       withTimezone: true,
     }),
@@ -752,6 +756,10 @@ export const assetAllocations = pgTable(
     index('idx_asset_allocation_recipient').on(table.recipientId),
     index('idx_asset_allocation_department').on(table.departmentId),
     check('chk_asset_allocation_attempt', sql`${table.attemptNumber} > 0`),
+    check(
+      'chk_asset_allocation_target',
+      sql`(${table.targetType} = 'individual' and ${table.recipientId} is not null and ${table.recipientDecision} is not null) or (${table.targetType} = 'shared_location' and ${table.recipientId} is null and ${table.recipientDecision} is null)`,
+    ),
   ],
 );
 

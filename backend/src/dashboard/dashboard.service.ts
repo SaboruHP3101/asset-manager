@@ -109,7 +109,7 @@ export class DashboardService {
       canApproveOrder
         ? this.purchaseOrders.findApprovalQueue(actor)
         : Promise.resolve([]),
-      canTrackOrders
+      canTrackOrders || canCreateOrder
         ? this.purchaseOrders.findAll(actor, {})
         : Promise.resolve([]),
       canInspect
@@ -120,6 +120,9 @@ export class DashboardService {
     const ongoingOrders = visibleOrders.filter((order) =>
       ['issued', 'partially_received'].includes(order.status),
     );
+    const draftOrders = canCreateOrder
+      ? visibleOrders.filter((order) => order.status === 'draft')
+      : [];
 
     return {
       assignedAssets: assetsResult[0]?.value ?? 0,
@@ -132,6 +135,7 @@ export class DashboardService {
         purchaseOrders:
           eligibleOrderItems.length +
           orderApprovalQueue.length +
+          draftOrders.length +
           ongoingOrders.length,
         inspections: inspectionQueue.length,
         allocations: allocationQueue.length,

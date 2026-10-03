@@ -28,6 +28,7 @@ class _PurchaseRequestDetailScreenState
   String? _error;
   bool _loading = true;
   bool _acting = false;
+  bool _addingQuote = false;
 
   @override
   void initState() {
@@ -36,9 +37,9 @@ class _PurchaseRequestDetailScreenState
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool showPageLoader = true}) async {
     setState(() {
-      _loading = true;
+      if (showPageLoader) _loading = true;
       _error = null;
     });
     try {
@@ -123,6 +124,7 @@ class _PurchaseRequestDetailScreenState
           ? _RequestActionBar(
               detail: detail,
               disabled: _acting,
+              addingQuote: _addingQuote,
               onAction: _handleAction,
               onChooseQuote: _chooseQuoteItem,
               onCreateOrder: _openPurchaseOrderForm,
@@ -132,6 +134,11 @@ class _PurchaseRequestDetailScreenState
   }
 
   Future<void> _chooseQuoteItem() async {
+    final items = [..._detail!.items]
+      ..sort(
+        (left, right) =>
+            _quoteState(left).sortOrder.compareTo(_quoteState(right).sortOrder),
+      );
     final item = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       showDragHandle: true,
@@ -147,9 +154,23 @@ class _PurchaseRequestDetailScreenState
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
-            for (final item in _detail!.items)
+            for (final item in items)
               ListTile(
-                title: Text(item['itemName'] as String),
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item['itemName'] as String),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${item['categoryName']} • Số lượng ${item['quantity']}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    _QuoteStateChip(state: _quoteState(item)),
+                  ],
+                ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.pop(context, item),
               ),
@@ -208,16 +229,30 @@ class _PurchaseRequestDetailScreenState
     );
   }
 
-  Future<void> _run(Future<void> Function() action) async {
-    setState(() => _acting = true);
+  Future<void> _run(
+    Future<void> Function() action, {
+    bool addingQuote = false,
+  }) async {
+    if (_acting) return;
+    setState(() {
+      _acting = true;
+      _addingQuote = addingQuote;
+    });
     try {
       await action();
-      await _load();
+      if (!mounted) return;
+      await _load(showPageLoader: false);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(purchaseApiError(error))));
-      setState(() => _acting = false);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _acting = false;
+          _addingQuote = false;
+        });
+      }
     }
   }
 
@@ -299,7 +334,7 @@ class _PurchaseRequestDetailScreenState
       if (!mounted) return;
       final input = await showDialog<_QuoteInput>(
         context: context,
-        builder: (_) => _QuoteDialog(suppliers: suppliers),
+        builder: (_) => _QuoteDialog(suppliers: suppliers, item: item),
       );
       if (input == null) return;
       await _run(
@@ -313,6 +348,7 @@ class _PurchaseRequestDetailScreenState
           image: input.image,
           note: input.note,
         ),
+        addingQuote: true,
       );
     } catch (error) {
       if (!mounted) return;
@@ -404,6 +440,7 @@ class _RequestActionBar extends StatelessWidget {
   const _RequestActionBar({
     required this.detail,
     required this.disabled,
+    required this.addingQuote,
     required this.onAction,
     required this.onChooseQuote,
     required this.onCreateOrder,
@@ -411,12 +448,14 @@ class _RequestActionBar extends StatelessWidget {
 
   final PurchaseRequestDetail detail;
   final bool disabled;
+  final bool addingQuote;
   final ValueChanged<String> onAction;
   final VoidCallback onChooseQuote;
   final VoidCallback onCreateOrder;
 
   @override
   Widget build(BuildContext context) {
+    final quoteProgress = _QuoteProgress.fromItems(detail.items);
     Widget? primary;
     if (detail.allows('purchase.request.update')) {
       primary = OutlinedButton.icon(
@@ -439,7 +478,9 @@ class _RequestActionBar extends StatelessWidget {
     }
     if (detail.allows('purchase.request.enrich_procurement')) {
       primary = FilledButton(
-        onPressed: disabled ? null : () => onAction('submit_procurement'),
+        onPressed: disabled || !quoteProgress.isComplete
+            ? null
+            : () => onAction('submit_procurement'),
         child: const Text('Trình Trưởng Thu mua'),
       );
     }
@@ -480,6 +521,10 @@ class _RequestActionBar extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (canAddQuote) ...[
+                  _QuoteProgressSummary(progress: quoteProgress),
+                  const SizedBox(height: 10),
+                ],
                 ?primary,
                 if (canEdit || canAddQuote) ...[
                   const SizedBox(height: 8),
@@ -498,8 +543,19 @@ class _RequestActionBar extends StatelessWidget {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: disabled ? null : onChooseQuote,
-                            icon: const Icon(Icons.request_quote_outlined),
-                            label: const Text('Thêm báo giá'),
+                            icon: addingQuote
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.request_quote_outlined),
+                            label: Text(
+                              addingQuote
+                                  ? 'Đang lưu báo giá…'
+                                  : 'Thêm báo giá',
+                            ),
                           ),
                         ),
                     ],
@@ -515,9 +571,10 @@ class _RequestActionBar extends StatelessWidget {
 }
 
 class _QuoteDialog extends StatefulWidget {
-  const _QuoteDialog({required this.suppliers});
+  const _QuoteDialog({required this.suppliers, required this.item});
 
   final List<PurchaseSupplierOption> suppliers;
+  final Map<String, dynamic> item;
 
   @override
   State<_QuoteDialog> createState() => _QuoteDialogState();
@@ -549,7 +606,10 @@ class _QuoteDialogState extends State<_QuoteDialog> {
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              _QuoteItemContext(item: widget.item),
+              const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: _supplierId,
                 isExpanded: true,
@@ -603,6 +663,16 @@ class _QuoteDialogState extends State<_QuoteDialog> {
                 value: _selected,
                 onChanged: (value) => setState(() => _selected = value),
               ),
+              if (_selected && _hasSelectedQuote(widget.item))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Báo giá đang chọn trước đó sẽ được thay thế.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -647,6 +717,200 @@ class _QuoteDialogState extends State<_QuoteDialog> {
           child: const Text('Lưu'),
         ),
       ],
+    );
+  }
+}
+
+enum _QuoteState {
+  missing('Chưa có báo giá', 0),
+  unselected('Chưa chọn báo giá', 1),
+  selected('Đã chọn báo giá', 2);
+
+  const _QuoteState(this.label, this.sortOrder);
+
+  final String label;
+  final int sortOrder;
+}
+
+_QuoteState _quoteState(Map<String, dynamic> item) {
+  final quotes = item['quotes'];
+
+  if (quotes is! List || quotes.isEmpty) return _QuoteState.missing;
+  if (_hasSelectedQuote(item)) return _QuoteState.selected;
+
+  return _QuoteState.unselected;
+}
+
+bool _hasSelectedQuote(Map<String, dynamic> item) {
+  final quotes = item['quotes'];
+
+  return quotes is List &&
+      quotes.any((quote) => quote is Map && quote['isSelected'] == true);
+}
+
+class _QuoteProgress {
+  const _QuoteProgress({
+    required this.total,
+    required this.completed,
+    required this.missingNames,
+  });
+
+  factory _QuoteProgress.fromItems(List<Map<String, dynamic>> items) {
+    final missing = items
+        .where((item) => !_hasSelectedQuote(item))
+        .map((item) => item['itemName']?.toString() ?? 'Hạng mục chưa đặt tên')
+        .toList();
+
+    return _QuoteProgress(
+      total: items.length,
+      completed: items.length - missing.length,
+      missingNames: missing,
+    );
+  }
+
+  final int total;
+  final int completed;
+  final List<String> missingNames;
+
+  bool get isComplete => total > 0 && completed == total;
+}
+
+class _QuoteProgressSummary extends StatelessWidget {
+  const _QuoteProgressSummary({required this.progress});
+
+  final _QuoteProgress progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final missingSummary = progress.missingNames.length <= 2
+        ? progress.missingNames.join(', ')
+        : '${progress.missingNames.take(2).join(', ')} và '
+              '${progress.missingNames.length - 2} hạng mục khác';
+
+    return Semantics(
+      label: progress.isComplete
+          ? 'Đã hoàn tất báo giá cho tất cả hạng mục'
+          : 'Còn hạng mục chưa chọn báo giá',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: progress.isComplete
+              ? colorScheme.primaryContainer
+              : colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    progress.isComplete
+                        ? Icons.check_circle_outline
+                        : Icons.pending_actions_outlined,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Đã hoàn tất báo giá '
+                      '${progress.completed}/${progress.total} hạng mục',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+              if (!progress.isComplete && missingSummary.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Còn thiếu: $missingSummary',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuoteStateChip extends StatelessWidget {
+  const _QuoteStateChip({required this.state});
+
+  final _QuoteState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final selected = state == _QuoteState.selected;
+
+    return Chip(
+      visualDensity: VisualDensity.compact,
+      label: Text(state.label),
+      backgroundColor: selected
+          ? colorScheme.primaryContainer
+          : colorScheme.surfaceContainerHighest,
+      side: BorderSide.none,
+    );
+  }
+}
+
+class _QuoteItemContext extends StatelessWidget {
+  const _QuoteItemContext({required this.item});
+
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final specifications = item['specifications']?.toString() ?? '';
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.inventory_2_outlined, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Báo giá cho',
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                  Text(
+                    item['itemName']?.toString() ?? 'Hạng mục',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  Text(
+                    '${item['categoryName']} • Số lượng ${item['quantity']}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (specifications.isNotEmpty)
+                    Text(
+                      specifications,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

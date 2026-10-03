@@ -317,15 +317,16 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
   }
 
   Future<String?> _showReasonDialog(String title) async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
+    var reason = '';
+
+    return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(title),
         content: TextField(
-          controller: controller,
           autofocus: true,
           maxLines: 3,
+          onChanged: (value) => reason = value,
           decoration: const InputDecoration(labelText: 'Lý do bắt buộc'),
         ),
         actions: [
@@ -335,7 +336,7 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
           ),
           FilledButton(
             onPressed: () {
-              final value = controller.text.trim();
+              final value = reason.trim();
               if (value.isNotEmpty) Navigator.pop(context, value);
             },
             child: const Text('Xác nhận'),
@@ -343,8 +344,6 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
         ],
       ),
     );
-    controller.dispose();
-    return result;
   }
 }
 
@@ -424,14 +423,17 @@ class _OrderActionBar extends StatelessWidget {
                     tooltip: 'Thêm hành động',
                     enabled: !disabled,
                     onSelected: (value) {
-                      switch (value) {
-                        case _OrderOverflowAction.cancel:
-                          onCancel();
-                          return;
-                        case _OrderOverflowAction.closeShort:
-                          onCloseShort();
-                          return;
-                      }
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!context.mounted) return;
+                        switch (value) {
+                          case _OrderOverflowAction.cancel:
+                            onCancel();
+                            return;
+                          case _OrderOverflowAction.closeShort:
+                            onCloseShort();
+                            return;
+                        }
+                      });
                     },
                     itemBuilder: (context) => [
                       if (canCancel)

@@ -31,6 +31,7 @@ class _PurchaseOrdersScreenState extends State<PurchaseOrdersScreen> {
   bool get _canCreate => _actions.contains('purchase.order.create');
   bool get _canApprove => _actions.contains('purchase.order.approve');
   bool get _canRecord => _actions.contains('purchase.receipt.record');
+
   /// Khởi tạo repository rồi tải đồng thời các tab đơn mua
   @override
   void initState() {
@@ -105,6 +106,11 @@ class _PurchaseOrdersScreenState extends State<PurchaseOrdersScreen> {
       views.add(
         _PurchaseOrderWorkList(
           eligible: _eligible ?? [],
+          drafts: _canCreate
+              ? (_orders ?? [])
+                    .where((order) => order.status == 'draft')
+                    .toList()
+              : const [],
           approvals: _queue ?? [],
           onCreate: _create,
           onOpen: _open,
@@ -159,6 +165,7 @@ class _PurchaseOrdersScreenState extends State<PurchaseOrdersScreen> {
 class _PurchaseOrderWorkList extends StatelessWidget {
   const _PurchaseOrderWorkList({
     required this.eligible,
+    required this.drafts,
     required this.approvals,
     required this.onCreate,
     required this.onOpen,
@@ -166,6 +173,7 @@ class _PurchaseOrderWorkList extends StatelessWidget {
   });
 
   final List<EligiblePurchaseOrderItem> eligible;
+  final List<PurchaseOrderSummary> drafts;
   final List<PurchaseOrderSummary> approvals;
   final void Function({String? requestId}) onCreate;
   final ValueChanged<String> onOpen;
@@ -176,7 +184,7 @@ class _PurchaseOrderWorkList extends StatelessWidget {
     final requestIds = eligible.map((item) => item.requestId).toSet().toList();
     return RefreshIndicator(
       onRefresh: onRefresh,
-      child: requestIds.isEmpty && approvals.isEmpty
+      child: requestIds.isEmpty && drafts.isEmpty && approvals.isEmpty
           ? ListView(
               children: const [
                 SizedBox(height: 120),
@@ -191,7 +199,16 @@ class _PurchaseOrderWorkList extends StatelessWidget {
           : ListView(
               padding: const EdgeInsets.all(12),
               children: [
+                if (drafts.isNotEmpty) ...[
+                  Text(
+                    'Đơn mua nháp cần hoàn tất',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  for (final item in drafts)
+                    _OrderCard(item: item, onOpen: onOpen),
+                ],
                 if (requestIds.isNotEmpty) ...[
+                  if (drafts.isNotEmpty) const SizedBox(height: 8),
                   Text(
                     'Cần tạo đơn',
                     style: Theme.of(context).textTheme.titleMedium,

@@ -49,6 +49,7 @@ void main() {
     expect(find.text('Hàng giao cần kiểm tra'), findsNothing);
     expect(find.text('Cấp phát tài sản'), findsNothing);
     expect(find.text('Đề nghị mua'), findsOneWidget);
+    expect(find.text('Đơn đặt mua'), findsNothing);
     expect(find.text('Báo hỏng'), findsOneWidget);
     expect(find.text('Yêu cầu điều chuyển'), findsNothing);
   });
@@ -73,7 +74,11 @@ void main() {
     expect(find.text('Đơn đặt mua cần xử lý'), findsOneWidget);
     expect(find.text('Hàng giao cần kiểm tra'), findsNothing);
     expect(find.text('Cấp phát tài sản'), findsNothing);
+    await tester.scrollUntilVisible(find.text('Thao tác nhanh'), 250);
+    await tester.drag(find.byType(ListView), const Offset(0, -200));
+    await tester.pumpAndSettle();
     expect(find.text('Đề nghị mua'), findsNothing);
+    expect(find.text('Đơn đặt mua'), findsOneWidget);
     expect(find.text('Báo hỏng'), findsNothing);
   });
 

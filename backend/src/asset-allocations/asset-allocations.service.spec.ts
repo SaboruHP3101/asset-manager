@@ -15,6 +15,10 @@ describe('allocationOutcome', () => {
     expect(allocationOutcome('confirmed', 'confirmed')).toBe('confirmed');
   });
 
+  it('kích hoạt tài sản dùng chung sau khi Trưởng phòng xác nhận', () => {
+    expect(allocationOutcome('confirmed', null)).toBe('confirmed');
+  });
+
   it('ưu tiên kết quả từ chối của một trong hai bên', () => {
     expect(allocationOutcome('rejected', 'pending')).toBe('rejected');
     expect(allocationOutcome('confirmed', 'rejected')).toBe('rejected');

@@ -211,6 +211,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    if (_actions.contains('purchase.order.create'))
+      _QuickAction(
+        title: 'Đơn đặt mua',
+        icon: Icons.shopping_cart_checkout_outlined,
+        onTap: () => _open(PurchaseOrdersScreen(allowedActions: _actions)),
+      ),
     if (_actions.contains('repair.report'))
       _QuickAction(
         title: 'Báo hỏng',

@@ -21,4 +21,38 @@ void main() {
     expect(task.recipientDecision, 'pending');
     expect(task.decisionParty, 'recipient');
   });
+
+  test('groups allocation work by purchase request with progress', () {
+    final tasks = [
+      AssetAllocationTask.fromJson({
+        'queueType': 'initial',
+        'requestId': 'request-1',
+        'requestCode': 'PR-2026-001',
+        'assetId': 'asset-1',
+        'assetCode': 'TS-001',
+        'assetName': 'Bàn họp',
+        'totalAssets': 3,
+        'allocatedAssets': 1,
+        'pendingAssets': 2,
+      }),
+      AssetAllocationTask.fromJson({
+        'queueType': 'initial',
+        'requestId': 'request-1',
+        'requestCode': 'PR-2026-001',
+        'assetId': 'asset-2',
+        'assetCode': 'TS-002',
+        'assetName': 'Ghế họp',
+        'totalAssets': 3,
+        'allocatedAssets': 1,
+        'pendingAssets': 2,
+      }),
+    ];
+
+    final groups = groupAllocationTasks(tasks);
+
+    expect(groups, hasLength(1));
+    expect(groups.single.requestCode, 'PR-2026-001');
+    expect(groups.single.tasks, hasLength(2));
+    expect(groups.single.progress, closeTo(1 / 3, 0.001));
+  });
 }

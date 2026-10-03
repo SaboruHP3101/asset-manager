@@ -110,7 +110,7 @@ describe('DashboardService', () => {
 
     expect(result.pendingTasks).toEqual({
       purchaseRequests: 1,
-      purchaseOrders: 3,
+      purchaseOrders: 4,
       inspections: 1,
       allocations: 1,
     });

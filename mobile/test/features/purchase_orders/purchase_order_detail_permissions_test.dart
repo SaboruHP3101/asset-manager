@@ -40,14 +40,43 @@ class _ActionRepository extends PurchaseOrdersRepository {
   }) async {}
 }
 
+class _OverflowActionRepository extends PurchaseOrdersRepository {
+  _OverflowActionRepository({required this.initial, required this.refreshed})
+    : super(dio: Dio());
+
+  final PurchaseOrderDetail initial;
+  final PurchaseOrderDetail refreshed;
+  int findOneCalls = 0;
+  String? cancellationReason;
+
+  @override
+  Future<PurchaseOrderDetail> findOne(String id) async {
+    findOneCalls += 1;
+
+    return findOneCalls == 1 ? initial : refreshed;
+  }
+
+  @override
+  Future<void> cancel(String id, String reason) async {
+    cancellationReason = reason;
+  }
+}
+
 class _ReceiptsRepository extends PurchaseReceiptsRepository {
   _ReceiptsRepository() : super(dio: Dio());
+
+  String? closeShortReason;
 
   @override
   Future<List<PurchaseReceiptProgress>> findOrderProgress(
     String orderId,
   ) async {
     return const [];
+  }
+
+  @override
+  Future<void> closeShort(String orderId, String reason) async {
+    closeShortReason = reason;
   }
 }
 
@@ -171,5 +200,65 @@ void main() {
       find.widgetWithText(FilledButton, 'Ghi nhận giao hàng'),
     );
     expect(receiptButton.onPressed, isNotNull);
+  });
+
+  testWidgets('đóng thiếu từ menu không gây lỗi lifecycle', (tester) async {
+    final repository = _OverflowActionRepository(
+      initial: _detail(const [
+        'purchase.receipt.close_short',
+      ], status: 'partially_received'),
+      refreshed: _detail(const [], status: 'closed_short'),
+    );
+    final receiptsRepository = _ReceiptsRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PurchaseOrderDetailScreen(
+          orderId: 'order-id',
+          repository: repository,
+          receiptsRepository: receiptsRepository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Thêm hành động'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Đóng thiếu'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Nhà cung cấp giao thiếu');
+    await tester.tap(find.widgetWithText(FilledButton, 'Xác nhận'));
+    await tester.pumpAndSettle();
+
+    expect(receiptsRepository.closeShortReason, 'Nhà cung cấp giao thiếu');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('hủy đơn mua từ menu không gây lỗi lifecycle', (tester) async {
+    final repository = _OverflowActionRepository(
+      initial: _detail(const ['purchase.order.cancel']),
+      refreshed: _detail(const [], status: 'cancelled'),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PurchaseOrderDetailScreen(
+          orderId: 'order-id',
+          repository: repository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Thêm hành động'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hủy đơn mua'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Không còn nhu cầu');
+    await tester.tap(find.widgetWithText(FilledButton, 'Xác nhận'));
+    await tester.pumpAndSettle();
+
+    expect(repository.cancellationReason, 'Không còn nhu cầu');
+    expect(tester.takeException(), isNull);
   });
 }

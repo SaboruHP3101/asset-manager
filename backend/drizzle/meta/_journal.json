@@ -22,6 +22,13 @@
       "when": 1791012546617,
       "tag": "0002_controlled-other-category",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791021372110,
+      "tag": "0003_allocation-batch-shared-target",
+      "breakpoints": true
     }
   ]
 }

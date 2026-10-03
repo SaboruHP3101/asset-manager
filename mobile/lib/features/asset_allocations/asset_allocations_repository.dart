@@ -48,30 +48,33 @@ class AssetAllocationsRepository {
         .toList();
   }
 
-  Future<void> allocate({
-    required AssetAllocationTask task,
-    required String recipientId,
+  Future<void> allocateBatch({
+    required List<AssetAllocationTask> tasks,
+    required String targetType,
+    String? recipientId,
     required String departmentId,
     required String location,
   }) => _dio.post<void>(
-    task.queueType == 'reallocation'
-        ? '/asset-allocations/reallocate'
-        : '/asset-allocations',
+    tasks.first.queueType == 'reallocation'
+        ? '/asset-allocations/reallocate/batch'
+        : '/asset-allocations/batch',
     data: {
-      'assetId': task.assetId,
-      'recipientId': recipientId,
+      'assetIds': tasks.map((task) => task.assetId).toList(),
+      'targetType': targetType,
+      'recipientId': ?recipientId,
       'departmentId': departmentId,
       'location': location,
     },
   );
 
-  Future<void> decide({
-    required AssetAllocationTask task,
+  Future<void> decideBatch({
+    required List<AssetAllocationTask> tasks,
     required bool confirmed,
     String? reason,
   }) => _dio.post(
-    '/asset-allocations/${task.allocationId}/${task.decisionParty}-decision',
+    '/asset-allocations/batch/${tasks.first.decisionParty}-decision',
     data: {
+      'allocationIds': tasks.map((task) => task.allocationId).toList(),
       'confirmed': confirmed,
       if (reason?.isNotEmpty ?? false) 'reason': reason,
     },

@@ -19,7 +19,9 @@ import {
 import { WORKFLOW_ACTIONS } from '../auth/workflow-actions.config.js';
 import { AssetAllocationsService } from './asset-allocations.service.js';
 import {
+  AssetAllocationBatchDecisionDto,
   AssetAllocationDecisionDto,
+  CreateAssetAllocationBatchDto,
   CreateAssetAllocationDto,
 } from './dto/asset-allocation.dto.js';
 
@@ -59,12 +61,47 @@ export class AssetAllocationsController {
     return this.service.create(dto, actor, false);
   }
 
+  @Post('batch')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.purchaseAllocationCreateInitial)
+  createInitialBatch(
+    @Body() dto: CreateAssetAllocationBatchDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.service.createBatch(dto, actor, false);
+  }
+
   @Post('reallocate')
   reallocate(
     @Body() dto: CreateAssetAllocationDto,
     @CurrentEmployee() actor: AuthenticatedEmployee,
   ) {
     return this.service.create(dto, actor, true);
+  }
+
+  @Post('reallocate/batch')
+  reallocateBatch(
+    @Body() dto: CreateAssetAllocationBatchDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.service.createBatch(dto, actor, true);
+  }
+
+  @Post('batch/department-decision')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.purchaseAllocationConfirmDepartment)
+  decideDepartmentBatch(
+    @Body() dto: AssetAllocationBatchDecisionDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.service.decideBatch(dto, actor, 'department');
+  }
+
+  @Post('batch/recipient-decision')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.purchaseAllocationConfirmRecipient)
+  decideRecipientBatch(
+    @Body() dto: AssetAllocationBatchDecisionDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.service.decideBatch(dto, actor, 'recipient');
   }
 
   @Post(':id/department-decision')

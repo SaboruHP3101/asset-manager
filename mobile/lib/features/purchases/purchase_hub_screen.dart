@@ -128,7 +128,7 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
           _ordersRepository.findApprovalQueue()
         else
           Future.value(const <Object>[]),
-        if (_canTrackOrders)
+        if (_canTrackOrders || _canCreateOrder)
           _ordersRepository.findAll()
         else
           Future.value(const <Object>[]),
@@ -145,11 +145,21 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
             (order) => ['issued', 'partially_received'].contains(order.status),
           )
           .length;
+      final draftOrderCount = _canCreateOrder
+          ? results[4]
+                .cast<PurchaseOrderSummary>()
+                .where((order) => order.status == 'draft')
+                .length
+          : 0;
       setState(() {
         _counts = _HubCounts(
           mine: results[0].length,
           requestQueue: results[1].length,
-          orderQueue: results[2].length + results[3].length + ongoingOrderCount,
+          orderQueue:
+              results[2].length +
+              results[3].length +
+              draftOrderCount +
+              ongoingOrderCount,
           inspectionQueue: results[5].length,
           allocationQueue: results[6].length,
         );

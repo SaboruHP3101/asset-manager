@@ -19,7 +19,9 @@ import { DRIZZLE } from '../drizzle/drizzle.module.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { RequestAuditService } from '../request-audit/request-audit.service.js';
 import {
+  AssetAllocationBatchDecisionDto,
   AssetAllocationDecisionDto,
+  CreateAssetAllocationBatchDto,
   CreateAssetAllocationDto,
 } from './dto/asset-allocation.dto.js';
 
@@ -30,13 +32,16 @@ type ManagementOwner =
 
 export function allocationOutcome(
   departmentDecision: string,
-  recipientDecision: string,
+  recipientDecision: string | null,
 ): 'pending_confirmations' | 'rejected' | 'confirmed' {
   if (departmentDecision === 'rejected' || recipientDecision === 'rejected') {
     return 'rejected';
   }
 
-  if (departmentDecision === 'confirmed' && recipientDecision === 'confirmed') {
+  if (
+    departmentDecision === 'confirmed' &&
+    (recipientDecision === null || recipientDecision === 'confirmed')
+  ) {
     return 'confirmed';
   }
 
@@ -56,133 +61,71 @@ export class AssetAllocationsService {
     actor: AuthenticatedEmployee,
     reallocation: boolean,
   ) {
-    const allocationId = await this.db.transaction(async (transaction) => {
+    const result = await this.createBatch(
+      {
+        assetIds: [dto.assetId],
+        targetType: dto.targetType,
+        recipientId: dto.recipientId,
+        departmentId: dto.departmentId,
+        location: dto.location,
+      },
+      actor,
+      reallocation,
+    );
+
+    return this.findOne(result.allocationIds[0], actor);
+  }
+
+  async createBatch(
+    dto: CreateAssetAllocationBatchDto,
+    actor: AuthenticatedEmployee,
+    reallocation: boolean,
+  ) {
+    const allocationIds = await this.db.transaction(async (transaction) => {
       const tx = transaction as unknown as Database;
+      const assetIds = [...dto.assetIds].sort();
+      const contexts = [];
 
-      await this.lockAsset(tx, dto.assetId);
-      const asset = await this.requireAssetContext(tx, dto.assetId);
-      const expectedStatus = reallocation
-        ? 'awaiting_reallocation'
-        : 'awaiting_allocation';
-
-      if (asset.status !== expectedStatus) {
-        throw new ConflictException(
-          reallocation
-            ? 'Tài sản không ở trạng thái chờ phân bổ lại.'
-            : 'Tài sản không ở trạng thái chờ cấp phát ban đầu.',
-        );
+      for (const assetId of assetIds) {
+        await this.lockAsset(tx, assetId);
+        contexts.push(await this.requireAssetContext(tx, assetId));
       }
 
-      if (reallocation) {
-        this.assertReallocationActor(actor, asset.managementOwner);
-      } else if (
-        !actor.isDepartmentHead ||
-        actor.departmentId !== asset.requestDepartmentId
-      ) {
-        throw new ForbiddenException(
-          'Chỉ Trưởng phòng đề nghị được cấp phát ban đầu.',
-        );
-      }
-
-      const recipient = await this.requireRecipient(tx, dto.recipientId);
-
-      if (recipient.departmentId !== dto.departmentId) {
+      if (new Set(contexts.map((asset) => asset.requestId)).size !== 1) {
         throw new BadRequestException(
-          'Người nhận không thuộc phòng ban đã chọn.',
+          'Chỉ có thể cấp phát cùng lúc các tài sản thuộc một đề nghị mua.',
         );
       }
 
-      if (!reallocation && dto.departmentId !== asset.requestDepartmentId) {
-        throw new ForbiddenException(
-          'Cấp phát ban đầu chỉ dành cho phòng ban đề nghị.',
+      let recipient: Awaited<ReturnType<typeof this.requireRecipient>> | null =
+        null;
+
+      if (dto.targetType === 'individual') {
+        if (!dto.recipientId) {
+          throw new BadRequestException('Vui lòng chọn người nhận.');
+        }
+
+        recipient = await this.requireRecipient(tx, dto.recipientId);
+
+        if (recipient.departmentId !== dto.departmentId) {
+          throw new BadRequestException(
+            'Người nhận không thuộc phòng ban đã chọn.',
+          );
+        }
+      }
+
+      const ids: string[] = [];
+
+      for (const asset of contexts) {
+        ids.push(
+          await this.createAllocation(tx, asset, dto, actor, reallocation),
         );
       }
 
-      const previous = await tx
-        .select({
-          id: schema.assetAllocations.id,
-          attemptNumber: schema.assetAllocations.attemptNumber,
-          status: schema.assetAllocations.status,
-        })
-        .from(schema.assetAllocations)
-        .where(eq(schema.assetAllocations.assetId, dto.assetId))
-        .orderBy(desc(schema.assetAllocations.attemptNumber))
-        .limit(1);
-      const latest = previous[0];
-
-      if (reallocation && latest?.status !== 'rejected') {
-        throw new ConflictException(
-          'Không tìm thấy lần cấp phát bị từ chối để thay thế.',
-        );
-      }
-
-      const now = new Date();
-
-      if (latest) {
-        await tx
-          .update(schema.assetAllocations)
-          .set({
-            status: 'superseded',
-            supersededAt: now,
-            updatedAt: now,
-            updatedBy: actor.id,
-          })
-          .where(eq(schema.assetAllocations.id, latest.id));
-      }
-
-      const [allocation] = await tx
-        .insert(schema.assetAllocations)
-        .values({
-          assetId: dto.assetId,
-          attemptNumber: (latest?.attemptNumber ?? 0) + 1,
-          initiatedBy: actor.id,
-          departmentId: dto.departmentId,
-          recipientId: dto.recipientId,
-          location: dto.location.trim(),
-          managementOwnerSnapshot: asset.managementOwner,
-          createdBy: actor.id,
-          updatedBy: actor.id,
-        })
-        .returning({ id: schema.assetAllocations.id });
-
-      await tx
-        .update(schema.assets)
-        .set({
-          status: 'awaiting_allocation_confirmation',
-          currentUserId: null,
-          currentManagingDepartmentId: null,
-          currentLocation: null,
-          updatedAt: now,
-          updatedBy: actor.id,
-        })
-        .where(eq(schema.assets.id, dto.assetId));
-
-      await this.audit.logPurchase(tx, {
-        requestId: asset.requestId,
-        revision: asset.requestRevision,
-        actionType: reallocation
-          ? 'purchase.allocation.reallocate'
-          : 'purchase.allocation.create_initial',
-        actor,
-        result: 'pending',
-        previousStatus: asset.status,
-        newStatus: 'awaiting_allocation_confirmation',
-        entityType: 'allocation',
-        entityId: allocation.id,
-        metadata: { assetId: dto.assetId, recipientId: dto.recipientId },
-      });
-      await this.notifyPendingConfirmations(
-        tx,
-        allocation.id,
-        asset.assetCode,
-        dto.departmentId,
-        dto.recipientId,
-      );
-
-      return allocation.id;
+      return ids;
     });
 
-    return this.findOne(allocationId, actor);
+    return { allocationIds, count: allocationIds.length };
   }
 
   async decide(
@@ -191,72 +134,39 @@ export class AssetAllocationsService {
     actor: AuthenticatedEmployee,
     party: DecisionParty,
   ) {
+    await this.decideBatch(
+      { allocationIds: [id], confirmed: dto.confirmed, reason: dto.reason },
+      actor,
+      party,
+    );
+
+    return this.findOne(id, actor);
+  }
+
+  async decideBatch(
+    dto: AssetAllocationBatchDecisionDto,
+    actor: AuthenticatedEmployee,
+    party: DecisionParty,
+  ) {
     await this.db.transaction(async (transaction) => {
       const tx = transaction as unknown as Database;
 
-      await this.lockAllocation(tx, id);
-      const allocation = await this.requireAllocationContext(tx, id);
+      for (const id of [...dto.allocationIds].sort()) {
+        await this.lockAllocation(tx, id);
+        const allocation = await this.requireAllocationContext(tx, id);
 
-      if (allocation.allocationStatus !== 'pending_confirmations') {
-        throw new ConflictException('Lần cấp phát này không còn chờ xác nhận.');
-      }
+        if (allocation.allocationStatus !== 'pending_confirmations') {
+          throw new ConflictException(
+            'Một lần cấp phát đã không còn chờ xác nhận.',
+          );
+        }
 
-      this.assertDecisionActor(allocation, actor, party);
-      const currentDecision =
-        party === 'department'
-          ? allocation.departmentHeadDecision
-          : allocation.recipientDecision;
-
-      if (currentDecision !== 'pending') {
-        throw new ConflictException('Bạn đã xác nhận lần cấp phát này.');
-      }
-
-      const now = new Date();
-      const decision = dto.confirmed ? 'confirmed' : 'rejected';
-
-      await tx
-        .update(schema.assetAllocations)
-        .set(
-          party === 'department'
-            ? {
-                departmentHeadDecision: decision,
-                departmentHeadDecidedBy: actor.id,
-                departmentHeadDecidedAt: now,
-                departmentHeadNote: dto.reason?.trim() ?? null,
-                updatedAt: now,
-                updatedBy: actor.id,
-              }
-            : {
-                recipientDecision: decision,
-                recipientDecidedAt: now,
-                recipientNote: dto.reason?.trim() ?? null,
-                updatedAt: now,
-                updatedBy: actor.id,
-              },
-        )
-        .where(eq(schema.assetAllocations.id, id));
-
-      const outcome = allocationOutcome(
-        party === 'department' ? decision : allocation.departmentHeadDecision,
-        party === 'recipient' ? decision : allocation.recipientDecision,
-      );
-
-      if (outcome === 'rejected') {
-        await this.rejectAllocation(tx, allocation, actor, dto.reason!, now);
-      } else if (outcome === 'confirmed') {
-        await this.activateAsset(tx, allocation, actor, now);
-      } else {
-        await this.auditDecision(
-          tx,
-          allocation,
-          actor,
-          party,
-          'pending_confirmations',
-        );
+        this.assertDecisionActor(allocation, actor, party);
+        await this.applyDecision(tx, allocation, dto, actor, party);
       }
     });
 
-    return this.findOne(id, actor);
+    return { count: dto.allocationIds.length };
   }
 
   async findQueue(actor: AuthenticatedEmployee) {
@@ -314,7 +224,27 @@ export class AssetAllocationsService {
         .map((asset) => ({ ...asset, queueType: 'reallocation' })),
     );
 
-    return queue;
+    const progressByRequest = new Map<string, Record<string, number>>();
+
+    for (const asset of assets) {
+      const progress = progressByRequest.get(asset.requestId) ?? {
+        totalAssets: 0,
+        allocatedAssets: 0,
+        pendingAssets: 0,
+      };
+
+      progress.totalAssets += 1;
+
+      if (asset.status === 'active') progress.allocatedAssets += 1;
+      else progress.pendingAssets += 1;
+
+      progressByRequest.set(asset.requestId, progress);
+    }
+
+    return queue.map((item) => ({
+      ...item,
+      ...progressByRequest.get(item.requestId as string),
+    }));
   }
 
   async findRecipients(departmentId: string, actor: AuthenticatedEmployee) {
@@ -358,6 +288,191 @@ export class AssetAllocationsService {
     }
 
     return allocation;
+  }
+
+  private async createAllocation(
+    tx: Database,
+    asset: Awaited<ReturnType<typeof this.requireAssetContext>>,
+    dto: CreateAssetAllocationBatchDto,
+    actor: AuthenticatedEmployee,
+    reallocation: boolean,
+  ) {
+    const expectedStatus = reallocation
+      ? 'awaiting_reallocation'
+      : 'awaiting_allocation';
+
+    if (asset.status !== expectedStatus) {
+      throw new ConflictException(
+        reallocation
+          ? 'Một tài sản không ở trạng thái chờ phân bổ lại.'
+          : 'Một tài sản không ở trạng thái chờ cấp phát ban đầu.',
+      );
+    }
+
+    if (reallocation) {
+      this.assertReallocationActor(actor, asset.managementOwner);
+    } else if (
+      !actor.isDepartmentHead ||
+      actor.departmentId !== asset.requestDepartmentId
+    ) {
+      throw new ForbiddenException(
+        'Chỉ Trưởng phòng đề nghị được cấp phát ban đầu.',
+      );
+    }
+
+    if (!reallocation && dto.departmentId !== asset.requestDepartmentId) {
+      throw new ForbiddenException(
+        'Cấp phát ban đầu chỉ dành cho phòng ban đề nghị.',
+      );
+    }
+
+    const previous = await tx
+      .select({
+        id: schema.assetAllocations.id,
+        attemptNumber: schema.assetAllocations.attemptNumber,
+        status: schema.assetAllocations.status,
+      })
+      .from(schema.assetAllocations)
+      .where(eq(schema.assetAllocations.assetId, asset.id))
+      .orderBy(desc(schema.assetAllocations.attemptNumber))
+      .limit(1);
+    const latest = previous[0];
+
+    if (reallocation && latest?.status !== 'rejected') {
+      throw new ConflictException(
+        'Không tìm thấy lần cấp phát bị từ chối để thay thế.',
+      );
+    }
+
+    const now = new Date();
+
+    if (latest) {
+      await tx
+        .update(schema.assetAllocations)
+        .set({
+          status: 'superseded',
+          supersededAt: now,
+          updatedAt: now,
+          updatedBy: actor.id,
+        })
+        .where(eq(schema.assetAllocations.id, latest.id));
+    }
+
+    const recipientId =
+      dto.targetType === 'individual' ? dto.recipientId! : null;
+    const [allocation] = await tx
+      .insert(schema.assetAllocations)
+      .values({
+        assetId: asset.id,
+        attemptNumber: (latest?.attemptNumber ?? 0) + 1,
+        initiatedBy: actor.id,
+        departmentId: dto.departmentId,
+        targetType: dto.targetType,
+        recipientId,
+        recipientDecision: dto.targetType === 'individual' ? 'pending' : null,
+        location: dto.location.trim(),
+        managementOwnerSnapshot: asset.managementOwner,
+        createdBy: actor.id,
+        updatedBy: actor.id,
+      })
+      .returning({ id: schema.assetAllocations.id });
+
+    await tx
+      .update(schema.assets)
+      .set({
+        status: 'awaiting_allocation_confirmation',
+        currentUserId: null,
+        currentManagingDepartmentId: null,
+        currentLocation: null,
+        updatedAt: now,
+        updatedBy: actor.id,
+      })
+      .where(eq(schema.assets.id, asset.id));
+
+    await this.audit.logPurchase(tx, {
+      requestId: asset.requestId,
+      revision: asset.requestRevision,
+      actionType: reallocation
+        ? 'purchase.allocation.reallocate'
+        : 'purchase.allocation.create_initial',
+      actor,
+      result: 'pending',
+      previousStatus: asset.status,
+      newStatus: 'awaiting_allocation_confirmation',
+      entityType: 'allocation',
+      entityId: allocation.id,
+      metadata: { assetId: asset.id, recipientId, targetType: dto.targetType },
+    });
+    await this.notifyPendingConfirmations(
+      tx,
+      allocation.id,
+      asset.assetCode,
+      dto.departmentId,
+      recipientId,
+    );
+
+    return allocation.id;
+  }
+
+  private async applyDecision(
+    tx: Database,
+    allocation: Awaited<ReturnType<typeof this.requireAllocationContext>>,
+    dto: AssetAllocationDecisionDto,
+    actor: AuthenticatedEmployee,
+    party: DecisionParty,
+  ) {
+    const currentDecision =
+      party === 'department'
+        ? allocation.departmentHeadDecision
+        : allocation.recipientDecision;
+
+    if (currentDecision !== 'pending') {
+      throw new ConflictException('Bạn đã xác nhận lần cấp phát này.');
+    }
+
+    const now = new Date();
+    const decision = dto.confirmed ? 'confirmed' : 'rejected';
+
+    await tx
+      .update(schema.assetAllocations)
+      .set(
+        party === 'department'
+          ? {
+              departmentHeadDecision: decision,
+              departmentHeadDecidedBy: actor.id,
+              departmentHeadDecidedAt: now,
+              departmentHeadNote: dto.reason?.trim() ?? null,
+              updatedAt: now,
+              updatedBy: actor.id,
+            }
+          : {
+              recipientDecision: decision,
+              recipientDecidedAt: now,
+              recipientNote: dto.reason?.trim() ?? null,
+              updatedAt: now,
+              updatedBy: actor.id,
+            },
+      )
+      .where(eq(schema.assetAllocations.id, allocation.id));
+
+    const outcome = allocationOutcome(
+      party === 'department' ? decision : allocation.departmentHeadDecision,
+      party === 'recipient' ? decision : allocation.recipientDecision,
+    );
+
+    if (outcome === 'rejected') {
+      await this.rejectAllocation(tx, allocation, actor, dto.reason!, now);
+    } else if (outcome === 'confirmed') {
+      await this.activateAsset(tx, allocation, actor, now);
+    } else {
+      await this.auditDecision(
+        tx,
+        allocation,
+        actor,
+        party,
+        'pending_confirmations',
+      );
+    }
   }
 
   private async rejectAllocation(
@@ -406,8 +521,9 @@ export class AssetAllocationsService {
         body: `${allocation.assetCode} bị từ chối cấp phát: ${reason}`,
         metadata: { allocationId: allocation.id },
       })),
-      ...[...new Set([allocation.initiatedBy, allocation.recipientId])].map(
-        (recipientId) => ({
+      ...[...new Set([allocation.initiatedBy, allocation.recipientId])]
+        .filter((recipientId): recipientId is string => recipientId !== null)
+        .map((recipientId) => ({
           recipientId,
           eventType: 'asset_allocation_rejected' as const,
           entityType: 'allocation' as const,
@@ -415,8 +531,7 @@ export class AssetAllocationsService {
           title: 'Cấp phát bị từ chối',
           body: `${allocation.assetCode} bị từ chối cấp phát: ${reason}`,
           metadata: { assetId: allocation.assetId },
-        }),
-      ),
+        })),
     ]);
   }
 
@@ -434,7 +549,10 @@ export class AssetAllocationsService {
       .update(schema.assets)
       .set({
         status: 'active',
-        currentUserId: allocation.recipientId,
+        currentUserId:
+          allocation.targetType === 'individual'
+            ? allocation.recipientId
+            : null,
         currentManagingDepartmentId: allocation.departmentId,
         currentLocation: allocation.location,
         updatedAt: now,
@@ -445,7 +563,8 @@ export class AssetAllocationsService {
       assetId: allocation.assetId,
       handoverType:
         allocation.attemptNumber === 1 ? 'initial_allocation' : 'reallocation',
-      receivedByEmployeeId: allocation.recipientId,
+      receivedByEmployeeId:
+        allocation.targetType === 'individual' ? allocation.recipientId : null,
       receivedByDepartmentId: allocation.departmentId,
       handoverDate: now.toISOString().slice(0, 10),
       status: 'completed',
@@ -474,7 +593,7 @@ export class AssetAllocationsService {
         ...ownerRecipients,
         ...departmentHeads.map((head) => head.id),
       ]),
-    ];
+    ].filter((recipientId): recipientId is string => recipientId !== null);
 
     await this.notifications.createMany(
       tx,
@@ -528,7 +647,7 @@ export class AssetAllocationsService {
     allocationId: string,
     assetCode: string,
     departmentId: string,
-    recipientId: string,
+    recipientId: string | null,
   ) {
     const heads = await tx
       .select({ id: schema.employees.id })
@@ -542,7 +661,7 @@ export class AssetAllocationsService {
       );
     const recipients = [
       ...new Set([recipientId, ...heads.map((head) => head.id)]),
-    ];
+    ].filter((id): id is string => id !== null);
 
     await this.notifications.createMany(
       tx,
@@ -600,9 +719,6 @@ export class AssetAllocationsService {
           schema.purchaseRequests.id,
         ),
       )
-      .where(
-        sql`${schema.assets.status} in ('awaiting_allocation', 'awaiting_reallocation')`,
-      )
       .orderBy(asc(schema.assets.assetCode));
   }
 
@@ -613,8 +729,12 @@ export class AssetAllocationsService {
         assetId: schema.assets.id,
         assetCode: schema.assets.assetCode,
         assetName: schema.assets.name,
+        requestId: schema.purchaseRequests.id,
+        requestCode: schema.purchaseRequests.requestCode,
+        requestDepartmentId: schema.purchaseRequests.departmentId,
         allocationStatus: schema.assetAllocations.status,
         departmentId: schema.assetAllocations.departmentId,
+        targetType: schema.assetAllocations.targetType,
         recipientId: schema.assetAllocations.recipientId,
         recipientName: schema.employees.fullName,
         location: schema.assetAllocations.location,
@@ -626,9 +746,34 @@ export class AssetAllocationsService {
         schema.assets,
         eq(schema.assetAllocations.assetId, schema.assets.id),
       )
-      .innerJoin(
+      .leftJoin(
         schema.employees,
         eq(schema.assetAllocations.recipientId, schema.employees.id),
+      )
+      .innerJoin(
+        schema.purchaseOrderItems,
+        eq(schema.assets.purchaseOrderItemId, schema.purchaseOrderItems.id),
+      )
+      .innerJoin(
+        schema.purchaseRequestItems,
+        eq(
+          schema.purchaseOrderItems.purchaseRequestItemId,
+          schema.purchaseRequestItems.id,
+        ),
+      )
+      .innerJoin(
+        schema.purchaseRequestRevisions,
+        eq(
+          schema.purchaseRequestItems.requestRevisionId,
+          schema.purchaseRequestRevisions.id,
+        ),
+      )
+      .innerJoin(
+        schema.purchaseRequests,
+        eq(
+          schema.purchaseRequestRevisions.purchaseRequestId,
+          schema.purchaseRequests.id,
+        ),
       )
       .where(eq(schema.assetAllocations.status, 'pending_confirmations'))
       .orderBy(asc(schema.assets.assetCode));
@@ -692,6 +837,7 @@ export class AssetAllocationsService {
         initiatedBy: schema.assetAllocations.initiatedBy,
         departmentId: schema.assetAllocations.departmentId,
         departmentName: schema.departments.name,
+        targetType: schema.assetAllocations.targetType,
         recipientId: schema.assetAllocations.recipientId,
         recipientName: schema.employees.fullName,
         location: schema.assetAllocations.location,
@@ -715,7 +861,7 @@ export class AssetAllocationsService {
         schema.departments,
         eq(schema.assetAllocations.departmentId, schema.departments.id),
       )
-      .innerJoin(
+      .leftJoin(
         schema.employees,
         eq(schema.assetAllocations.recipientId, schema.employees.id),
       )

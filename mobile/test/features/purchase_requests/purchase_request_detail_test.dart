@@ -11,12 +11,18 @@ class _FakeRepository extends PurchaseRequestsRepository {
 
   final PurchaseRequestDetail detail;
   final List<PurchaseSupplierOption> supplierOptions;
+  int submitProcurementCalls = 0;
 
   @override
   Future<PurchaseRequestDetail> findOne(String id) async => detail;
 
   @override
   Future<List<PurchaseSupplierOption>> suppliers() async => supplierOptions;
+
+  @override
+  Future<void> submitProcurement(String id) async {
+    submitProcurementCalls += 1;
+  }
 }
 
 void main() {
@@ -99,6 +105,118 @@ void main() {
 
     expect(find.text('Chỉnh sửa'), findsNothing);
     expect(find.text('Gửi trình ký'), findsNothing);
+  });
+
+  testWidgets(
+    'chỉ cho trình Trưởng Thu mua khi mọi hạng mục có báo giá được chọn',
+    (tester) async {
+      final detail = PurchaseRequestDetail(
+        id: 'request-id',
+        status: 'pending_procurement_enrichment',
+        revision: 1,
+        pendingAction: 'purchase.request.enrich_procurement',
+        allowedActions: const ['purchase.request.enrich_procurement'],
+        requestCode: 'PR-2026-PROGRESS',
+        neededByDate: '2026-10-15',
+        purpose: 'Trang bị nhân viên mới',
+        items: const [
+          {
+            'id': 'complete-item',
+            'categoryName': 'Máy tính xách tay',
+            'itemName': 'MacBook Pro 14in',
+            'specifications': 'M3 Pro, RAM 18 GB',
+            'quantity': 1,
+            'quotes': [
+              {'id': 'quote-id', 'isSelected': true},
+            ],
+          },
+          {
+            'id': 'missing-item',
+            'categoryName': 'Màn hình',
+            'itemName': 'Màn hình 27 inch',
+            'specifications': 'Độ phân giải 4K',
+            'quantity': 2,
+            'quotes': <Map<String, dynamic>>[],
+          },
+        ],
+        timeline: const [],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PurchaseRequestDetailScreen(
+            requestId: detail.id,
+            repository: _FakeRepository(detail),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final submitButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Trình Trưởng Thu mua'),
+      );
+
+      expect(submitButton.onPressed, isNull);
+      expect(find.text('Đã hoàn tất báo giá 1/2 hạng mục'), findsOneWidget);
+      expect(find.text('Còn thiếu: Màn hình 27 inch'), findsOneWidget);
+    },
+  );
+
+  testWidgets('enable trình Trưởng Thu mua khi báo giá đã hoàn tất', (
+    tester,
+  ) async {
+    final detail = PurchaseRequestDetail(
+      id: 'request-id',
+      status: 'pending_procurement_enrichment',
+      revision: 1,
+      pendingAction: 'purchase.request.enrich_procurement',
+      allowedActions: const ['purchase.request.enrich_procurement'],
+      requestCode: 'PR-2026-COMPLETE',
+      neededByDate: '2026-10-15',
+      purpose: 'Trang bị nhân viên mới',
+      items: const [
+        {
+          'id': 'complete-item',
+          'categoryName': 'Máy tính xách tay',
+          'itemName': 'MacBook Pro 14in',
+          'specifications': 'M3 Pro, RAM 18 GB',
+          'quantity': 1,
+          'quotes': [
+            {'id': 'quote-id', 'isSelected': true},
+          ],
+        },
+      ],
+      timeline: const [],
+    );
+
+    final repository = _FakeRepository(detail);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PurchaseRequestDetailScreen(
+          requestId: detail.id,
+          repository: repository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final submitButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Trình Trưởng Thu mua'),
+    );
+
+    expect(submitButton.onPressed, isNotNull);
+    expect(find.text('Đã hoàn tất báo giá 1/1 hạng mục'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Trình Trưởng Thu mua'));
+    await tester.pumpAndSettle();
+
+    final addQuoteButton = tester.widget<OutlinedButton>(
+      find.widgetWithText(OutlinedButton, 'Thêm báo giá'),
+    );
+
+    expect(repository.submitProcurementCalls, 1);
+    expect(addQuoteButton.onPressed, isNotNull);
   });
 
   testWidgets('lịch sử xử lý hiển thị label thay cho enum', (tester) async {
@@ -187,7 +305,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Thêm báo giá'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Laptop doanh nghiệp').last);
+    final itemTile = find.ancestor(
+      of: find.text('Laptop doanh nghiệp').last,
+      matching: find.byType(ListTile),
+    );
+    await tester.ensureVisible(itemTile);
+    await tester.tap(itemTile);
     await tester.pumpAndSettle();
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
@@ -201,6 +324,9 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(find.text('Báo giá cho'), findsOneWidget);
+    expect(find.text('Laptop • Số lượng 1'), findsOneWidget);
+    expect(find.text('RAM 16 GB'), findsAtLeastNWidgets(2));
     expect(tester.takeException(), isNull);
   });
 }

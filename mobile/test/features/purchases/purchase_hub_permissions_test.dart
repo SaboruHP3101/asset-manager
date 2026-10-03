@@ -32,7 +32,9 @@ class _RequestsRepository extends PurchaseRequestsRepository {
 }
 
 class _OrdersRepository extends PurchaseOrdersRepository {
-  _OrdersRepository() : super(dio: Dio());
+  _OrdersRepository({this.orders = const []}) : super(dio: Dio());
+
+  final List<PurchaseOrderSummary> orders;
 
   int eligibleCalls = 0;
   int approvalCalls = 0;
@@ -53,7 +55,7 @@ class _OrdersRepository extends PurchaseOrdersRepository {
   @override
   Future<List<PurchaseOrderSummary>> findAll({String? requestId}) async {
     findAllCalls += 1;
-    return const [];
+    return orders;
   }
 }
 
@@ -118,7 +120,20 @@ void main() {
     tester,
   ) async {
     final requests = _RequestsRepository();
-    final orders = _OrdersRepository();
+    final orders = _OrdersRepository(
+      orders: const [
+        PurchaseOrderSummary(
+          id: 'draft-order-id',
+          purchaseOrderCode: 'PO-DRAFT',
+          purchaseRequestId: 'request-id',
+          requestCode: 'PR-001',
+          supplierName: 'Nhà cung cấp',
+          status: 'draft',
+          orderDate: '2026-10-03',
+          expectedDeliveryDate: '2026-10-10',
+        ),
+      ],
+    );
     final receipts = _ReceiptsRepository();
 
     await tester.pumpWidget(
@@ -154,6 +169,14 @@ void main() {
     expect(orders.approvalCalls, 0);
     expect(orders.findAllCalls, 1);
     expect(receipts.inspectionCalls, 1);
+    final orderCard = find.ancestor(
+      of: find.text('Đơn đặt mua'),
+      matching: find.byType(Card),
+    );
+    expect(
+      find.descendant(of: orderCard, matching: find.text('1')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('người nhận chỉ thấy cấp phát khi backend giao task', (
