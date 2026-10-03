@@ -12,10 +12,12 @@ class PurchaseOrderDetailScreen extends StatefulWidget {
     required this.orderId,
     super.key,
     this.repository,
+    this.receiptsRepository,
   });
 
   final String orderId;
   final PurchaseOrdersRepository? repository;
+  final PurchaseReceiptsRepository? receiptsRepository;
 
   /// Tạo state tải detail và xử lý action của đơn mua
   @override
@@ -36,30 +38,39 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
   void initState() {
     super.initState();
     _repository = widget.repository ?? PurchaseOrdersRepository();
-    _receiptsRepository = PurchaseReceiptsRepository();
+    _receiptsRepository =
+        widget.receiptsRepository ?? PurchaseReceiptsRepository();
     _load();
+  }
+
+  Future<({PurchaseOrderDetail detail, List<PurchaseReceiptProgress> progress})>
+  _fetchLatest() async {
+    final detail = await _repository.findOne(widget.orderId);
+    final progress =
+        [
+          'issued',
+          'partially_received',
+          'fully_received',
+          'closed_short',
+        ].contains(detail.status)
+        ? await _receiptsRepository.findOrderProgress(widget.orderId)
+        : <PurchaseReceiptProgress>[];
+
+    return (detail: detail, progress: progress);
   }
 
   Future<void> _load() async {
     setState(() {
       _detail = null;
+      _progress = const [];
       _error = null;
     });
     try {
-      final detail = await _repository.findOne(widget.orderId);
-      final progress =
-          [
-            'issued',
-            'partially_received',
-            'fully_received',
-            'closed_short',
-          ].contains(detail.status)
-          ? await _receiptsRepository.findOrderProgress(widget.orderId)
-          : <PurchaseReceiptProgress>[];
+      final latest = await _fetchLatest();
       if (!mounted) return;
       setState(() {
-        _detail = detail;
-        _progress = progress;
+        _detail = latest.detail;
+        _progress = latest.progress;
       });
     } catch (error) {
       if (!mounted) return;
@@ -74,78 +85,105 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
       appBar: AppBar(
         title: Text(detail?.purchaseOrderCode ?? 'Chi tiết đơn mua'),
       ),
-      body: _error != null
-          ? _DetailMessage(message: _error!, onRetry: _load)
-          : detail == null
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  _OrderHeader(detail: detail),
-                  if (detail.cancellationReason != null)
-                    Card(
-                      color: Theme.of(context).colorScheme.errorContainer,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: _error != null
+                ? _DetailMessage(message: _error!, onRetry: _load)
+                : detail == null
+                ? const Center(child: CircularProgressIndicator())
+                : RefreshIndicator(
+                    onRefresh: _load,
+                    child: ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        _OrderHeader(detail: detail),
+                        if (detail.cancellationReason != null)
+                          Card(
+                            color: Theme.of(context).colorScheme.errorContainer,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Text(
+                                '${detail.status == 'closed_short' ? 'Lý do đóng thiếu' : 'Lý do hủy'}: '
+                                '${detail.cancellationReason}',
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Hạng mục',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        for (final item in detail.items) _OrderItem(item: item),
+                        if (_progress.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'Tiến độ giao và kiểm tra',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          for (final line in _progress)
+                            Card(
+                              child: ListTile(
+                                title: Text(line.itemName),
+                                subtitle: Text(
+                                  'Đặt ${line.ordered} • Đã giao ${line.delivered} • '
+                                  'Đạt ${line.accepted} • Không đạt ${line.rejected}\n'
+                                  'Chờ kiểm tra ${line.pending} • Còn có thể giao ${line.remaining}',
+                                ),
+                              ),
+                            ),
+                        ],
+                        const SizedBox(height: 8),
+                        _Totals(totals: detail.totals),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Lịch sử',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        if (detail.timeline.isEmpty)
+                          const Text('Chưa có lịch sử xử lý.')
+                        else
+                          for (final event in detail.timeline)
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.history),
+                              title: Text(
+                                purchaseOrderHistoryLabel(
+                                  event['actionType']?.toString() ?? '',
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${purchaseOrderHistoryStatusTransitionLabel(event['previousStatus']?.toString() ?? '', event['newStatus']?.toString() ?? '')}'
+                                '${event['reason'] == null ? '' : '\n${event['reason']}'}',
+                              ),
+                            ),
+                      ],
+                    ),
+                  ),
+          ),
+          if (_acting)
+            Positioned.fill(
+              child: ColoredBox(
+                color: Theme.of(context).colorScheme.scrim
+                    .withValues(alpha: 0.22),
+                child: Center(
+                  child: Semantics(
+                    label: 'Đang cập nhật đơn đặt mua',
+                    liveRegion: true,
+                    child: const Card(
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Text(
-                          '${detail.status == 'closed_short' ? 'Lý do đóng thiếu' : 'Lý do hủy'}: '
-                          '${detail.cancellationReason}',
+                        padding: EdgeInsets.all(20),
+                        child: CircularProgressIndicator(
+                          key: Key('po-action-loader'),
                         ),
                       ),
                     ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Hạng mục',
-                    style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  for (final item in detail.items) _OrderItem(item: item),
-                  if (_progress.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      'Tiến độ giao và kiểm tra',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    for (final line in _progress)
-                      Card(
-                        child: ListTile(
-                          title: Text(line.itemName),
-                          subtitle: Text(
-                            'Đặt ${line.ordered} • Đã giao ${line.delivered} • '
-                            'Đạt ${line.accepted} • Không đạt ${line.rejected}\n'
-                            'Chờ kiểm tra ${line.pending} • Còn có thể giao ${line.remaining}',
-                          ),
-                        ),
-                      ),
-                  ],
-                  const SizedBox(height: 8),
-                  _Totals(totals: detail.totals),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Lịch sử',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  if (detail.timeline.isEmpty)
-                    const Text('Chưa có lịch sử xử lý.')
-                  else
-                    for (final event in detail.timeline)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.history),
-                        title: Text(
-                          purchaseOrderHistoryLabel(
-                            event['actionType']?.toString() ?? '',
-                          ),
-                        ),
-                        subtitle: Text(
-                          '${purchaseOrderHistoryStatusTransitionLabel(event['previousStatus']?.toString() ?? '', event['newStatus']?.toString() ?? '')}'
-                          '${event['reason'] == null ? '' : '\n${event['reason']}'}',
-                        ),
-                      ),
-                ],
+                ),
               ),
             ),
+        ],
+      ),
       bottomNavigationBar: detail == null || _error != null
           ? null
           : _OrderActionBar(
@@ -212,16 +250,38 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
   }
 
   Future<void> _run(Future<void> Function() action) async {
+    if (_acting) return;
     setState(() => _acting = true);
+
     try {
       await action();
-      await _load();
-      if (mounted) setState(() => _acting = false);
     } catch (error) {
       if (!mounted) return;
       setState(() => _acting = false);
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(purchaseOrderApiError(error))));
+      return;
+    }
+
+    try {
+      final latest = await _fetchLatest();
+      if (!mounted) return;
+      setState(() {
+        _detail = latest.detail;
+        _progress = latest.progress;
+        _error = null;
+        _acting = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _detail = null;
+        _progress = const [];
+        _error =
+            'Thao tác đã hoàn tất nhưng không thể tải trạng thái mới. '
+            '${purchaseOrderApiError(error)}';
+        _acting = false;
+      });
     }
   }
 

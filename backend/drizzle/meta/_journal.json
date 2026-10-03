@@ -8,6 +8,20 @@
       "when": 1790090058472,
       "tag": "0000_purchase_asset_workflow_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791009926045,
+      "tag": "0001_asset-category-purchase-options",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791012546617,
+      "tag": "0002_controlled-other-category",
+      "breakpoints": true
     }
   ]
 }

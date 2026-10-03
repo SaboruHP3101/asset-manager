@@ -11,7 +11,9 @@ import 'asset_detail_screen.dart';
 import 'asset_status_chip.dart';
 
 class AssetsScreen extends StatefulWidget {
-  const AssetsScreen({super.key});
+  const AssetsScreen({super.key, this.initiallyOpenScanner = false});
+
+  final bool initiallyOpenScanner;
 
   @override
   State<AssetsScreen> createState() => _AssetsScreenState();
@@ -53,7 +55,14 @@ class _AssetsScreenState extends State<AssetsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    if (widget.initiallyOpenScanner) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await _loadData();
+        if (mounted) await _scanQr();
+      });
+    } else {
+      _loadData();
+    }
   }
 
   @override

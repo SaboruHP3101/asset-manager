@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -50,6 +51,15 @@ export class PurchaseRequestsController {
     @CurrentEmployee() actor: AuthenticatedEmployee,
   ) {
     return this.service.update(id, dto, actor);
+  }
+
+  @Delete(':id')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.purchaseRequestDeleteDraft)
+  deleteDraft(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.service.deleteDraft(id, actor);
   }
 
   @Post(':id/submit')

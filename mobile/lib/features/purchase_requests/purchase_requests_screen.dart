@@ -74,13 +74,13 @@ class _PurchaseRequestsScreenState extends State<PurchaseRequestsScreen> {
   }
 
   Future<void> _create() async {
-    final changed = await Navigator.push<bool>(
+    final result = await Navigator.push<PurchaseRequestFormResult>(
       context,
       MaterialPageRoute(
         builder: (_) => PurchaseRequestFormScreen(repository: _repository),
       ),
     );
-    if (changed == true) await _load();
+    if (result != null) await _load();
   }
 
   Future<void> _open(String id) async {

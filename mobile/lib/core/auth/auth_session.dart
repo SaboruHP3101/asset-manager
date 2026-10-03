@@ -7,6 +7,8 @@ class AuthenticatedProfile {
     required this.department,
     required this.isDepartmentHead,
     required this.allowedActions,
+    this.fullName = '',
+    this.role = '',
   });
 
   factory AuthenticatedProfile.fromJson(Map<String, dynamic> json) =>
@@ -16,11 +18,15 @@ class AuthenticatedProfile {
         allowedActions: Set<String>.from(
           json['allowedActions'] as List<dynamic>? ?? const [],
         ),
+        fullName: json['fullName'] as String? ?? '',
+        role: json['role'] as String? ?? '',
       );
 
   final String department;
   final bool isDepartmentHead;
   final Set<String> allowedActions;
+  final String fullName;
+  final String role;
 
   bool allows(String action) => allowedActions.contains(action);
 

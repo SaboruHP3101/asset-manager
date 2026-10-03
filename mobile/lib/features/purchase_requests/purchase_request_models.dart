@@ -25,17 +25,26 @@ class PurchaseRequestSummary {
 }
 
 class PurchaseCategoryOption {
-  const PurchaseCategoryOption({required this.id, required this.name});
+  const PurchaseCategoryOption({
+    required this.id,
+    required this.name,
+    this.parentCategoryId,
+    this.allowsCustomType = false,
+  });
 
   factory PurchaseCategoryOption.fromJson(Map<String, dynamic> json) {
     return PurchaseCategoryOption(
       id: json['id'] as String,
       name: json['name'] as String,
+      parentCategoryId: json['parentCategoryId'] as String?,
+      allowsCustomType: json['allowsCustomType'] as bool? ?? false,
     );
   }
 
   final String id;
   final String name;
+  final String? parentCategoryId;
+  final bool allowsCustomType;
 }
 
 class PurchaseSupplierOption {
@@ -58,6 +67,7 @@ class PurchaseRequestItemDraft {
     required this.itemName,
     required this.specifications,
     required this.quantity,
+    this.customCategoryDescription,
     this.purpose,
   });
 
@@ -67,6 +77,7 @@ class PurchaseRequestItemDraft {
       itemName: json['itemName'] as String,
       specifications: json['specifications'] as String,
       quantity: json['quantity'] as int,
+      customCategoryDescription: json['customCategoryDescription'] as String?,
       purpose: json['purpose'] as String?,
     );
   }
@@ -75,6 +86,7 @@ class PurchaseRequestItemDraft {
   final String itemName;
   final String specifications;
   final int quantity;
+  final String? customCategoryDescription;
   final String? purpose;
 
   Map<String, dynamic> toJson() => {
@@ -82,6 +94,8 @@ class PurchaseRequestItemDraft {
     'itemName': itemName,
     'specifications': specifications,
     'quantity': quantity,
+    if (customCategoryDescription?.isNotEmpty ?? false)
+      'customCategoryDescription': customCategoryDescription,
     if (purpose?.isNotEmpty ?? false) 'purpose': purpose,
   };
 }

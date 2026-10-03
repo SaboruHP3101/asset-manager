@@ -24,6 +24,7 @@ describe('seed account purchase actions', () => {
         expect.arrayContaining([
           WORKFLOW_ACTIONS.purchaseRequestCreate,
           WORKFLOW_ACTIONS.purchaseRequestUpdate,
+          WORKFLOW_ACTIONS.purchaseRequestDeleteDraft,
           WORKFLOW_ACTIONS.purchaseRequestSubmit,
         ]),
       );

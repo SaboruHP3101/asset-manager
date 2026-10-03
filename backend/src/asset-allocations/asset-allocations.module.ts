@@ -8,5 +8,6 @@ import { AssetAllocationsService } from './asset-allocations.service.js';
   imports: [DrizzleModule, AuthModule],
   controllers: [AssetAllocationsController],
   providers: [AssetAllocationsService],
+  exports: [AssetAllocationsService],
 })
 export class AssetAllocationsModule {}

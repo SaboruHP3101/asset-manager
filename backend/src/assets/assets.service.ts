@@ -13,6 +13,8 @@ import {
   eq,
   ilike,
   inArray,
+  or,
+  sql,
 } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema.js';
@@ -61,9 +63,18 @@ export class AssetsService {
     sort = 'name_asc',
   ) {
     const conditions = [eq(schema.assets.currentUserId, employeeId)];
+    const displayName = sql<string>`coalesce(${schema.assets.name}, ${schema.assetCategories.name})`;
 
     if (search?.trim()) {
-      conditions.push(ilike(schema.assetCategories.name, `%${search.trim()}%`));
+      const keyword = `%${search.trim()}%`;
+
+      conditions.push(
+        or(
+          ilike(schema.assets.name, keyword),
+          ilike(schema.assetCategories.name, keyword),
+          ilike(schema.assets.assetCode, keyword),
+        )!,
+      );
     }
 
     if (categoryId) {
@@ -103,7 +114,8 @@ export class AssetsService {
         id: schema.assets.id,
         assetCode: schema.assets.assetCode,
         qrCode: schema.assets.qrCode,
-        name: schema.assetCategories.name,
+        name: displayName,
+        category: schema.assetCategories.name,
         department: schema.departments.name,
         status: schema.assets.status,
       })
@@ -117,11 +129,7 @@ export class AssetsService {
         eq(schema.assets.currentManagingDepartmentId, schema.departments.id),
       )
       .where(and(...conditions))
-      .orderBy(
-        sort === 'name_desc'
-          ? desc(schema.assetCategories.name)
-          : asc(schema.assetCategories.name),
-      );
+      .orderBy(sort === 'name_desc' ? desc(displayName) : asc(displayName));
 
     if (records.length === 0) return [];
 
@@ -199,7 +207,7 @@ export class AssetsService {
         id: schema.assets.id,
         assetCode: schema.assets.assetCode,
         qrCode: schema.assets.qrCode,
-        name: schema.assetCategories.name,
+        name: sql<string>`coalesce(${schema.assets.name}, ${schema.assetCategories.name})`,
         category: schema.assetCategories.name,
         department: schema.departments.name,
         supplier: schema.suppliers.legalName,

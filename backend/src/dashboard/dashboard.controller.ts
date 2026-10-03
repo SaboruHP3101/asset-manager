@@ -15,9 +15,20 @@ export class DashboardController {
 
   @Get('mine')
   @ApiOkResponse({
-    schema: { example: { assignedAssets: 4, activeRequests: 2 } },
+    schema: {
+      example: {
+        assignedAssets: 4,
+        activeRequests: 2,
+        pendingTasks: {
+          purchaseRequests: 1,
+          purchaseOrders: 2,
+          inspections: 0,
+          allocations: 1,
+        },
+      },
+    },
   })
   getMine(@CurrentEmployee() employee: AuthenticatedEmployee) {
-    return this.dashboardService.getMySummary(employee.id);
+    return this.dashboardService.getMySummary(employee);
   }
 }

@@ -16,6 +16,7 @@ export const WORKFLOW_ACTIONS = {
   repairConfirmResult: 'repair.confirm_result',
   purchaseRequestCreate: 'purchase.request.create',
   purchaseRequestUpdate: 'purchase.request.update',
+  purchaseRequestDeleteDraft: 'purchase.request.delete_draft',
   purchaseRequestSubmit: 'purchase.request.submit',
   purchaseRequestApproveDepartment: 'purchase.request.approve_department',
   purchaseRequestEnrichProcurement: 'purchase.request.enrich_procurement',
@@ -51,6 +52,7 @@ export const EMPLOYEE_ACTIONS: readonly WorkflowAction[] = [
   WORKFLOW_ACTIONS.repairConfirmResult,
   WORKFLOW_ACTIONS.purchaseRequestCreate,
   WORKFLOW_ACTIONS.purchaseRequestUpdate,
+  WORKFLOW_ACTIONS.purchaseRequestDeleteDraft,
   WORKFLOW_ACTIONS.purchaseRequestSubmit,
   WORKFLOW_ACTIONS.purchaseAllocationConfirmRecipient,
 ];

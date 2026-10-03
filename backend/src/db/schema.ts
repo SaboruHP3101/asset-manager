@@ -231,6 +231,8 @@ export const assetCategories = pgTable(
     trackingMode: assetTrackingModeEnum('tracking_mode')
       .notNull()
       .default('individual_asset'),
+    isPurchaseOption: boolean('is_purchase_option').notNull().default(false),
+    allowsCustomType: boolean('allows_custom_type').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     createdBy: createdBy(),
@@ -347,6 +349,9 @@ export const purchaseRequestItems = pgTable(
       .notNull()
       .references(() => assetCategories.id),
     itemName: varchar('item_name', { length: 255 }).notNull(),
+    customCategoryDescription: varchar('custom_category_description', {
+      length: 255,
+    }),
     specifications: text('specifications').notNull(),
     purpose: text('purpose'),
     quantity: integer('quantity').notNull(),

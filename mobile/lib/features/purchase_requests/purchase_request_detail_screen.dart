@@ -163,7 +163,7 @@ class _PurchaseRequestDetailScreenState
   Future<void> _handleAction(String action) async {
     final detail = _detail!;
     if (action == 'edit') {
-      final changed = await Navigator.push<bool>(
+      final result = await Navigator.push<PurchaseRequestFormResult>(
         context,
         MaterialPageRoute(
           builder: (_) => PurchaseRequestFormScreen(
@@ -172,7 +172,11 @@ class _PurchaseRequestDetailScreenState
           ),
         ),
       );
-      if (changed == true) await _load();
+      if (result == PurchaseRequestFormResult.deleted) {
+        if (mounted) Navigator.pop(context);
+        return;
+      }
+      if (result == PurchaseRequestFormResult.saved) await _load();
       return;
     }
 

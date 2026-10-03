@@ -5,7 +5,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { DrizzleQueryError, eq } from 'drizzle-orm';
+import { asc, DrizzleQueryError, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
@@ -45,6 +45,16 @@ export class AssetCategoriesService {
     return assetCategories.map(
       (assetCategory) => new AssetCategory(assetCategory),
     );
+  }
+
+  async findPurchaseOptions() {
+    const categories = await this.db
+      .select()
+      .from(schema.assetCategories)
+      .where(eq(schema.assetCategories.isPurchaseOption, true))
+      .orderBy(asc(schema.assetCategories.name));
+
+    return categories.map((category) => new AssetCategory(category));
   }
 
   async findOne(id: string) {

@@ -39,7 +39,9 @@ class PurchaseRequestsRepository {
   }
 
   Future<List<PurchaseCategoryOption>> categories() async {
-    final response = await _dio.get<List<dynamic>>('/asset-categories');
+    final response = await _dio.get<List<dynamic>>(
+      '/asset-categories/purchase-options',
+    );
     return response.data!
         .map(
           (item) => PurchaseCategoryOption.fromJson(
@@ -87,6 +89,9 @@ class PurchaseRequestsRepository {
 
   Future<void> submit(String id) =>
       _dio.post<void>('/purchase-requests/$id/submit');
+
+  Future<void> deleteDraft(String id) =>
+      _dio.delete<void>('/purchase-requests/$id');
 
   Future<void> submitProcurement(String id) =>
       _dio.post<void>('/purchase-requests/$id/submit-procurement');

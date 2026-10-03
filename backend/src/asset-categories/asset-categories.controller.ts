@@ -42,6 +42,12 @@ export class AssetCategoriesController {
     return this.assetCategoriesService.findAll();
   }
 
+  @Get('purchase-options')
+  @ApiOkResponse({ type: AssetCategory, isArray: true })
+  findPurchaseOptions() {
+    return this.assetCategoriesService.findPurchaseOptions();
+  }
+
   @Get(':id')
   @ApiOkResponse({ type: AssetCategory })
   @ApiNotFoundResponse({ description: 'Không tìm thấy danh mục tài sản' })

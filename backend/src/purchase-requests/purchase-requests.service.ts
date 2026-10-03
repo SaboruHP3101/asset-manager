@@ -97,8 +97,6 @@ export class PurchaseRequestsService {
       actor,
       WORKFLOW_ACTIONS.purchaseRequestUpdate,
     );
-    const categories = await this.loadCategories(dto);
-
     await this.db.transaction(async (transaction) => {
       const tx = transaction as unknown as Database;
       const request = await this.requireRequest(tx, id, [
@@ -108,6 +106,12 @@ export class PurchaseRequestsService {
 
       this.authorization.assertOwnRequest(actor, request);
       const revision = await this.requireCurrentRevision(tx, request);
+      const existingItems = await this.loadRevisionItems(tx, revision.id);
+      const categories = await this.loadCategories(
+        dto,
+        tx,
+        new Set(existingItems.map((item) => item.assetCategoryId)),
+      );
 
       await tx
         .update(schema.purchaseRequestRevisions)
@@ -139,6 +143,51 @@ export class PurchaseRequestsService {
     });
 
     return this.findOne(id, actor);
+  }
+
+  async deleteDraft(id: string, actor: AuthenticatedEmployee) {
+    this.authorization.assertAction(
+      actor,
+      WORKFLOW_ACTIONS.purchaseRequestDeleteDraft,
+    );
+
+    await this.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as Database;
+      const request = await this.requireRequest(tx, id, ['draft']);
+
+      this.authorization.assertOwnRequest(actor, request);
+
+      const revisions = await tx
+        .select({ id: schema.purchaseRequestRevisions.id })
+        .from(schema.purchaseRequestRevisions)
+        .where(eq(schema.purchaseRequestRevisions.purchaseRequestId, id));
+      const revisionIds = revisions.map((revision) => revision.id);
+
+      if (revisionIds.length > 0) {
+        await tx
+          .delete(schema.purchaseRequestItems)
+          .where(
+            inArray(schema.purchaseRequestItems.requestRevisionId, revisionIds),
+          );
+        await tx
+          .delete(schema.purchaseRequestRevisions)
+          .where(inArray(schema.purchaseRequestRevisions.id, revisionIds));
+      }
+
+      await tx
+        .delete(schema.requestApprovals)
+        .where(
+          and(
+            eq(schema.requestApprovals.requestType, 'purchase'),
+            eq(schema.requestApprovals.requestId, id),
+          ),
+        );
+      await tx
+        .delete(schema.purchaseRequests)
+        .where(eq(schema.purchaseRequests.id, id));
+    });
+
+    return { deleted: true };
   }
 
   async submit(id: string, actor: AuthenticatedEmployee) {
@@ -605,6 +654,8 @@ export class PurchaseRequestsService {
         assetCategoryId: schema.purchaseRequestItems.assetCategoryId,
         categoryName: schema.assetCategories.name,
         itemName: schema.purchaseRequestItems.itemName,
+        customCategoryDescription:
+          schema.purchaseRequestItems.customCategoryDescription,
         specifications: schema.purchaseRequestItems.specifications,
         purpose: schema.purchaseRequestItems.purpose,
         quantity: schema.purchaseRequestItems.quantity,
@@ -687,13 +738,20 @@ export class PurchaseRequestsService {
     };
   }
 
-  private async loadCategories(dto: SavePurchaseRequestDto) {
+  private async loadCategories(
+    dto: SavePurchaseRequestDto,
+    db: Database = this.db,
+    allowedLegacyIds: ReadonlySet<string> = new Set(),
+  ) {
     const ids = [...new Set(dto.items.map((item) => item.assetCategoryId))];
-    const categories = await this.db
+    const categories = await db
       .select({
         id: schema.assetCategories.id,
+        parentCategoryId: schema.assetCategories.parentCategoryId,
         managementOwner: schema.assetCategories.managementOwner,
         trackingMode: schema.assetCategories.trackingMode,
+        isPurchaseOption: schema.assetCategories.isPurchaseOption,
+        allowsCustomType: schema.assetCategories.allowsCustomType,
       })
       .from(schema.assetCategories)
       .where(inArray(schema.assetCategories.id, ids));
@@ -702,7 +760,64 @@ export class PurchaseRequestsService {
       throw new BadRequestException('Có danh mục tài sản không tồn tại.');
     }
 
-    return new Map(categories.map((category) => [category.id, category]));
+    const parentIds = [
+      ...new Set(
+        categories.flatMap((category) =>
+          category.parentCategoryId ? [category.parentCategoryId] : [],
+        ),
+      ),
+    ];
+    const parents = parentIds.length
+      ? await db
+          .select({
+            id: schema.assetCategories.id,
+            parentCategoryId: schema.assetCategories.parentCategoryId,
+            isPurchaseOption: schema.assetCategories.isPurchaseOption,
+          })
+          .from(schema.assetCategories)
+          .where(inArray(schema.assetCategories.id, parentIds))
+      : [];
+    const parentById = new Map(parents.map((parent) => [parent.id, parent]));
+    const unavailableCategories = categories.filter((category) => {
+      if (allowedLegacyIds.has(category.id)) return false;
+
+      if (!category.isPurchaseOption || !category.parentCategoryId) return true;
+
+      const parent = parentById.get(category.parentCategoryId);
+
+      return (
+        !parent || parent.parentCategoryId !== null || !parent.isPurchaseOption
+      );
+    });
+
+    if (unavailableCategories.length > 0) {
+      throw new BadRequestException(
+        'Hạng mục phải sử dụng danh mục cấp 2 hợp lệ.',
+      );
+    }
+
+    const categoryById = new Map(
+      categories.map((category) => [category.id, category]),
+    );
+
+    for (const item of dto.items) {
+      const category = categoryById.get(item.assetCategoryId)!;
+      const customDescription = item.customCategoryDescription?.trim();
+
+      if (category.allowsCustomType && !customDescription) {
+        throw new BadRequestException(
+          'Vui lòng mô tả loại tài sản khi chọn loại Khác.',
+        );
+      }
+
+      if (!category.allowsCustomType && customDescription) {
+        throw new BadRequestException(
+          'Chỉ được mô tả loại tài sản khi chọn loại Khác.',
+        );
+      }
+    }
+
+    return categoryById;
   }
 
   private async insertItems(
@@ -720,6 +835,8 @@ export class PurchaseRequestsService {
           requestRevisionId: revisionId,
           assetCategoryId: item.assetCategoryId,
           itemName: item.itemName,
+          customCategoryDescription:
+            item.customCategoryDescription?.trim() || null,
           specifications: item.specifications,
           purpose: item.purpose,
           quantity: item.quantity,
@@ -854,6 +971,7 @@ export class PurchaseRequestsService {
         requestRevisionId: nextRevision.id,
         assetCategoryId: item.assetCategoryId,
         itemName: item.itemName,
+        customCategoryDescription: item.customCategoryDescription,
         specifications: item.specifications,
         purpose: item.purpose,
         quantity: item.quantity,
@@ -1084,6 +1202,10 @@ export class PurchaseRequestsService {
         WORKFLOW_ACTIONS.purchaseRequestUpdate,
         WORKFLOW_ACTIONS.purchaseRequestSubmit,
       );
+    }
+
+    if (request.requesterId === actor.id && request.status === 'draft') {
+      candidates.push(WORKFLOW_ACTIONS.purchaseRequestDeleteDraft);
     }
 
     const pending = this.pendingAction(request.status);

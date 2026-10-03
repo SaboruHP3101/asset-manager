@@ -1,0 +1,2 @@
+ALTER TABLE "asset_categories" ADD COLUMN "allows_custom_type" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "purchase_request_items" ADD COLUMN "custom_category_description" varchar(255);

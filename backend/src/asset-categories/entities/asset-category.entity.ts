@@ -4,6 +4,8 @@ export class AssetCategory {
   name: string;
   parentCategoryId?: string | null;
   description?: string | null;
+  isPurchaseOption: boolean;
+  allowsCustomType: boolean;
   createdAt: Date;
   updatedAt: Date;
   createdBy?: string | null;

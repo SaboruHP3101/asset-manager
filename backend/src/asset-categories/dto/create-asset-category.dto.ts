@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -28,4 +29,14 @@ export class CreateAssetCategoryDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  /** Cho phép nhân viên chọn danh mục này khi tạo đề nghị mua. */
+  @IsBoolean()
+  @IsOptional()
+  isPurchaseOption?: boolean;
+
+  /** Yêu cầu người dùng mô tả loại tài sản khi chọn danh mục này. */
+  @IsBoolean()
+  @IsOptional()
+  allowsCustomType?: boolean;
 }

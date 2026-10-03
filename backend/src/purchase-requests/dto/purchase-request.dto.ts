@@ -24,6 +24,11 @@ export class PurchaseRequestItemDto {
   @MaxLength(255)
   itemName: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  customCategoryDescription?: string;
+
   @IsString()
   @IsNotEmpty()
   specifications: string;

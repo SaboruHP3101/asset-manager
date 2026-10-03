@@ -34,8 +34,13 @@ class _MainLayoutState extends State<MainLayout> {
       if (!mounted) return;
       setState(() {
         _screens = [
-          HomeScreen(profile: profile),
-          AssetsScreen(),
+          HomeScreen(
+            profile: profile,
+            onOpenAssets: () => _onTabTapped(1),
+            onOpenRequests: () => _onTabTapped(2),
+            onScanAssets: _openAssetScanner,
+          ),
+          const AssetsScreen(),
           const RepairRequestsScreen(),
           ProfileScreen(),
         ];
@@ -55,6 +60,13 @@ class _MainLayoutState extends State<MainLayout> {
     } catch (_) {
       if (mounted) setState(() => _error = 'Không thể tải quyền người dùng.');
     }
+  }
+
+  void _openAssetScanner() {
+    setState(() {
+      _screens![1] = AssetsScreen(key: UniqueKey(), initiallyOpenScanner: true);
+      _currentIndex = 1;
+    });
   }
 
   void _onTabTapped(int index) {

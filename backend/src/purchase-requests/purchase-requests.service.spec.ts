@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 import type { PurchaseAuthorizationService } from '../auth/purchase-authorization.service.js';
 import type { NotificationsService } from '../notifications/notifications.service.js';
@@ -111,5 +112,163 @@ describe('PurchaseRequestsService approvals', () => {
         }),
       ]),
     );
+  });
+});
+
+describe('PurchaseRequestsService category validation', () => {
+  function categoryService({
+    isPurchaseOption,
+    parentCategoryId = null,
+    allowsCustomType = false,
+  }: {
+    isPurchaseOption: boolean;
+    parentCategoryId?: string | null;
+    allowsCustomType?: boolean;
+  }) {
+    const category = {
+      id: 'category-id',
+      parentCategoryId,
+      managementOwner: 'it',
+      trackingMode: 'individual_asset',
+      isPurchaseOption,
+      allowsCustomType,
+    };
+    const parent = {
+      id: 'parent-id',
+      parentCategoryId: null,
+      isPurchaseOption: true,
+    };
+    const rows = [[category], [parent]];
+    let selectIndex = 0;
+    const select = vi.fn(() => {
+      const where = vi.fn().mockResolvedValue(rows[selectIndex++] ?? []);
+
+      return { from: vi.fn(() => ({ where })) };
+    });
+    const service = new PurchaseRequestsService(
+      { select } as never,
+      {} as PurchaseAuthorizationService,
+      {} as RequestAuditService,
+      {} as NotificationsService,
+    );
+
+    return service as unknown as {
+      loadCategories: (
+        dto: {
+          items: {
+            assetCategoryId: string;
+            customCategoryDescription?: string;
+          }[];
+        },
+        db?: unknown,
+        allowedLegacyIds?: ReadonlySet<string>,
+      ) => Promise<unknown>;
+    };
+  }
+
+  it('rejects a category that is not a purchase option', async () => {
+    const service = categoryService({ isPurchaseOption: false });
+
+    await expect(
+      service.loadCategories({
+        items: [{ assetCategoryId: 'category-id' }],
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects a level-one category', async () => {
+    const service = categoryService({ isPurchaseOption: true });
+
+    await expect(
+      service.loadCategories({
+        items: [{ assetCategoryId: 'category-id' }],
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('accepts a level-two purchase category', async () => {
+    const service = categoryService({
+      isPurchaseOption: true,
+      parentCategoryId: 'parent-id',
+    });
+
+    await expect(
+      service.loadCategories({
+        items: [{ assetCategoryId: 'category-id' }],
+      }),
+    ).resolves.toBeInstanceOf(Map);
+  });
+
+  it('requires a description for a controlled Other category', async () => {
+    const service = categoryService({
+      isPurchaseOption: true,
+      parentCategoryId: 'parent-id',
+      allowsCustomType: true,
+    });
+
+    await expect(
+      service.loadCategories({
+        items: [{ assetCategoryId: 'category-id' }],
+      }),
+    ).rejects.toThrow('Vui lòng mô tả loại tài sản');
+  });
+
+  it('allows an existing legacy category while editing', async () => {
+    const service = categoryService({ isPurchaseOption: false });
+
+    await expect(
+      service.loadCategories(
+        { items: [{ assetCategoryId: 'category-id' }] },
+        undefined,
+        new Set(['category-id']),
+      ),
+    ).resolves.toBeInstanceOf(Map);
+  });
+});
+
+describe('PurchaseRequestsService draft deletion', () => {
+  it('deletes only the owner draft and its revision data', async () => {
+    const rows = [
+      [
+        {
+          id: 'request-id',
+          status: 'draft',
+          requesterId: actor.id,
+          departmentId: actor.departmentId,
+          currentRevision: 1,
+        },
+      ],
+      [{ id: 'revision-id' }],
+    ];
+    let selectIndex = 0;
+    const select = vi.fn(() => {
+      const where = vi.fn().mockResolvedValue(rows[selectIndex++] ?? []);
+
+      return { from: vi.fn(() => ({ where })) };
+    });
+    const deleteWhere = vi.fn().mockResolvedValue(undefined);
+    const db = {
+      select,
+      delete: vi.fn(() => ({ where: deleteWhere })),
+      transaction: vi.fn(
+        (callback: (transaction: unknown) => Promise<unknown>) => callback(db),
+      ),
+    };
+    const authorization = {
+      assertAction: vi.fn(),
+      assertOwnRequest: vi.fn(),
+    };
+    const service = new PurchaseRequestsService(
+      db as never,
+      authorization as unknown as PurchaseAuthorizationService,
+      {} as RequestAuditService,
+      {} as NotificationsService,
+    );
+
+    await expect(service.deleteDraft('request-id', actor)).resolves.toEqual({
+      deleted: true,
+    });
+    expect(authorization.assertOwnRequest).toHaveBeenCalledOnce();
+    expect(db.delete).toHaveBeenCalledTimes(4);
   });
 });

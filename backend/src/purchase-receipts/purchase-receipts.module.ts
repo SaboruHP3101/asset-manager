@@ -8,5 +8,6 @@ import { PurchaseReceiptsService } from './purchase-receipts.service.js';
   imports: [DrizzleModule, AuthModule],
   controllers: [PurchaseReceiptsController],
   providers: [PurchaseReceiptsService],
+  exports: [PurchaseReceiptsService],
 })
 export class PurchaseReceiptsModule {}
