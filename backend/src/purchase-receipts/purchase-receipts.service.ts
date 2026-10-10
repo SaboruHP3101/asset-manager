@@ -60,6 +60,42 @@ export function calculateReceiptProgress(
   };
 }
 
+export function validateReceiptSerialNumbers(
+  serialNumbers: string[] | undefined,
+  deliveredQuantity: number,
+  requiresSerials: boolean,
+  itemName: string,
+): string[] {
+  const values = serialNumbers ?? [];
+  const normalized = values.map((serial) => serial.trim());
+
+  if (normalized.some((serial) => serial.length === 0)) {
+    throw new BadRequestException(
+      `Mã sản phẩm của ${itemName} không được để trống.`,
+    );
+  }
+
+  if (new Set(normalized).size !== normalized.length) {
+    throw new BadRequestException(
+      `Danh sách mã sản phẩm của ${itemName} có mã bị trùng.`,
+    );
+  }
+
+  if (normalized.length > deliveredQuantity) {
+    throw new BadRequestException(
+      `Số mã sản phẩm của ${itemName} vượt số lượng giao.`,
+    );
+  }
+
+  if (requiresSerials && normalized.length !== deliveredQuantity) {
+    throw new BadRequestException(
+      `${itemName} cần đủ ${deliveredQuantity} mã sản phẩm.`,
+    );
+  }
+
+  return normalized;
+}
+
 @Injectable()
 export class PurchaseReceiptsService {
   constructor(
@@ -117,6 +153,7 @@ export class PurchaseReceiptsService {
         }
 
         const progress = await this.loadOrderProgress(tx, orderItems);
+        const serialsByItemId = new Map<string, string[]>();
 
         for (const item of selectedItems) {
           const input = inputById.get(item.id)!;
@@ -128,9 +165,39 @@ export class PurchaseReceiptsService {
             );
           }
 
-          if ((input.serialNumbers?.length ?? 0) > input.deliveredQuantity) {
-            throw new BadRequestException(
-              `Số serial của ${item.itemNameSnapshot} vượt số lượng giao.`,
+          serialsByItemId.set(
+            item.id,
+            validateReceiptSerialNumbers(
+              input.serialNumbers,
+              input.deliveredQuantity,
+              item.trackingModeSnapshot === 'individual_asset',
+              item.itemNameSnapshot,
+            ),
+          );
+        }
+
+        const submittedSerials = [...serialsByItemId.values()].flat();
+
+        if (new Set(submittedSerials).size !== submittedSerials.length) {
+          throw new BadRequestException(
+            'Một mã sản phẩm không được dùng cho nhiều hạng mục.',
+          );
+        }
+
+        if (submittedSerials.length > 0) {
+          const existingSerials = await tx
+            .select({ serialNumber: schema.purchaseReceiptUnits.serialNumber })
+            .from(schema.purchaseReceiptUnits)
+            .where(
+              inArray(
+                schema.purchaseReceiptUnits.serialNumber,
+                submittedSerials,
+              ),
+            );
+
+          if (existingSerials.length > 0) {
+            throw new ConflictException(
+              `Mã sản phẩm ${existingSerials[0].serialNumber} đã được ghi nhận.`,
             );
           }
         }
@@ -175,7 +242,7 @@ export class PurchaseReceiptsService {
             Array.from({ length: input.deliveredQuantity }, (_, index) => ({
               purchaseReceiptItemId: receiptItem.id,
               sequenceNumber: index + 1,
-              serialNumber: input.serialNumbers?.[index]?.trim() || null,
+              serialNumber: serialsByItemId.get(item.id)?.[index] ?? null,
               createdBy: actor.id,
               updatedBy: actor.id,
             })),

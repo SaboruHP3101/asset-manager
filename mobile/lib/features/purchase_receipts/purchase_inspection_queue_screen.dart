@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/widgets/code_scanner_screen.dart';
 import 'purchase_receipt_models.dart';
 import 'purchase_receipts_repository.dart';
 
 class PurchaseInspectionQueueScreen extends StatefulWidget {
-  const PurchaseInspectionQueueScreen({super.key, this.repository});
+  const PurchaseInspectionQueueScreen({
+    super.key,
+    this.repository,
+    this.scanner,
+  });
 
   final PurchaseReceiptsRepository? repository;
+  final CodeScannerLauncher? scanner;
 
   @override
   State<PurchaseInspectionQueueScreen> createState() =>
@@ -17,6 +23,7 @@ class PurchaseInspectionQueueScreen extends StatefulWidget {
 class _PurchaseInspectionQueueScreenState
     extends State<PurchaseInspectionQueueScreen> {
   late final PurchaseReceiptsRepository _repository;
+  late final CodeScannerLauncher _scanner;
   List<PurchaseInspectionUnit>? _units;
   String? _error;
   String? _actingUnitId;
@@ -25,6 +32,7 @@ class _PurchaseInspectionQueueScreenState
   void initState() {
     super.initState();
     _repository = widget.repository ?? PurchaseReceiptsRepository();
+    _scanner = widget.scanner ?? openCodeScanner;
     _load();
   }
 
@@ -45,6 +53,18 @@ class _PurchaseInspectionQueueScreenState
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Hàng chờ kiểm tra'),
+      actions: [
+        IconButton(
+          onPressed:
+              _units?.any((unit) => unit.serialNumber?.isNotEmpty ?? false) ==
+                      true &&
+                  _actingUnitId == null
+              ? _scanUnit
+              : null,
+          tooltip: 'Quét mã sản phẩm',
+          icon: const Icon(Icons.qr_code_scanner),
+        ),
+      ],
     ),
     body: _error != null
         ? _Message(message: _error!, onRetry: _load)
@@ -117,6 +137,68 @@ class _PurchaseInspectionQueueScreenState
       ),
     ),
   );
+
+  Future<void> _scanUnit() async {
+    final codes = await _scanner(
+      context,
+      title: 'Quét mã sản phẩm',
+      targetCount: 1,
+      initialCodes: const [],
+    );
+    if (codes == null || codes.isEmpty || !mounted) return;
+
+    final scannedCode = codes.first.trim();
+    PurchaseInspectionUnit? matchedUnit;
+    for (final unit in _units ?? const <PurchaseInspectionUnit>[]) {
+      if (unit.serialNumber?.trim() == scannedCode) {
+        matchedUnit = unit;
+        break;
+      }
+    }
+    final unit = matchedUnit;
+    if (unit == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mã không thuộc danh sách hàng chờ kiểm tra.'),
+        ),
+      );
+      return;
+    }
+
+    final action = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                unit.itemName,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 6),
+              Text('${unit.purchaseOrderCode} • ${unit.receiptCode}'),
+              Text('Mã sản phẩm: ${unit.serialNumber}'),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Xác nhận đạt'),
+              ),
+              OutlinedButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Ghi nhận không đạt'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+    await _inspect(unit, accepted: action);
+  }
 
   Future<void> _inspect(
     PurchaseInspectionUnit unit, {

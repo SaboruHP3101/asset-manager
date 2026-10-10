@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/widgets/code_scanner_screen.dart';
 import 'purchase_receipt_models.dart';
 import 'purchase_receipts_repository.dart';
 
@@ -9,10 +10,12 @@ class PurchaseReceiptFormScreen extends StatefulWidget {
     required this.orderId,
     super.key,
     this.repository,
+    this.scanner,
   });
 
   final String orderId;
   final PurchaseReceiptsRepository? repository;
+  final CodeScannerLauncher? scanner;
 
   @override
   State<PurchaseReceiptFormScreen> createState() =>
@@ -25,6 +28,7 @@ class _PurchaseReceiptFormScreenState extends State<PurchaseReceiptFormScreen> {
   final _deliveryNoteNumber = TextEditingController();
   final _picker = ImagePicker();
   late final PurchaseReceiptsRepository _repository;
+  late final CodeScannerLauncher _scanner;
   final Map<String, TextEditingController> _quantities = {};
   final Map<String, TextEditingController> _serials = {};
   List<PurchaseReceiptProgress>? _items;
@@ -38,6 +42,7 @@ class _PurchaseReceiptFormScreenState extends State<PurchaseReceiptFormScreen> {
   void initState() {
     super.initState();
     _repository = widget.repository ?? PurchaseReceiptsRepository();
+    _scanner = widget.scanner ?? openCodeScanner;
     final now = DateTime.now();
     _deliveryDate.text =
         '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
@@ -92,9 +97,15 @@ class _PurchaseReceiptFormScreenState extends State<PurchaseReceiptFormScreen> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  key: const ValueKey('delivery-note-number'),
                   controller: _deliveryNoteNumber,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Số phiếu giao hàng',
+                    suffixIcon: IconButton(
+                      onPressed: _scanDeliveryNoteNumber,
+                      tooltip: 'Quét số phiếu giao hàng',
+                      icon: const Icon(Icons.qr_code_scanner),
+                    ),
                   ),
                   validator: (value) => value?.trim().isEmpty ?? true
                       ? 'Nhập số phiếu giao hàng.'
@@ -138,56 +149,66 @@ class _PurchaseReceiptFormScreenState extends State<PurchaseReceiptFormScreen> {
           ),
   );
 
-  Widget _line(PurchaseReceiptProgress item) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(item.itemName, style: Theme.of(context).textTheme.titleMedium),
-          Text(
-            'Đặt ${item.ordered} • Đã giao ${item.delivered} • '
-            'Đạt ${item.accepted} • Không đạt ${item.rejected} • '
-            'Còn có thể giao ${item.remaining}',
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _quantities[item.purchaseOrderItemId],
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Số lượng đợt này'),
-            validator: (value) {
-              final quantity = int.tryParse(value ?? '');
-              if (quantity == null || quantity < 0) {
-                return 'Số lượng không hợp lệ.';
-              }
-              if (quantity > item.remaining) return 'Tối đa ${item.remaining}.';
-              return null;
-            },
-          ),
-          if (item.trackingMode == 'individual_asset') ...[
+  Widget _line(PurchaseReceiptProgress item) {
+    final itemId = item.purchaseOrderItemId;
+    final serialCount = _serialList(_serials[itemId]?.text).length;
+    final quantity = int.tryParse(_quantities[itemId]?.text ?? '') ?? 0;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(item.itemName, style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'Đặt ${item.ordered} • Đã giao ${item.delivered} • '
+              'Đạt ${item.accepted} • Không đạt ${item.rejected} • '
+              'Còn có thể giao ${item.remaining}',
+            ),
             const SizedBox(height: 8),
             TextFormField(
-              controller: _serials[item.purchaseOrderItemId],
-              minLines: 2,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Serial (mỗi dòng một số, nếu có)',
-              ),
+              key: ValueKey('receipt-quantity-$itemId'),
+              controller: _quantities[itemId],
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Số lượng đợt này'),
+              onChanged: (_) => setState(() {}),
               validator: (value) {
-                final count = _serialList(value).length;
-                final quantity =
-                    int.tryParse(_quantities[item.purchaseOrderItemId]!.text) ??
-                    0;
-                return count > quantity
-                    ? 'Số serial không được vượt số lượng giao.'
-                    : null;
+                final valueAsNumber = int.tryParse(value ?? '');
+                if (valueAsNumber == null || valueAsNumber < 0) {
+                  return 'Số lượng không hợp lệ.';
+                }
+                if (valueAsNumber > item.remaining) {
+                  return 'Tối đa ${item.remaining}.';
+                }
+                return null;
               },
             ),
+            if (item.trackingMode == 'individual_asset') ...[
+              const SizedBox(height: 8),
+              TextFormField(
+                key: ValueKey('receipt-serials-$itemId'),
+                controller: _serials[itemId],
+                minLines: 2,
+                maxLines: 5,
+                decoration: InputDecoration(
+                  labelText: 'Mã sản phẩm (mỗi dòng một mã)',
+                  helperText: 'Đã có $serialCount/$quantity mã',
+                  suffixIcon: IconButton(
+                    onPressed: () => _scanSerials(item),
+                    tooltip: 'Quét mã ${item.itemName}',
+                    icon: const Icon(Icons.qr_code_scanner),
+                  ),
+                ),
+                onChanged: (_) => setState(() {}),
+                validator: (value) => _validateSerials(item, value),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _fileButton({
     required String label,
@@ -221,6 +242,60 @@ class _PurchaseReceiptFormScreenState extends State<PurchaseReceiptFormScreen> {
       .map((serial) => serial.trim())
       .where((serial) => serial.isNotEmpty)
       .toList();
+
+  String? _validateSerials(PurchaseReceiptProgress item, String? value) {
+    final serials = _serialList(value);
+    final quantity =
+        int.tryParse(_quantities[item.purchaseOrderItemId]?.text ?? '') ?? 0;
+    if (serials.length != serials.toSet().length) {
+      return 'Danh sách có mã bị trùng.';
+    }
+    if (serials.any(_serialIsUsedInAnotherItem(item.purchaseOrderItemId))) {
+      return 'Mã đã được dùng ở hạng mục khác.';
+    }
+    if (serials.length != quantity) {
+      return 'Cần đủ $quantity mã cho $quantity sản phẩm.';
+    }
+    return null;
+  }
+
+  bool Function(String) _serialIsUsedInAnotherItem(String itemId) =>
+      (serial) => _serials.entries.any(
+        (entry) =>
+            entry.key != itemId &&
+            _serialList(entry.value.text).contains(serial),
+      );
+
+  Future<void> _scanSerials(PurchaseReceiptProgress item) async {
+    final itemId = item.purchaseOrderItemId;
+    final quantity = int.tryParse(_quantities[itemId]?.text ?? '') ?? 0;
+    if (quantity <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nhập số lượng giao trước khi quét mã.')),
+      );
+      return;
+    }
+
+    final serials = await _scanner(
+      context,
+      title: 'Quét mã ${item.itemName}',
+      targetCount: quantity,
+      initialCodes: _serialList(_serials[itemId]?.text),
+    );
+    if (serials == null || !mounted) return;
+    setState(() => _serials[itemId]!.text = serials.join('\n'));
+  }
+
+  Future<void> _scanDeliveryNoteNumber() async {
+    final codes = await _scanner(
+      context,
+      title: 'Quét số phiếu giao hàng',
+      targetCount: 1,
+      initialCodes: const [],
+    );
+    if (codes == null || codes.isEmpty || !mounted) return;
+    setState(() => _deliveryNoteNumber.text = codes.first);
+  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
