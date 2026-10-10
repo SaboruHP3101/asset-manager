@@ -13,6 +13,7 @@ import {
   eq,
   ilike,
   inArray,
+  notInArray,
   or,
   sql,
 } from 'drizzle-orm';
@@ -217,6 +218,8 @@ export class AssetsService {
         purchaseDate: schema.assets.purchaseDate,
         inServiceDate: schema.assets.inServiceDate,
         initialValue: schema.assets.initialValue,
+        managementOwner: schema.assetCategories.managementOwner,
+        currentWarehouseId: schema.assets.currentWarehouseId,
       })
       .from(schema.assets)
       .innerJoin(
@@ -284,11 +287,24 @@ export class AssetsService {
       )
       .where(eq(schema.assetHandoverHistory.assetId, assetId))
       .orderBy(desc(schema.assetHandoverHistory.handoverDate));
+    const [activeRecall] = await this.db
+      .select({
+        id: schema.assetRecallRequests.id,
+        status: schema.assetRecallRequests.status,
+      })
+      .from(schema.assetRecallRequests)
+      .where(
+        and(
+          eq(schema.assetRecallRequests.assetId, assetId),
+          notInArray(schema.assetRecallRequests.status, ['completed']),
+        ),
+      );
 
     return {
       ...record,
       imageUrl: attachment?.url ?? null,
       handoverHistory,
+      activeRecall: activeRecall ?? null,
     };
   }
 

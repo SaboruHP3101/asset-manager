@@ -27,7 +27,8 @@ import {
 } from './dto/purchase-receipt.dto.js';
 
 type Database = NodePgDatabase<typeof schema>;
-type ManagementOwner = (typeof schema.assetManagementOwnerEnum.enumValues)[number];
+type ManagementOwner =
+  (typeof schema.assetManagementOwnerEnum.enumValues)[number];
 type ReceiptFiles = Partial<
   Record<'deliveryNote' | 'invoice' | 'warranty', Express.Multer.File[]>
 >;
@@ -110,7 +111,9 @@ export class PurchaseReceiptsService {
         );
 
         if (selectedItems.length !== dto.items.length) {
-          throw new BadRequestException('Đợt giao chứa hạng mục không thuộc PO.');
+          throw new BadRequestException(
+            'Đợt giao chứa hạng mục không thuộc PO.',
+          );
         }
 
         const progress = await this.loadOrderProgress(tx, orderItems);
@@ -358,8 +361,7 @@ export class PurchaseReceiptsService {
           .where(eq(schema.purchaseReceiptUnits.id, unitId));
 
         let asset:
-          | { id: string; assetCode: string; qrCode: string }
-          | undefined;
+          { id: string; assetCode: string; qrCode: string } | undefined;
 
         if (
           dto.accepted &&
@@ -395,9 +397,21 @@ export class PurchaseReceiptsService {
           asset = createdAsset;
         }
 
-        await this.refreshReceiptItem(tx, context.purchaseReceiptItemId, actor.id);
-        const receiptStatus = await this.refreshReceipt(tx, context.receiptId, actor.id);
-        const orderStatus = await this.refreshOrder(tx, context.purchaseOrderId, actor.id);
+        await this.refreshReceiptItem(
+          tx,
+          context.purchaseReceiptItemId,
+          actor.id,
+        );
+        const receiptStatus = await this.refreshReceipt(
+          tx,
+          context.receiptId,
+          actor.id,
+        );
+        const orderStatus = await this.refreshOrder(
+          tx,
+          context.purchaseOrderId,
+          actor.id,
+        );
 
         await this.audit.logPurchase(tx, {
           requestId: context.purchaseRequestId,
@@ -509,7 +523,9 @@ export class PurchaseReceiptsService {
         );
       }
 
-      if ([...progress.values()].every((line) => line.accepted >= line.ordered)) {
+      if (
+        [...progress.values()].every((line) => line.accepted >= line.ordered)
+      ) {
         throw new ConflictException('PO đã nhận đủ, không thể đóng thiếu.');
       }
 
@@ -768,7 +784,8 @@ export class PurchaseReceiptsService {
       )
       .where(eq(schema.purchaseReceiptUnits.id, unitId));
 
-    if (!context) throw new NotFoundException('Không tìm thấy đơn vị kiểm tra.');
+    if (!context)
+      throw new NotFoundException('Không tìm thấy đơn vị kiểm tra.');
 
     return context;
   }
@@ -789,7 +806,9 @@ export class PurchaseReceiptsService {
       );
     const inspected = counts.accepted + counts.rejected;
     const [item] = await db
-      .select({ deliveredQuantity: schema.purchaseReceiptItems.deliveredQuantity })
+      .select({
+        deliveredQuantity: schema.purchaseReceiptItems.deliveredQuantity,
+      })
       .from(schema.purchaseReceiptItems)
       .where(eq(schema.purchaseReceiptItems.id, receiptItemId));
 
@@ -853,11 +872,7 @@ export class PurchaseReceiptsService {
     return status;
   }
 
-  private async refreshOrder(
-    db: Database,
-    orderId: string,
-    actorId: string,
-  ) {
+  private async refreshOrder(db: Database, orderId: string, actorId: string) {
     const items = await this.loadOrderItems(db, orderId);
     const progress = await this.loadOrderProgress(db, items);
     const lines = [...progress.values()];

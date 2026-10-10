@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, count, eq, notInArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { AssetAllocationsService } from '../asset-allocations/asset-allocations.service.js';
+import { AssetRecallRequestsService } from '../asset-recall-requests/asset-recall-requests.service.js';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 import {
   getAllowedWorkflowActions,
@@ -23,6 +24,7 @@ export class DashboardService {
     private readonly purchaseOrders: PurchaseOrdersService,
     private readonly purchaseReceipts: PurchaseReceiptsService,
     private readonly assetAllocations: AssetAllocationsService,
+    private readonly assetRecalls: AssetRecallRequestsService,
   ) {}
 
   /**
@@ -65,6 +67,8 @@ export class DashboardService {
       visibleOrders,
       inspectionQueue,
       allocationQueue,
+      recallResult,
+      recallQueue,
     ] = await Promise.all([
       this.db
         .select({ value: count(schema.assets.id) })
@@ -116,6 +120,16 @@ export class DashboardService {
         ? this.purchaseReceipts.findInspectionQueue(actor)
         : Promise.resolve([]),
       this.assetAllocations.findQueue(actor),
+      this.db
+        .select({ value: count(schema.assetRecallRequests.id) })
+        .from(schema.assetRecallRequests)
+        .where(
+          and(
+            eq(schema.assetRecallRequests.requestedBy, actor.id),
+            notInArray(schema.assetRecallRequests.status, ['completed']),
+          ),
+        ),
+      this.assetRecalls.findQueue(actor),
     ]);
     const ongoingOrders = visibleOrders.filter((order) =>
       ['issued', 'partially_received'].includes(order.status),
@@ -129,7 +143,8 @@ export class DashboardService {
       activeRequests:
         (purchaseResult[0]?.value ?? 0) +
         (transferResult[0]?.value ?? 0) +
-        (repairResult[0]?.value ?? 0),
+        (repairResult[0]?.value ?? 0) +
+        (recallResult[0]?.value ?? 0),
       pendingTasks: {
         purchaseRequests: requestQueue.length,
         purchaseOrders:
@@ -139,6 +154,7 @@ export class DashboardService {
           ongoingOrders.length,
         inspections: inspectionQueue.length,
         allocations: allocationQueue.length,
+        recalls: recallQueue.length,
       },
     };
   }

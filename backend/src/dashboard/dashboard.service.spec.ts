@@ -1,6 +1,7 @@
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { vi } from 'vitest';
 import type { AssetAllocationsService } from '../asset-allocations/asset-allocations.service.js';
+import type { AssetRecallRequestsService } from '../asset-recall-requests/asset-recall-requests.service.js';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 import * as schema from '../db/schema.js';
 import type { PurchaseOrdersService } from '../purchase-orders/purchase-orders.service.js';
@@ -57,6 +58,9 @@ function createServices() {
     allocations: {
       findQueue: vi.fn(async () => [{ assetId: 'asset-id' }]),
     },
+    recalls: {
+      findQueue: vi.fn(async () => []),
+    },
   };
 }
 
@@ -64,11 +68,12 @@ describe('DashboardService', () => {
   it('không tải hoặc trả hàng chờ nghiệp vụ khi nhân viên không có quyền', async () => {
     const services = createServices();
     const service = new DashboardService(
-      createDatabase([4, 1, 2, 3]),
+      createDatabase([4, 1, 2, 3, 0]),
       services.requests as unknown as PurchaseRequestsService,
       services.orders as unknown as PurchaseOrdersService,
       services.receipts as unknown as PurchaseReceiptsService,
       services.allocations as unknown as AssetAllocationsService,
+      services.recalls as unknown as AssetRecallRequestsService,
     );
 
     const result = await service.getMySummary(createActor());
@@ -81,6 +86,7 @@ describe('DashboardService', () => {
         purchaseOrders: 0,
         inspections: 0,
         allocations: 1,
+        recalls: 0,
       },
     });
     expect(services.requests.findQueue).not.toHaveBeenCalled();
@@ -94,11 +100,12 @@ describe('DashboardService', () => {
   it('tính công việc đúng phạm vi của nhân viên Thu mua', async () => {
     const services = createServices();
     const service = new DashboardService(
-      createDatabase([2, 1, 0, 1]),
+      createDatabase([2, 1, 0, 1, 0]),
       services.requests as unknown as PurchaseRequestsService,
       services.orders as unknown as PurchaseOrdersService,
       services.receipts as unknown as PurchaseReceiptsService,
       services.allocations as unknown as AssetAllocationsService,
+      services.recalls as unknown as AssetRecallRequestsService,
     );
 
     const result = await service.getMySummary(
@@ -113,6 +120,7 @@ describe('DashboardService', () => {
       purchaseOrders: 4,
       inspections: 1,
       allocations: 1,
+      recalls: 0,
     });
     expect(services.requests.findQueue).toHaveBeenCalledOnce();
     expect(services.orders.findEligibleRequests).toHaveBeenCalledOnce();

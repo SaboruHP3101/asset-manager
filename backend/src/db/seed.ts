@@ -62,6 +62,27 @@ async function seedRoles() {
   return new Map(rows.map((row) => [row.name, row.id]));
 }
 
+async function seedWarehouses(departmentIds: Map<string, string>) {
+  await db
+    .insert(schema.warehouses)
+    .values({
+      code: 'IT_WAREHOUSE',
+      name: 'Kho IT',
+      managingDepartmentId: departmentIds.get('IT')!,
+      location: 'Kho IT',
+    })
+    .onConflictDoUpdate({
+      target: schema.warehouses.code,
+      set: {
+        name: 'Kho IT',
+        managingDepartmentId: departmentIds.get('IT')!,
+        location: 'Kho IT',
+        isActive: true,
+        updatedAt: new Date(),
+      },
+    });
+}
+
 // Hai cấp đầu là danh mục nghiệp vụ được chọn ở đề nghị. Thương hiệu và model
 // chỉ phục vụ phân loại chi tiết, không xuất hiện trong form đề nghị mua.
 async function seedCategories() {
@@ -547,91 +568,35 @@ async function seedEmployees(
   roleIds: Map<string, string>,
 ) {
   const password = await bcrypt.hash('Dev@123', 10);
+  const departmentEmailSlugs = {
+    IT: 'it',
+    ACCOUNTING: 'ke-toan',
+    WAREHOUSE: 'kho-van',
+    PROCUREMENT: 'thu-mua',
+    EXECUTIVE: 'ban-dieu-hanh',
+  } as const;
   const employees = [
-    [
-      'NV001',
-      'Nguyễn Minh Anh',
-      'minh.anh@example.com',
-      '0901000001',
-      'IT',
-      'IT',
-      true,
-    ],
-    [
-      'NV002',
-      'Trần Thu Hà',
-      'thu.ha@example.com',
-      '0901000002',
-      'ACCOUNTING',
-      'ACCOUNTING',
-      true,
-    ],
-    [
-      'NV003',
-      'Lê Quốc Bảo',
-      'quoc.bao@example.com',
-      '0901000003',
-      'WAREHOUSE',
-      'EMPLOYEE',
-      true,
-    ],
+    ['NV001', 'Nguyễn Minh Anh', '0901000001', 'IT', 'IT', true],
+    ['NV002', 'Trần Thu Hà', '0901000002', 'ACCOUNTING', 'ACCOUNTING', true],
+    ['NV003', 'Lê Quốc Bảo', '0901000003', 'WAREHOUSE', 'EMPLOYEE', true],
     [
       'NV004',
       'Phạm Ngọc Lan',
-      'ngoc.lan@example.com',
       '0901000004',
       'PROCUREMENT',
       'PROCUREMENT',
       false,
     ],
-    [
-      'NV005',
-      'Võ Hoàng Nam',
-      'hoang.nam@example.com',
-      '0901000005',
-      'IT',
-      'EMPLOYEE',
-      false,
-    ],
-    [
-      'NV006',
-      'Đặng Thanh Sơn',
-      'thanh.son@example.com',
-      '0901000006',
-      'EXECUTIVE',
-      'EXECUTIVE',
-      false,
-    ],
-    [
-      'NV007',
-      'Bùi Hải Yến',
-      'hai.yen@example.com',
-      '0901000007',
-      'PROCUREMENT',
-      'PROCUREMENT',
-      true,
-    ],
-    [
-      'NV008',
-      'Đỗ Gia Huy',
-      'gia.huy@example.com',
-      '0901000008',
-      'WAREHOUSE',
-      'EMPLOYEE',
-      false,
-    ],
+    ['NV005', 'Võ Hoàng Nam', '0901000005', 'IT', 'EMPLOYEE', false],
+    ['NV006', 'Đặng Thanh Sơn', '0901000006', 'EXECUTIVE', 'EXECUTIVE', false],
+    ['NV007', 'Bùi Hải Yến', '0901000007', 'PROCUREMENT', 'PROCUREMENT', true],
+    ['NV008', 'Đỗ Gia Huy', '0901000008', 'WAREHOUSE', 'EMPLOYEE', false],
   ] as const;
 
   for (const employee of employees) {
-    const [
-      employeeCode,
-      fullName,
-      email,
-      phoneNumber,
-      department,
-      role,
-      isHead,
-    ] = employee;
+    const [employeeCode, fullName, phoneNumber, department, role, isHead] =
+      employee;
+    const email = `${isHead ? 'truong.' : ''}${departmentEmailSlugs[department]}@email.com`;
 
     await db
       .insert(schema.employees)
@@ -669,6 +634,10 @@ async function seedAssets(
   categories: Map<string, typeof schema.assetCategories.$inferSelect>,
   supplierIds: Map<string, string>,
 ) {
+  const [itWarehouse] = await db
+    .select()
+    .from(schema.warehouses)
+    .where(eq(schema.warehouses.code, 'IT_WAREHOUSE'));
   const assets = [
     [
       'TS001',
@@ -835,6 +804,17 @@ async function seedAssets(
       })
       .onConflictDoNothing({ target: schema.assets.assetCode });
   }
+
+  // Dữ liệu mẫu `available` phải nằm trong kho để flow exchange có tài sản mẫu để đổi.
+  await db
+    .update(schema.assets)
+    .set({
+      currentUserId: null,
+      currentManagingDepartmentId: itWarehouse.managingDepartmentId,
+      currentWarehouseId: itWarehouse.id,
+      currentLocation: itWarehouse.location,
+    })
+    .where(inArray(schema.assets.assetCode, ['TS007', 'TS014']));
 
   return db
     .select()
@@ -1150,6 +1130,8 @@ async function main() {
   }
 
   const departments = await seedDepartments();
+
+  await seedWarehouses(departments);
   const roles = await seedRoles();
   const categories = await seedCategories();
   const suppliers = await seedSuppliers();

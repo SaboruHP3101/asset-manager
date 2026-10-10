@@ -23,7 +23,8 @@ const imageFileFilter = (
   callback: (error: Error | null, acceptFile: boolean) => void,
 ) => {
   const allowed =
-    file.mimetype.startsWith('image/') && imageExtension.test(file.originalname);
+    file.mimetype.startsWith('image/') &&
+    imageExtension.test(file.originalname);
 
   callback(
     allowed ? null : new Error('Chỉ chấp nhận tệp ảnh chứng từ.'),

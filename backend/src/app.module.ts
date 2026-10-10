@@ -30,6 +30,8 @@ import { PurchaseRequestsModule } from './purchase-requests/purchase-requests.mo
 import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module.js';
 import { PurchaseReceiptsModule } from './purchase-receipts/purchase-receipts.module.js';
 import { AssetAllocationsModule } from './asset-allocations/asset-allocations.module.js';
+import { AssetRecallRequestsModule } from './asset-recall-requests/asset-recall-requests.module.js';
+import { WarehousesModule } from './warehouses/warehouses.module.js';
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { AssetAllocationsModule } from './asset-allocations/asset-allocations.mo
     PurchaseOrdersModule,
     PurchaseReceiptsModule,
     AssetAllocationsModule,
+    AssetRecallRequestsModule,
+    WarehousesModule,
     EmployeesModule,
     DepartmentsModule,
     RolesModule,

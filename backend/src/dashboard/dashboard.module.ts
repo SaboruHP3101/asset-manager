@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AssetAllocationsModule } from '../asset-allocations/asset-allocations.module.js';
+import { AssetRecallRequestsModule } from '../asset-recall-requests/asset-recall-requests.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { DrizzleModule } from '../drizzle/drizzle.module.js';
 import { PurchaseOrdersModule } from '../purchase-orders/purchase-orders.module.js';
@@ -16,6 +17,7 @@ import { DashboardService } from './dashboard.service.js';
     PurchaseOrdersModule,
     PurchaseReceiptsModule,
     AssetAllocationsModule,
+    AssetRecallRequestsModule,
   ],
   controllers: [DashboardController],
   providers: [DashboardService],

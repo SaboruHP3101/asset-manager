@@ -15,7 +15,6 @@ class PurchaseOrderFormScreen extends StatefulWidget {
   final String? initialRequestId;
   final PurchaseOrderDetail? initial;
 
-  /// Tạo state quản lý dữ liệu tải về
   @override
   State<PurchaseOrderFormScreen> createState() =>
       _PurchaseOrderFormScreenState();
@@ -24,16 +23,15 @@ class PurchaseOrderFormScreen extends StatefulWidget {
 class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late final PurchaseOrdersRepository _repository;
-  final _orderDate = TextEditingController();
-  final _deliveryDate = TextEditingController();
   final Map<String, TextEditingController> _quantities = {};
+  late DateTime _orderDate;
+  late DateTime _deliveryDate;
   List<EligiblePurchaseOrderItem>? _eligible;
   String? _requestId;
   String? _supplierId;
   String? _error;
   bool _saving = false;
 
-  /// Khởi tạo repository, ngày mặc định và tải quantity còn lại
   @override
   void initState() {
     super.initState();
@@ -41,15 +39,13 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     final initial = widget.initial;
     _requestId = initial?.purchaseRequestId ?? widget.initialRequestId;
     _supplierId = initial?.supplierId;
-    _orderDate.text = initial?.orderDate ?? _today();
-    _deliveryDate.text = initial?.expectedDeliveryDate ?? _today();
+    _orderDate = _parseApiDate(initial?.orderDate) ?? _today();
+    _deliveryDate = _parseApiDate(initial?.expectedDeliveryDate) ?? _orderDate;
     _load();
   }
 
   @override
   void dispose() {
-    _orderDate.dispose();
-    _deliveryDate.dispose();
     for (final controller in _quantities.values) {
       controller.dispose();
     }
@@ -130,6 +126,49 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
       )
       .toList();
 
+  EligiblePurchaseOrderItem? get _selectedRequest {
+    for (final request in _requests) {
+      if (request.requestId == _requestId) return request;
+    }
+    return null;
+  }
+
+  int get _selectedItemCount =>
+      _items.where((item) => (_quantityFor(item) ?? 0) > 0).length;
+
+  int get _totalQuantity => _items.fold(
+    0,
+    (total, item) => total + ((_quantityFor(item) ?? 0).clamp(0, 999999)),
+  );
+
+  bool get _hasValidQuantities => _items.every((item) {
+    final quantity = _quantityFor(item);
+    return quantity != null &&
+        quantity >= 0 &&
+        quantity <= item.remainingQuantity;
+  });
+
+  bool get _canSave =>
+      !_saving &&
+      _requestId != null &&
+      _supplierId != null &&
+      _selectedItemCount > 0 &&
+      _hasValidQuantities &&
+      !_deliveryDate.isBefore(_orderDate);
+
+  String? get _actionHint {
+    if (_requestId == null) return 'Chọn đề nghị để tiếp tục.';
+    if (_supplierId == null) return 'Chọn nhà cung cấp để xem hạng mục.';
+    if (!_hasValidQuantities) return 'Kiểm tra lại số lượng hạng mục.';
+    if (_selectedItemCount == 0) {
+      return 'Chọn ít nhất một hạng mục có số lượng.';
+    }
+    if (_deliveryDate.isBefore(_orderDate)) {
+      return 'Ngày giao không được trước ngày đặt.';
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -148,38 +187,51 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
             )
           : Form(
               key: _formKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                 children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: _requestId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Đề nghị *'),
-                    items: _requests
-                        .map(
-                          (item) => DropdownMenuItem(
-                            value: item.requestId,
-                            child: Text(item.requestCode),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: widget.initial != null
-                        ? null
-                        : (value) => setState(() {
-                            _requestId = value;
-                            _supplierId = null;
-                            _clearQuantities();
-                          }),
-                    validator: (value) =>
-                        value == null ? 'Chọn đề nghị.' : null,
+                  const _SectionTitle(
+                    icon: Icons.description_outlined,
+                    title: 'Thông tin đơn mua',
                   ),
+                  const SizedBox(height: 12),
+                  if (widget.initialRequestId != null &&
+                      _selectedRequest != null)
+                    _RequestCard(requestCode: _selectedRequest!.requestCode)
+                  else
+                    DropdownButtonFormField<String>(
+                      initialValue: _requestId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Đề nghị *'),
+                      items: _requests
+                          .map(
+                            (item) => DropdownMenuItem(
+                              value: item.requestId,
+                              child: Text(item.requestCode),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: widget.initial != null
+                          ? null
+                          : (value) => setState(() {
+                              _requestId = value;
+                              _supplierId = null;
+                              _clearQuantities();
+                            }),
+                      validator: (value) =>
+                          value == null ? 'Chọn đề nghị.' : null,
+                    ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     key: ValueKey(_requestId),
                     initialValue: _supplierId,
                     isExpanded: true,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Nhà cung cấp *',
+                      helperText: _requestId == null
+                          ? 'Chọn đề nghị trước.'
+                          : 'Chỉ hiển thị nhà cung cấp có báo giá được chọn.',
                     ),
                     items: _suppliers
                         .map(
@@ -192,7 +244,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                           ),
                         )
                         .toList(),
-                    onChanged: widget.initial != null
+                    onChanged: widget.initial != null || _requestId == null
                         ? null
                         : (value) => setState(() {
                             _supplierId = value;
@@ -202,47 +254,67 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                         value == null ? 'Chọn nhà cung cấp.' : null,
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _orderDate,
-                    readOnly: true,
-                    decoration: const InputDecoration(labelText: 'Ngày đặt *'),
-                    onTap: () => _pickDate(_orderDate),
+                  _dateField(
+                    label: 'Ngày đặt *',
+                    value: _orderDate,
+                    onTap: () => _pickDate(isDeliveryDate: false),
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _deliveryDate,
-                    readOnly: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Ngày giao dự kiến *',
-                    ),
-                    onTap: () => _pickDate(_deliveryDate),
+                  _dateField(
+                    label: 'Ngày giao dự kiến *',
+                    value: _deliveryDate,
+                    errorText: _deliveryDate.isBefore(_orderDate)
+                        ? 'Ngày giao không được trước ngày đặt.'
+                        : null,
+                    onTap: () => _pickDate(isDeliveryDate: true),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 28),
+                  const _SectionTitle(
+                    icon: Icons.inventory_2_outlined,
+                    title: 'Hạng mục đặt mua',
+                  ),
+                  const SizedBox(height: 4),
                   Text(
-                    'Hạng mục',
-                    style: Theme.of(context).textTheme.titleMedium,
+                    'Hạng mục được lọc theo báo giá đã chọn của nhà cung cấp.',
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
-                  if (_supplierId != null && _items.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Text(
-                        'Nhà cung cấp này không còn hạng mục để đặt.',
-                      ),
+                  const SizedBox(height: 12),
+                  if (_requestId == null)
+                    const _ItemsEmptyState(
+                      icon: Icons.assignment_outlined,
+                      message: 'Chọn đề nghị để xem nhà cung cấp và hạng mục.',
+                    )
+                  else if (_supplierId == null)
+                    const _ItemsEmptyState(
+                      icon: Icons.local_shipping_outlined,
+                      message: 'Chọn nhà cung cấp để xem các hạng mục có thể đặt mua.',
+                    )
+                  else if (_items.isEmpty)
+                    const _ItemsEmptyState(
+                      icon: Icons.inventory_2_outlined,
+                      message:
+                          'Nhà cung cấp này không còn hạng mục để đặt mua.',
+                    )
+                  else
+                    for (final item in _items) _quantityField(item),
+                  if (_items.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _SummaryCard(
+                      itemCount: _selectedItemCount,
+                      quantity: _totalQuantity,
                     ),
-                  for (final item in _items) _quantityField(item),
-                  const SizedBox(height: 20),
-                  FilledButton.icon(
-                    onPressed: _saving ? null : _save,
-                    icon: _saving
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.save_outlined),
-                    label: const Text('Lưu Đơn mua nháp'),
-                  ),
+                  ],
                 ],
               ),
+            ),
+      bottomNavigationBar:
+          _eligible == null || _error != null || _requests.isEmpty
+          ? null
+          : _PurchaseOrderActionBar(
+              saving: _saving,
+              enabled: _canSave,
+              hint: _actionHint,
+              onSave: _save,
             ),
     );
   }
@@ -253,29 +325,82 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
       () => TextEditingController(text: '0'),
     );
     return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
       child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Text(
-                '${item.itemName}\nCòn có thể đặt: ${item.remainingQuantity}',
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Checkbox(
+                  value: (_quantityFor(item) ?? 0) > 0,
+                  onChanged: (selected) =>
+                      _setQuantity(item, selected == true ? 1 : 0),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.itemName,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Còn có thể đặt: ${item.remainingQuantity}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            SizedBox(
-              width: 90,
-              child: TextFormField(
-                controller: controller,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Số lượng'),
-                validator: (value) {
-                  final quantity = int.tryParse(value ?? '');
-                  if (quantity == null || quantity < 0) return 'Không hợp lệ';
-                  if (quantity > item.remainingQuantity) return 'Vượt quá';
-                  return null;
-                },
-              ),
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IconButton.filledTonal(
+                  tooltip: 'Giảm số lượng ${item.itemName}',
+                  onPressed: (_quantityFor(item) ?? 0) <= 0
+                      ? null
+                      : () => _setQuantity(item, (_quantityFor(item) ?? 0) - 1),
+                  icon: const Icon(Icons.remove),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextFormField(
+                    controller: controller,
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Số lượng'),
+                    onChanged: (_) => setState(() {}),
+                    validator: (value) {
+                      final quantity = int.tryParse(value ?? '');
+                      if (quantity == null || quantity < 0) {
+                        return 'Không hợp lệ';
+                      }
+                      if (quantity > item.remainingQuantity) {
+                        return 'Tối đa ${item.remainingQuantity}';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                IconButton.filledTonal(
+                  tooltip: 'Tăng số lượng ${item.itemName}',
+                  onPressed: (_quantityFor(item) ?? 0) >= item.remainingQuantity
+                      ? null
+                      : () => _setQuantity(item, (_quantityFor(item) ?? 0) + 1),
+                  icon: const Icon(Icons.add),
+                ),
+              ],
             ),
           ],
         ),
@@ -283,42 +408,75 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     );
   }
 
-  Future<void> _pickDate(TextEditingController controller) async {
+  Widget _dateField({
+    required String label,
+    required DateTime value,
+    required VoidCallback onTap,
+    String? errorText,
+  }) => Semantics(
+    button: true,
+    label: '$label, ${_formatDisplayDate(value)}',
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          errorText: errorText,
+          suffixIcon: const Icon(Icons.calendar_today_outlined),
+        ),
+        child: Text(_formatDisplayDate(value)),
+      ),
+    ),
+  );
+
+  int? _quantityFor(EligiblePurchaseOrderItem item) =>
+      int.tryParse(_quantities[item.itemId]?.text ?? '0');
+
+  void _setQuantity(EligiblePurchaseOrderItem item, int quantity) {
+    final controller = _quantities.putIfAbsent(
+      item.itemId,
+      () => TextEditingController(text: '0'),
+    );
+    controller.text = quantity.clamp(0, item.remainingQuantity).toString();
+    setState(() {});
+  }
+
+  Future<void> _pickDate({required bool isDeliveryDate}) async {
+    final current = isDeliveryDate ? _deliveryDate : _orderDate;
+    final firstDate = isDeliveryDate
+        ? _orderDate
+        : DateTime.now().subtract(const Duration(days: 365));
     final selected = await showDatePicker(
       context: context,
-      initialDate: DateTime.tryParse(controller.text) ?? DateTime.now(),
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      initialDate: current.isBefore(firstDate) ? firstDate : current,
+      firstDate: firstDate,
       lastDate: DateTime.now().add(const Duration(days: 3650)),
     );
-    if (selected != null) controller.text = _formatDate(selected);
+    if (selected == null) return;
+    setState(() {
+      if (isDeliveryDate) {
+        _deliveryDate = selected;
+      } else {
+        _orderDate = selected;
+      }
+    });
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || !_canSave) return;
     final quantities = <String, int>{
       for (final item in _items)
         item.itemId: int.tryParse(_quantities[item.itemId]?.text ?? '') ?? 0,
     };
-    if (!quantities.values.any((quantity) => quantity > 0)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chọn ít nhất một hạng mục có số lượng.')),
-      );
-      return;
-    }
-    if (_deliveryDate.text.compareTo(_orderDate.text) < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ngày giao không được trước ngày đặt.')),
-      );
-      return;
-    }
     setState(() => _saving = true);
     try {
       await _repository.save(
         id: widget.initial?.id,
         purchaseRequestId: _requestId!,
         supplierId: _supplierId!,
-        orderDate: _orderDate.text,
-        expectedDeliveryDate: _deliveryDate.text,
+        orderDate: _formatApiDate(_orderDate),
+        expectedDeliveryDate: _formatApiDate(_deliveryDate),
         contractId: widget.initial?.contractId,
         quantities: quantities,
       );
@@ -332,7 +490,10 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     }
   }
 
-  String _today() => _formatDate(DateTime.now());
+  DateTime _today() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
 
   void _clearQuantities() {
     for (final controller in _quantities.values) {
@@ -341,14 +502,166 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     _quantities.clear();
   }
 
-  String _formatDate(DateTime date) =>
+  DateTime? _parseApiDate(String? value) =>
+      value == null ? null : DateTime.tryParse(value);
+
+  String _formatApiDate(DateTime date) =>
       '${date.year.toString().padLeft(4, '0')}-'
       '${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';
+
+  String _formatDisplayDate(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/'
+      '${date.month.toString().padLeft(2, '0')}/'
+      '${date.year}';
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.icon, required this.title});
+
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Icon(icon, color: Theme.of(context).colorScheme.primary),
+      const SizedBox(width: 8),
+      Text(title, style: Theme.of(context).textTheme.titleMedium),
+    ],
+  );
+}
+
+class _RequestCard extends StatelessWidget {
+  const _RequestCard({required this.requestCode});
+
+  final String requestCode;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    elevation: 0,
+    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+    child: ListTile(
+      leading: const Icon(Icons.assignment_turned_in_outlined),
+      title: const Text('Đề nghị'),
+      subtitle: Text(requestCode),
+      trailing: const Icon(Icons.lock_outline, size: 20),
+    ),
+  );
+}
+
+class _ItemsEmptyState extends StatelessWidget {
+  const _ItemsEmptyState({required this.icon, required this.message});
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Column(
+      children: [
+        Icon(icon, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        const SizedBox(height: 10),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ],
+    ),
+  );
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({required this.itemCount, required this.quantity});
+
+  final int itemCount;
+  final int quantity;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    elevation: 0,
+    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          const Icon(Icons.summarize_outlined),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$itemCount hạng mục · Tổng số lượng: $quantity',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _PurchaseOrderActionBar extends StatelessWidget {
+  const _PurchaseOrderActionBar({
+    required this.saving,
+    required this.enabled,
+    required this.hint,
+    required this.onSave,
+  });
+
+  final bool saving;
+  final bool enabled;
+  final String? hint;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    elevation: 12,
+    child: SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (hint != null) ...[
+              Text(
+                hint!,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: enabled ? onSave : null,
+                icon: saving
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save_outlined),
+                label: Text(saving ? 'Đang lưu…' : 'Lưu nháp'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _FormMessage extends StatelessWidget {
   const _FormMessage({required this.message, this.onRetry});
+
   final String message;
   final VoidCallback? onRetry;
 

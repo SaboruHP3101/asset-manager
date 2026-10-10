@@ -36,6 +36,13 @@ export const WORKFLOW_ACTIONS = {
     'purchase.allocation.reallocate_procurement',
   purchaseAllocationConfirmDepartment: 'purchase.allocation.confirm_department',
   purchaseAllocationConfirmRecipient: 'purchase.allocation.confirm_recipient',
+  assetRecallCreate: 'asset.recall.create',
+  assetRecallUpdate: 'asset.recall.update',
+  assetRecallSubmit: 'asset.recall.submit',
+  assetRecallApproveDepartment: 'asset.recall.approve_department',
+  assetRecallApproveIt: 'asset.recall.approve_it',
+  assetRecallConfirmHandover: 'asset.recall.confirm_handover',
+  warehouseItView: 'warehouse.it.view',
 } as const;
 
 export type WorkflowAction =
@@ -55,6 +62,10 @@ export const EMPLOYEE_ACTIONS: readonly WorkflowAction[] = [
   WORKFLOW_ACTIONS.purchaseRequestDeleteDraft,
   WORKFLOW_ACTIONS.purchaseRequestSubmit,
   WORKFLOW_ACTIONS.purchaseAllocationConfirmRecipient,
+  WORKFLOW_ACTIONS.assetRecallCreate,
+  WORKFLOW_ACTIONS.assetRecallUpdate,
+  WORKFLOW_ACTIONS.assetRecallSubmit,
+  WORKFLOW_ACTIONS.assetRecallConfirmHandover,
 ];
 
 /**
@@ -81,6 +92,7 @@ export const DEPARTMENT_HEAD_ACTIONS: readonly WorkflowAction[] = [
   WORKFLOW_ACTIONS.purchaseRequestApproveDepartment,
   WORKFLOW_ACTIONS.purchaseAllocationCreateInitial,
   WORKFLOW_ACTIONS.purchaseAllocationConfirmDepartment,
+  WORKFLOW_ACTIONS.assetRecallApproveDepartment,
 ];
 
 const DEPARTMENT_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
@@ -96,6 +108,7 @@ const DEPARTMENT_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
     IT: [
       WORKFLOW_ACTIONS.purchaseReceiptInspectIt,
       WORKFLOW_ACTIONS.purchaseAllocationReallocateIt,
+      WORKFLOW_ACTIONS.warehouseItView,
     ],
   };
 
@@ -108,7 +121,10 @@ const DEPARTMENT_HEAD_PURCHASE_ACTIONS: Readonly<
     WORKFLOW_ACTIONS.purchaseOrderCancel,
     WORKFLOW_ACTIONS.purchaseReceiptCloseShort,
   ],
-  IT: [WORKFLOW_ACTIONS.purchaseRequestApproveIt],
+  IT: [
+    WORKFLOW_ACTIONS.purchaseRequestApproveIt,
+    WORKFLOW_ACTIONS.assetRecallApproveIt,
+  ],
 };
 
 /**

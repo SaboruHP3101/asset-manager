@@ -25,6 +25,8 @@ class _ActionRepository extends PurchaseOrdersRepository {
   final PurchaseOrderDetail initial;
   final Completer<PurchaseOrderDetail> refresh;
   int findOneCalls = 0;
+  bool? decisionApproved;
+  String? decisionReason;
 
   @override
   Future<PurchaseOrderDetail> findOne(String id) {
@@ -37,7 +39,28 @@ class _ActionRepository extends PurchaseOrdersRepository {
     String id, {
     required bool approved,
     String? reason,
-  }) async {}
+  }) async {
+    decisionApproved = approved;
+    decisionReason = reason;
+  }
+}
+
+class _SubmitRepository extends PurchaseOrdersRepository {
+  _SubmitRepository({required this.initial, required this.refreshed})
+    : super(dio: Dio());
+
+  final PurchaseOrderDetail initial;
+  final PurchaseOrderDetail refreshed;
+  int submitCalls = 0;
+
+  @override
+  Future<PurchaseOrderDetail> findOne(String id) async =>
+      submitCalls == 0 ? initial : refreshed;
+
+  @override
+  Future<void> submit(String id) async {
+    submitCalls += 1;
+  }
 }
 
 class _OverflowActionRepository extends PurchaseOrdersRepository {
@@ -83,6 +106,12 @@ class _ReceiptsRepository extends PurchaseReceiptsRepository {
 PurchaseOrderDetail _detail(
   List<String> allowedActions, {
   String status = 'draft',
+  List<Map<String, dynamic>> items = const [],
+  Map<String, dynamic> totals = const {
+    'subtotalExclVat': '0',
+    'vatAmount': '0',
+    'totalInclVat': '0',
+  },
   List<Map<String, dynamic>> timeline = const [],
 }) => PurchaseOrderDetail(
   id: 'order-id',
@@ -95,8 +124,8 @@ PurchaseOrderDetail _detail(
   supplierName: 'Nhà cung cấp',
   orderDate: '2026-10-02',
   expectedDeliveryDate: '2026-10-15',
-  items: const [],
-  totals: const {'subtotalExclVat': '0', 'vatAmount': '0', 'totalInclVat': '0'},
+  items: items,
+  totals: totals,
   timeline: timeline,
 );
 
@@ -149,6 +178,61 @@ void main() {
     expect(find.byTooltip('Thêm hành động'), findsNothing);
   });
 
+  testWidgets('trình duyệt chỉ gọi API sau khi xác nhận review', (
+    tester,
+  ) async {
+    final initial = _detail(
+      const ['purchase.order.submit'],
+      items: const [
+        {'itemNameSnapshot': 'Laptop Dell', 'quantity': 2},
+      ],
+      totals: const {
+        'subtotalExclVat': '20000000',
+        'vatAmount': '2000000',
+        'totalInclVat': '22000000',
+      },
+    );
+    final repository = _SubmitRepository(
+      initial: initial,
+      refreshed: _detail(
+        const [],
+        status: 'pending_procurement_head',
+        items: initial.items,
+        totals: initial.totals,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PurchaseOrderDetailScreen(
+          orderId: initial.id,
+          repository: repository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Trình duyệt'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Kiểm tra trước khi trình duyệt'), findsOneWidget);
+    expect(find.text('Laptop Dell'), findsWidgets);
+    expect(find.text('Tổng cộng: 22.000.000 VND'), findsWidgets);
+    expect(repository.submitCalls, 0);
+
+    await tester.tap(find.text('Quay lại kiểm tra'));
+    await tester.pumpAndSettle();
+    expect(repository.submitCalls, 0);
+
+    await tester.tap(find.text('Trình duyệt'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Xác nhận trình duyệt'));
+    await tester.pumpAndSettle();
+
+    expect(repository.submitCalls, 1);
+    expect(find.text('Chờ Trưởng Thu mua'), findsOneWidget);
+  });
+
   testWidgets('action hiển thị loader rồi dùng allowedActions mới nhất', (
     tester,
   ) async {
@@ -173,7 +257,9 @@ void main() {
 
     await tester.tap(find.text('Xử lý đơn mua'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Duyệt'));
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+    await tester.tap(find.text('Duyệt và phát hành'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 1));
 
@@ -200,6 +286,48 @@ void main() {
       find.widgetWithText(FilledButton, 'Ghi nhận giao hàng'),
     );
     expect(receiptButton.onPressed, isNotNull);
+  });
+
+  testWidgets('lý do trả về được nhập trong cùng bottom sheet', (tester) async {
+    final refresh = Completer<PurchaseOrderDetail>();
+    final repository = _ActionRepository(
+      initial: _detail(const [
+        'purchase.order.approve',
+      ], status: 'pending_procurement_head'),
+      refresh: refresh,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PurchaseOrderDetailScreen(
+          orderId: 'order-id',
+          repository: repository,
+          receiptsRepository: _ReceiptsRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Xử lý đơn mua'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Trả về chỉnh sửa'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('Lý do bắt buộc'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'Cần chỉnh lại số lượng');
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Xác nhận trả về'));
+    await tester.tap(find.text('Xác nhận trả về'));
+    await tester.pump();
+
+    expect(repository.decisionApproved, isFalse);
+    expect(repository.decisionReason, 'Cần chỉnh lại số lượng');
+
+    refresh.complete(_detail(const ['purchase.order.create']));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('đóng thiếu từ menu không gây lỗi lifecycle', (tester) async {

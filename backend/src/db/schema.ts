@@ -129,6 +129,29 @@ export const assetAllocationTargetTypeEnum = pgEnum(
   ['individual', 'shared_location'],
 );
 
+export const assetRecallTypeEnum = pgEnum('asset_recall_type', [
+  'exchange',
+  'upgrade',
+  'disposal',
+]);
+
+export const assetRecallStatusEnum = pgEnum('asset_recall_status', [
+  'draft',
+  'pending_department_head',
+  'pending_it_head',
+  'revision_required',
+  'pending_handover_confirmations',
+  'in_progress',
+  'ready_for_return',
+  'completed',
+]);
+
+export const assetRecallDecisionEnum = pgEnum('asset_recall_decision', [
+  'pending',
+  'confirmed',
+  'rejected',
+]);
+
 /**
  * requested - Yêu cầu điều chuyển mới được tạo và đang chờ xử lý.
  * dept_approved - Trưởng phòng đã duyệt yêu cầu điều chuyển.
@@ -666,6 +689,19 @@ export const purchaseReceiptUnits = pgTable(
   ],
 );
 
+export const warehouses = pgTable('warehouses', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  code: varchar('code', { length: 50 }).notNull().unique(),
+  name: varchar('name', { length: 255 }).notNull(),
+  managingDepartmentId: uuid('managing_department_id')
+    .notNull()
+    .references(() => departments.id),
+  location: varchar('location', { length: 500 }).notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
 export const assets = pgTable('assets', {
   id: uuid('id').primaryKey().defaultRandom(),
   assetCode: varchar('asset_code', { length: 100 }).notNull().unique(),
@@ -680,6 +716,9 @@ export const assets = pgTable('assets', {
   currentManagingDepartmentId: uuid(
     'current_managing_department_id',
   ).references(() => departments.id),
+  currentWarehouseId: uuid('current_warehouse_id').references(
+    () => warehouses.id,
+  ),
   purchaseOrderItemId: uuid('purchase_order_item_id').references(
     () => purchaseOrderItems.id,
   ),
@@ -781,6 +820,12 @@ export const assetHandoverHistory = pgTable('asset_handover_history', {
   receivedByDepartmentId: uuid('received_by_department_id').references(
     () => departments.id,
   ),
+  handoverFromWarehouseId: uuid('handover_from_warehouse_id').references(
+    () => warehouses.id,
+  ),
+  receivedByWarehouseId: uuid('received_by_warehouse_id').references(
+    () => warehouses.id,
+  ),
   handoverDate: date('handover_date', { mode: 'string' }).notNull(),
   status: varchar('status', { length: 100 }).notNull(),
   note: text('note'),
@@ -789,6 +834,89 @@ export const assetHandoverHistory = pgTable('asset_handover_history', {
   createdBy: createdBy(),
   updatedBy: updatedBy(),
 });
+
+export const assetRecallRequests = pgTable(
+  'asset_recall_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    type: assetRecallTypeEnum('type').notNull().default('exchange'),
+    status: assetRecallStatusEnum('status').notNull().default('draft'),
+    currentRevision: integer('current_revision').notNull().default(1),
+    assetId: uuid('asset_id')
+      .notNull()
+      .references(() => assets.id),
+    replacementAssetId: uuid('replacement_asset_id').references(
+      () => assets.id,
+    ),
+    requestedBy: uuid('requested_by')
+      .notNull()
+      .references(() => employees.id),
+    requestingDepartmentId: uuid('requesting_department_id')
+      .notNull()
+      .references(() => departments.id),
+    originalLocation: varchar('original_location', { length: 500 }),
+    reason: text('reason'),
+    departmentHeadDecision: assetRecallDecisionEnum('department_head_decision')
+      .notNull()
+      .default('pending'),
+    departmentHeadDecidedBy: uuid('department_head_decided_by').references(
+      () => employees.id,
+    ),
+    departmentHeadDecidedAt: timestamp('department_head_decided_at', {
+      withTimezone: true,
+    }),
+    departmentHeadNote: text('department_head_note'),
+    itHeadDecision: assetRecallDecisionEnum('it_head_decision')
+      .notNull()
+      .default('pending'),
+    itHeadDecidedBy: uuid('it_head_decided_by').references(() => employees.id),
+    itHeadDecidedAt: timestamp('it_head_decided_at', { withTimezone: true }),
+    itHeadNote: text('it_head_note'),
+    employeeHandoverDecision: assetRecallDecisionEnum(
+      'employee_handover_decision',
+    )
+      .notNull()
+      .default('pending'),
+    employeeHandoverDecidedAt: timestamp('employee_handover_decided_at', {
+      withTimezone: true,
+    }),
+    employeeHandoverNote: text('employee_handover_note'),
+    itHandoverDecision: assetRecallDecisionEnum('it_handover_decision')
+      .notNull()
+      .default('pending'),
+    itHandoverDecidedBy: uuid('it_handover_decided_by').references(
+      () => employees.id,
+    ),
+    itHandoverDecidedAt: timestamp('it_handover_decided_at', {
+      withTimezone: true,
+    }),
+    itHandoverNote: text('it_handover_note'),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    createdBy: createdBy(),
+    updatedBy: updatedBy(),
+  },
+  (table) => [
+    index('idx_asset_recall_status').on(table.status),
+    index('idx_asset_recall_requester').on(table.requestedBy),
+    index('idx_asset_recall_department').on(table.requestingDepartmentId),
+    index('idx_asset_recall_asset').on(table.assetId),
+    uniqueIndex('uq_asset_recall_active_asset')
+      .on(table.assetId)
+      .where(sql`${table.status} <> 'completed'`),
+    uniqueIndex('uq_asset_recall_reserved_replacement')
+      .on(table.replacementAssetId)
+      .where(
+        sql`${table.replacementAssetId} is not null and ${table.status} <> 'completed'`,
+      ),
+    check(
+      'chk_asset_recall_different_assets',
+      sql`${table.replacementAssetId} is null or ${table.replacementAssetId} <> ${table.assetId}`,
+    ),
+  ],
+);
 
 export const transferRequests = pgTable(
   'transfer_requests',

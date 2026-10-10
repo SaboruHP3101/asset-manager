@@ -6,10 +6,12 @@ import '../../../core/network/api_client.dart';
 import '../../../core/utils/department_labels.dart';
 import '../../../core/widgets/status_card.dart';
 import '../../asset_allocations/asset_allocation_queue_screen.dart';
+import '../../asset_recalls/asset_recall_requests_screen.dart';
 import '../../purchase_orders/purchase_orders_screen.dart';
 import '../../purchase_receipts/purchase_inspection_queue_screen.dart';
 import '../../purchase_requests/purchase_requests_screen.dart';
 import '../../repair_requests/repair_request_form.dart';
+import '../../warehouses/it_warehouse_screen.dart';
 
 typedef HomeDashboardLoader = Future<HomeDashboardData> Function();
 
@@ -21,6 +23,7 @@ class HomeDashboardData {
     required this.purchaseOrderTasks,
     required this.inspectionTasks,
     required this.allocationTasks,
+    this.recallTasks = 0,
   });
 
   factory HomeDashboardData.fromJson(Map<String, dynamic> json) {
@@ -35,6 +38,7 @@ class HomeDashboardData {
       purchaseOrderTasks: tasks['purchaseOrders'] as int? ?? 0,
       inspectionTasks: tasks['inspections'] as int? ?? 0,
       allocationTasks: tasks['allocations'] as int? ?? 0,
+      recallTasks: tasks['recalls'] as int? ?? 0,
     );
   }
 
@@ -44,6 +48,7 @@ class HomeDashboardData {
   final int purchaseOrderTasks;
   final int inspectionTasks;
   final int allocationTasks;
+  final int recallTasks;
 }
 
 class HomeScreen extends StatefulWidget {
@@ -190,6 +195,18 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icons.assignment_ind_outlined,
           onTap: () => _open(const AssetAllocationQueueScreen()),
         ),
+      if (dashboard.recallTasks > 0)
+        _HomeTask(
+          title: 'Đổi tài sản cần xử lý',
+          subtitle: 'Duyệt hoặc xác nhận bàn giao',
+          count: dashboard.recallTasks,
+          icon: Icons.swap_horiz,
+          onTap: () => _open(
+            const AssetRecallRequestsScreen(
+              initialTab: AssetRecallInitialTab.queue,
+            ),
+          ),
+        ),
     ];
   }
 
@@ -216,6 +233,18 @@ class _HomeScreenState extends State<HomeScreen> {
         title: 'Đơn đặt mua',
         icon: Icons.shopping_cart_checkout_outlined,
         onTap: () => _open(PurchaseOrdersScreen(allowedActions: _actions)),
+      ),
+    if (_actions.contains('asset.recall.create'))
+      _QuickAction(
+        title: 'Đổi tài sản',
+        icon: Icons.swap_horiz,
+        onTap: () => _open(const AssetRecallRequestsScreen()),
+      ),
+    if (_actions.contains('warehouse.it.view'))
+      _QuickAction(
+        title: 'Kho IT',
+        icon: Icons.warehouse_outlined,
+        onTap: () => _open(const ItWarehouseScreen()),
       ),
     if (_actions.contains('repair.report'))
       _QuickAction(

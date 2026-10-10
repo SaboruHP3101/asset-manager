@@ -24,6 +24,7 @@ export class DashboardController {
           purchaseOrders: 2,
           inspections: 0,
           allocations: 1,
+          recalls: 1,
         },
       },
     },

@@ -8,6 +8,8 @@ import '../../core/network/api_client.dart';
 import '../../core/utils/department_labels.dart';
 import '../repair_requests/repair_progress_screen.dart';
 import '../repair_requests/repair_request_form.dart';
+import '../asset_recalls/asset_recall_detail_screen.dart';
+import '../asset_recalls/asset_recall_form.dart';
 import 'asset_status_chip.dart';
 
 class AssetDetailScreen extends StatefulWidget {
@@ -83,6 +85,38 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
       ),
     );
     if (created == true) await _loadRepairProgress();
+  }
+
+  Future<void> _openRecallAction() async {
+    final asset = _asset!;
+    final activeRecall = asset['activeRecall'] == null
+        ? null
+        : Map<String, dynamic>.from(asset['activeRecall'] as Map);
+    String? requestId = activeRecall?['id'] as String?;
+
+    if (requestId == null) {
+      final result = await Navigator.of(context).push<AssetRecallFormResult>(
+        MaterialPageRoute(
+          builder: (_) => AssetRecallForm(
+            assetId: widget.assetId,
+            assetName: asset['name'] as String? ?? 'Tài sản',
+            assetCode: asset['assetCode'] as String?,
+            assetCategory: asset['category'] as String?,
+            assetLocation: asset['currentLocation'] as String?,
+            assetImageUrl: _imageUrl(),
+          ),
+        ),
+      );
+      requestId = result?.id;
+    }
+    if (requestId == null || !mounted) return;
+
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => AssetRecallDetailScreen(requestId: requestId!),
+      ),
+    );
+    await _loadAsset();
   }
 
   String? _imageUrl() {
@@ -276,23 +310,48 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                  child: FilledButton.icon(
-                    onPressed: _checkingRepair ? null : _openRepairAction,
-                    icon: _checkingRepair
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(
-                            _repairProgress == null
-                                ? Icons.build_outlined
-                                : Icons.timeline_outlined,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (asset['managementOwner'] == 'it') ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.tonalIcon(
+                            onPressed: _openRecallAction,
+                            icon: const Icon(Icons.swap_horiz),
+                            label: Text(
+                              asset['activeRecall'] == null
+                                  ? 'Yêu cầu đổi tài sản'
+                                  : 'Xem phiếu đổi tài sản',
+                            ),
                           ),
-                    label: Text(
-                      _repairProgress == null
-                          ? 'Gửi yêu cầu sửa chữa'
-                          : 'Xem tiến trình sửa chữa',
-                    ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _checkingRepair ? null : _openRepairAction,
+                          icon: _checkingRepair
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Icon(
+                                  _repairProgress == null
+                                      ? Icons.build_outlined
+                                      : Icons.timeline_outlined,
+                                ),
+                          label: Text(
+                            _repairProgress == null
+                                ? 'Gửi yêu cầu sửa chữa'
+                                : 'Xem tiến trình sửa chữa',
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

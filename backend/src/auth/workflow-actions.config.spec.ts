@@ -26,6 +26,10 @@ describe('seed account purchase actions', () => {
           WORKFLOW_ACTIONS.purchaseRequestUpdate,
           WORKFLOW_ACTIONS.purchaseRequestDeleteDraft,
           WORKFLOW_ACTIONS.purchaseRequestSubmit,
+          WORKFLOW_ACTIONS.assetRecallCreate,
+          WORKFLOW_ACTIONS.assetRecallUpdate,
+          WORKFLOW_ACTIONS.assetRecallSubmit,
+          WORKFLOW_ACTIONS.assetRecallConfirmHandover,
         ]),
       );
     },
@@ -45,6 +49,8 @@ describe('seed account purchase actions', () => {
     );
 
     expect(itHead).toContain(WORKFLOW_ACTIONS.purchaseRequestApproveIt);
+    expect(itHead).toContain(WORKFLOW_ACTIONS.assetRecallApproveIt);
+    expect(itHead).toContain(WORKFLOW_ACTIONS.warehouseItView);
     expect(procurementStaff).toContain(
       WORKFLOW_ACTIONS.purchaseRequestEnrichProcurement,
     );
@@ -64,6 +70,8 @@ describe('seed account purchase actions', () => {
         WORKFLOW_ACTIONS.purchaseRequestApproveProcurement,
       );
       expect(actions).not.toContain(WORKFLOW_ACTIONS.purchaseRequestApproveIt);
+      expect(actions).not.toContain(WORKFLOW_ACTIONS.assetRecallApproveIt);
+      expect(actions).not.toContain(WORKFLOW_ACTIONS.warehouseItView);
     }
   });
 });

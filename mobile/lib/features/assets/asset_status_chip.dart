@@ -4,6 +4,7 @@ String assetStatusLabel(String status) => switch (status.toLowerCase()) {
   'in_use' || 'using' || 'active' => 'Đang sử dụng',
   'repairing' || 'fixing' => 'Đang sửa chữa',
   'available' => 'Sẵn sàng',
+  'reserved_for_exchange' => 'Đã giữ chỗ',
   'awaiting_allocation' => 'Chờ cấp phát',
   'awaiting_reallocation' => 'Chờ phân bổ lại',
   'awaiting_allocation_confirmation' => 'Chờ xác nhận',
@@ -80,6 +81,10 @@ _StatusPresentation _presentation(BuildContext context, String status) {
     'available' => const _StatusPresentation(
       Color(0xFF1976D2),
       Icons.inventory_2_outlined,
+    ),
+    'reserved_for_exchange' => const _StatusPresentation(
+      Color(0xFF6A1B9A),
+      Icons.bookmark_added_outlined,
     ),
     'repairing' || 'fixing' => const _StatusPresentation(
       Color(0xFFB26A00),
