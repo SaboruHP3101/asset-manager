@@ -189,6 +189,115 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
     );
   }
 
+  Future<Map<String, String?>?> _disposalDialog() async {
+    final now = DateTime.now();
+    final date =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    var method = '';
+    var result = '';
+    var recoveryValue = '';
+
+    return showDialog<Map<String, String?>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Hoàn tất báo phế'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  initialValue: date,
+                  readOnly: true,
+                  decoration: const InputDecoration(labelText: 'Ngày xử lý'),
+                ),
+                TextField(
+                  autofocus: true,
+                  onChanged: (value) =>
+                      setDialogState(() => method = value.trim()),
+                  decoration: const InputDecoration(
+                    labelText: 'Phương thức xử lý *',
+                    hintText: 'Ví dụ: Bàn giao đơn vị xử lý rác điện tử',
+                  ),
+                ),
+                TextField(
+                  minLines: 2,
+                  maxLines: 4,
+                  onChanged: (value) => result = value.trim(),
+                  decoration: const InputDecoration(
+                    labelText: 'Kết quả / ghi chú',
+                  ),
+                ),
+                TextField(
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) => recoveryValue = value.trim(),
+                  decoration: const InputDecoration(
+                    labelText: 'Giá trị thu hồi (tùy chọn)',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy'),
+            ),
+            FilledButton(
+              onPressed: method.isEmpty
+                  ? null
+                  : () => Navigator.pop(context, {
+                      'disposalDate': date,
+                      'disposalMethod': method,
+                      'processingResult': result.isEmpty ? null : result,
+                      'recoveryValue': recoveryValue.isEmpty
+                          ? null
+                          : recoveryValue,
+                    }),
+              child: const Text('Hoàn tất'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _upgradeResultDialog() async {
+    var result = '';
+
+    return showDialog<String>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Hoàn tất nâng cấp'),
+          content: TextField(
+            autofocus: true,
+            minLines: 3,
+            maxLines: 6,
+            onChanged: (value) => setDialogState(() => result = value.trim()),
+            decoration: const InputDecoration(
+              labelText: 'Kết quả nâng cấp *',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy'),
+            ),
+            FilledButton(
+              onPressed: result.isEmpty
+                  ? null
+                  : () => Navigator.pop(context, result),
+              child: const Text('Gửi trả tài sản'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _edit() async {
     final request = _request!;
     final asset = Map<String, dynamic>.from(request['asset'] as Map);
@@ -202,6 +311,7 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
           assetLocation: asset['currentLocation'] as String?,
           requestId: request['id'] as String,
           initialReason: request['reason'] as String? ?? '',
+          initialType: request['type'] as String? ?? 'exchange',
           revisionRequired: request['status'] == 'revision_required',
           repository: _repository,
         ),
@@ -256,11 +366,26 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
     }
 
     if (_actions.contains('asset.recall.approve_it')) {
+      final disposal = _request?['type'] == 'disposal';
+      final upgrade = _request?['type'] == 'upgrade';
+
       return _ActionPrompt(
-        message: 'Chọn tài sản tương đương trong kho IT trước khi duyệt.',
+        message: disposal || upgrade
+            ? 'Duyệt để chuyển sang bước xác nhận bàn giao vào kho IT.'
+            : 'Chọn tài sản tương đương trong kho IT trước khi duyệt.',
         child: _DecisionActions(
-          approveLabel: 'Chọn tài sản & duyệt',
+          approveLabel: disposal
+              ? 'Duyệt báo phế'
+              : upgrade
+              ? 'Duyệt nâng cấp'
+              : 'Chọn tài sản & duyệt',
           onApprove: () async {
+            if (disposal || upgrade) {
+              await _run(
+                () => _repository.decideIt(widget.requestId, approved: true),
+              );
+              return;
+            }
             final replacementId = await _selectReplacement();
             if (replacementId != null) {
               await _run(
@@ -289,8 +414,13 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
     }
 
     if (_actions.contains('asset.recall.confirm_handover')) {
+      final disposal = _request?['type'] == 'disposal';
+      final upgrade = _request?['type'] == 'upgrade';
+
       return _ActionPrompt(
-        message: 'Xác nhận sau khi tài sản cũ và tài sản thay thế đã được bàn giao thực tế.',
+        message: disposal || upgrade
+            ? 'Xác nhận sau khi tài sản đã được bàn giao thực tế cho kho IT.'
+            : 'Xác nhận sau khi tài sản cũ và tài sản thay thế đã được bàn giao thực tế.',
         child: _DecisionActions(
           approveLabel: 'Xác nhận bàn giao',
           onApprove: () => _run(
@@ -301,6 +431,75 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
             if (reason != null) {
               await _run(
                 () => _repository.decideHandover(
+                  widget.requestId,
+                  confirmed: false,
+                  reason: reason,
+                ),
+              );
+            }
+          },
+        ),
+      );
+    }
+
+    if (_actions.contains('asset.recall.complete_disposal')) {
+      return _ActionPrompt(
+        message: 'Tài sản đang ở kho IT và chờ ghi nhận kết quả xử lý.',
+        child: _SingleAction(
+          label: 'Hoàn tất báo phế',
+          onPressed: () async {
+            final data = await _disposalDialog();
+            if (data == null) return;
+            await _run(
+              () => _repository.completeDisposal(
+                widget.requestId,
+                disposalDate: data['disposalDate']!,
+                disposalMethod: data['disposalMethod']!,
+                processingResult: data['processingResult'],
+                recoveryValue: data['recoveryValue'],
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    if (_actions.contains('asset.recall.process_upgrade')) {
+      return _ActionPrompt(
+        message: 'Tài sản đang ở kho IT và chờ ghi nhận kết quả nâng cấp.',
+        child: _SingleAction(
+          label: 'Hoàn tất nâng cấp',
+          onPressed: () async {
+            final result = await _upgradeResultDialog();
+            if (result != null) {
+              await _run(
+                () => _repository.completeUpgrade(
+                  widget.requestId,
+                  processingResult: result,
+                ),
+              );
+            }
+          },
+        ),
+      );
+    }
+
+    if (_actions.contains('asset.recall.confirm_upgrade_return')) {
+      return _ActionPrompt(
+        message: 'Kiểm tra tài sản đã nâng cấp trước khi xác nhận nhận lại.',
+        child: _DecisionActions(
+          approveLabel: 'Xác nhận nhận tài sản',
+          onApprove: () => _run(
+            () => _repository.decideUpgradeReturn(
+              widget.requestId,
+              confirmed: true,
+            ),
+          ),
+          onReject: () async {
+            final reason = await _reasonDialog('Yêu cầu IT xử lý lại');
+            if (reason != null) {
+              await _run(
+                () => _repository.decideUpgradeReturn(
                   widget.requestId,
                   confirmed: false,
                   reason: reason,
@@ -349,9 +548,23 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
         .cast<Map<String, dynamic>>();
     final actionArea = _actionArea();
     final status = request['status'] as String;
+    final type = request['type'] as String? ?? 'exchange';
+    final title = switch (type) {
+      'disposal' => 'Phiếu báo phế',
+      'upgrade' => 'Phiếu nâng cấp',
+      _ => 'Phiếu đổi tài sản',
+    };
+    final statusLabel =
+        type == 'disposal' &&
+            status == 'in_progress' &&
+            !_actions.contains('asset.recall.complete_disposal')
+        ? 'Đã bàn giao'
+        : type == 'upgrade' && status == 'in_progress'
+        ? 'Đang nâng cấp'
+        : assetRecallStatusLabel(status);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Phiếu đổi tài sản')),
+      appBar: AppBar(title: Text(title)),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -360,13 +573,18 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
           children: [
             _StatusBanner(
               status: status,
-              nextStep: _nextStep(status, _actions),
+              statusLabel: statusLabel,
+              nextStep: _nextStep(status, type, _actions),
               rejectionReason: _rejectionReason(request),
             ),
             const SizedBox(height: 12),
             _ApprovalSummary(request: request),
             const SizedBox(height: 12),
-            _AssetComparison(original: asset, replacement: replacement),
+            _AssetComparison(
+              original: asset,
+              replacement: replacement,
+              disposal: type == 'disposal',
+            ),
             const SizedBox(height: 12),
             _Section(
               title: 'Thông tin đề nghị',
@@ -382,6 +600,23 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
                   label: 'Lý do',
                   value: request['reason'] as String? ?? '—',
                 ),
+                if (request['disposalMethod'] != null)
+                  _Row(
+                    label: 'Phương thức xử lý',
+                    value: request['disposalMethod'] as String,
+                  ),
+                if (request['disposalDate'] != null)
+                  _Row(
+                    label: 'Ngày xử lý',
+                    value: request['disposalDate'].toString(),
+                  ),
+                if (request['processingResult'] != null)
+                  _Row(
+                    label: type == 'upgrade'
+                        ? 'Kết quả nâng cấp'
+                        : 'Kết quả xử lý',
+                    value: request['processingResult'] as String,
+                  ),
               ],
             ),
             if (replacement != null) ...[
@@ -435,23 +670,43 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
   }
 }
 
-String _nextStep(String status, List<String> actions) => switch (status) {
-  'draft' => 'Hoàn thiện lý do và gửi phiếu đến Trưởng bộ phận.',
-  'pending_department_head' =>
-    actions.contains('asset.recall.approve_department')
-        ? 'Bạn cần duyệt hoặc trả phiếu về cho nhân viên chỉnh sửa.'
-        : 'Phiếu đang chờ Trưởng bộ phận xem xét.',
-  'pending_it_head' =>
-    actions.contains('asset.recall.approve_it')
-        ? 'Bạn cần chọn tài sản thay thế và đưa ra quyết định.'
-        : 'Phiếu đang chờ Trưởng IT chọn tài sản thay thế.',
-  'revision_required' => 'Nhân viên cần cập nhật nội dung và gửi lại từ đầu.',
-  'pending_handover_confirmations' =>
-    'Hoàn tất xác nhận hai phía để ghi nhận việc đổi tài sản.',
-  'completed' =>
-    'Tài sản cũ đã về kho IT và tài sản thay thế đã được bàn giao.',
-  _ => 'Theo dõi trạng thái và hành động tiếp theo của phiếu.',
-};
+String _nextStep(String status, String type, List<String> actions) =>
+    switch (status) {
+      'draft' => 'Hoàn thiện lý do và gửi phiếu đến Trưởng bộ phận.',
+      'pending_department_head' =>
+        actions.contains('asset.recall.approve_department')
+            ? 'Bạn cần duyệt hoặc trả phiếu về cho nhân viên chỉnh sửa.'
+            : 'Phiếu đang chờ Trưởng bộ phận xem xét.',
+      'pending_it_head' =>
+        actions.contains('asset.recall.approve_it')
+            ? type == 'disposal' || type == 'upgrade'
+                  ? 'Bạn cần duyệt hoặc trả phiếu về chỉnh sửa.'
+                  : 'Bạn cần chọn tài sản thay thế và đưa ra quyết định.'
+            : 'Phiếu đang chờ Trưởng IT xem xét.',
+      'revision_required' =>
+        'Nhân viên cần cập nhật nội dung và gửi lại từ đầu.',
+      'pending_handover_confirmations' =>
+        type == 'disposal' || type == 'upgrade'
+            ? 'Hoàn tất xác nhận hai phía để đưa tài sản vào kho IT.'
+            : 'Hoàn tất xác nhận hai phía để ghi nhận việc đổi tài sản.',
+      'in_progress' =>
+        actions.contains('asset.recall.complete_disposal')
+            ? 'Tài sản đang ở kho IT và chờ bạn hoàn tất báo phế.'
+            : actions.contains('asset.recall.process_upgrade')
+            ? 'Tài sản đang ở kho IT và chờ bạn hoàn tất nâng cấp.'
+            : 'Bạn đã hoàn tất bàn giao.',
+      'ready_for_return' =>
+        actions.contains('asset.recall.confirm_upgrade_return')
+            ? 'Kiểm tra và xác nhận nhận lại tài sản đã nâng cấp.'
+            : 'Tài sản đã nâng cấp đang chờ nhân viên xác nhận nhận lại.',
+      'completed' =>
+        type == 'disposal'
+            ? 'Tài sản đã được ghi nhận báo phế.'
+            : type == 'upgrade'
+            ? 'Tài sản đã được nâng cấp và bàn giao lại.'
+            : 'Tài sản cũ đã về kho IT và tài sản thay thế đã được bàn giao.',
+      _ => 'Theo dõi trạng thái và hành động tiếp theo của phiếu.',
+    };
 
 String? _rejectionReason(Map<String, dynamic> request) {
   if (request['status'] != 'revision_required') return null;
@@ -484,6 +739,13 @@ String _auditLabel(String action) => switch (action) {
   'asset.recall.employee_handover_rejected' => 'Nhân viên đã từ chối bàn giao',
   'asset.recall.it_handover_rejected' => 'Trưởng IT đã từ chối bàn giao',
   'asset.recall.exchange_completed' => 'Đã hoàn tất đổi tài sản',
+  'asset.recall.disposal_received' => 'Tài sản đã được nhận vào kho IT',
+  'asset.recall.disposal_completed' => 'Đã hoàn tất báo phế tài sản',
+  'asset.recall.upgrade_received' => 'Tài sản đã được nhận vào kho IT',
+  'asset.recall.upgrade_completed' => 'IT đã hoàn tất nâng cấp',
+  'asset.recall.upgrade_return_confirmed' => 'Nhân viên đã nhận lại tài sản',
+  'asset.recall.upgrade_return_rejected' =>
+    'Nhân viên yêu cầu xử lý nâng cấp lại',
   _ => 'Phiếu đã được cập nhật',
 };
 
@@ -499,11 +761,13 @@ String? _formatAuditTime(Object? value) {
 class _StatusBanner extends StatelessWidget {
   const _StatusBanner({
     required this.status,
+    required this.statusLabel,
     required this.nextStep,
     required this.rejectionReason,
   });
 
   final String status;
+  final String statusLabel;
   final String nextStep;
   final String? rejectionReason;
 
@@ -524,7 +788,7 @@ class _StatusBanner extends StatelessWidget {
         : colors.onSecondaryContainer;
 
     return Semantics(
-      label: '${assetRecallStatusLabel(status)}. $nextStep',
+      label: '$statusLabel. $nextStep',
       child: Card(
         elevation: 0,
         color: background,
@@ -547,7 +811,7 @@ class _StatusBanner extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      assetRecallStatusLabel(status),
+                      statusLabel,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: foreground,
                         fontWeight: FontWeight.w700,
@@ -645,16 +909,21 @@ class _DecisionRow extends StatelessWidget {
 }
 
 class _AssetComparison extends StatelessWidget {
-  const _AssetComparison({required this.original, required this.replacement});
+  const _AssetComparison({
+    required this.original,
+    required this.replacement,
+    required this.disposal,
+  });
 
   final Map<String, dynamic> original;
   final Map<String, dynamic>? replacement;
+  final bool disposal;
 
   @override
   Widget build(BuildContext context) => Column(
     children: [
       _AssetSummaryCard(
-        title: 'Tài sản thu hồi',
+        title: disposal ? 'Tài sản báo phế' : 'Tài sản thu hồi',
         asset: original,
         icon: Icons.keyboard_return,
       ),

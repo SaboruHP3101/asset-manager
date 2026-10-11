@@ -4,7 +4,9 @@ String assetRecallStatusLabel(String status) => switch (status) {
   'pending_it_head' => 'Chờ Trưởng IT',
   'revision_required' => 'Cần chỉnh sửa',
   'pending_handover_confirmations' => 'Chờ xác nhận bàn giao',
-  'completed' => 'Đã đổi tài sản',
+  'in_progress' => 'Đang xử lý báo phế',
+  'ready_for_return' => 'Chờ nhận lại tài sản',
+  'completed' => 'Đã hoàn tất',
   _ => status.replaceAll('_', ' '),
 };
 

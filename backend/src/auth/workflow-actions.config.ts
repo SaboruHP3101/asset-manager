@@ -9,8 +9,12 @@ export const WORKFLOW_ACTIONS = {
   transferVerify: 'transfer.verify',
   transferConfirm: 'transfer.confirm',
   repairReport: 'repair.report',
+  repairUpdate: 'repair.update',
+  repairSubmit: 'repair.submit',
   repairAssess: 'repair.assess',
   repairApproveDepartment: 'repair.approve_department',
+  repairApproveIt: 'repair.approve_it',
+  repairConfirmHandover: 'repair.confirm_handover',
   repairAssign: 'repair.assign',
   repairComplete: 'repair.complete',
   repairConfirmResult: 'repair.confirm_result',
@@ -42,6 +46,9 @@ export const WORKFLOW_ACTIONS = {
   assetRecallApproveDepartment: 'asset.recall.approve_department',
   assetRecallApproveIt: 'asset.recall.approve_it',
   assetRecallConfirmHandover: 'asset.recall.confirm_handover',
+  assetRecallProcessUpgrade: 'asset.recall.process_upgrade',
+  assetRecallConfirmUpgradeReturn: 'asset.recall.confirm_upgrade_return',
+  assetRecallCompleteDisposal: 'asset.recall.complete_disposal',
   warehouseItView: 'warehouse.it.view',
 } as const;
 
@@ -56,6 +63,9 @@ export const EMPLOYEE_ACTIONS: readonly WorkflowAction[] = [
   WORKFLOW_ACTIONS.transferCreate,
   WORKFLOW_ACTIONS.transferConfirm,
   WORKFLOW_ACTIONS.repairReport,
+  WORKFLOW_ACTIONS.repairUpdate,
+  WORKFLOW_ACTIONS.repairSubmit,
+  WORKFLOW_ACTIONS.repairConfirmHandover,
   WORKFLOW_ACTIONS.repairConfirmResult,
   WORKFLOW_ACTIONS.purchaseRequestCreate,
   WORKFLOW_ACTIONS.purchaseRequestUpdate,
@@ -66,6 +76,7 @@ export const EMPLOYEE_ACTIONS: readonly WorkflowAction[] = [
   WORKFLOW_ACTIONS.assetRecallUpdate,
   WORKFLOW_ACTIONS.assetRecallSubmit,
   WORKFLOW_ACTIONS.assetRecallConfirmHandover,
+  WORKFLOW_ACTIONS.assetRecallConfirmUpgradeReturn,
 ];
 
 /**
@@ -124,6 +135,9 @@ const DEPARTMENT_HEAD_PURCHASE_ACTIONS: Readonly<
   IT: [
     WORKFLOW_ACTIONS.purchaseRequestApproveIt,
     WORKFLOW_ACTIONS.assetRecallApproveIt,
+    WORKFLOW_ACTIONS.assetRecallProcessUpgrade,
+    WORKFLOW_ACTIONS.assetRecallCompleteDisposal,
+    WORKFLOW_ACTIONS.repairApproveIt,
   ],
 };
 

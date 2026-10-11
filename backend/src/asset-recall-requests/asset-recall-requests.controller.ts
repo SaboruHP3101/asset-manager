@@ -19,6 +19,8 @@ import {
 import { WORKFLOW_ACTIONS } from '../auth/workflow-actions.config.js';
 import { AssetRecallRequestsService } from './asset-recall-requests.service.js';
 import {
+  CompleteDisposalDto,
+  CompleteUpgradeDto,
   CreateAssetRecallRequestDto,
   ItRecallDecisionDto,
   RecallDecisionDto,
@@ -121,5 +123,35 @@ export class AssetRecallRequestsController {
     @CurrentEmployee() actor: AuthenticatedEmployee,
   ) {
     return this.service.decideHandover(id, dto, actor);
+  }
+
+  @Post(':id/complete-disposal')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.assetRecallCompleteDisposal)
+  completeDisposal(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CompleteDisposalDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.service.completeDisposal(id, dto, actor);
+  }
+
+  @Post(':id/complete-upgrade')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.assetRecallProcessUpgrade)
+  completeUpgrade(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CompleteUpgradeDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.service.completeUpgrade(id, dto, actor);
+  }
+
+  @Post(':id/upgrade-return-decision')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.assetRecallConfirmUpgradeReturn)
+  decideUpgradeReturn(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RecallHandoverDecisionDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.service.decideUpgradeReturn(id, dto, actor);
   }
 }

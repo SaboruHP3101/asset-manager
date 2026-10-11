@@ -16,6 +16,8 @@
     "start:prod": "node dist/main",
     "db:push": "drizzle-kit push",
     "db:seed": "npm run build && node dist/db/seed.js",
+    "seed": "tsx --env-file=.env src/db/seed.ts",
+    "db:clear-non-core-data": "npm run build && node dist/db/clear-non-core-data.js",
     "lint": "npm run lint:oxlint && npm run lint:padding",
     "lint:oxlint": "oxlint src/ test/",
     "lint:padding": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",

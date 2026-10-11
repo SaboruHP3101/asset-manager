@@ -30,6 +30,10 @@ describe('seed account purchase actions', () => {
           WORKFLOW_ACTIONS.assetRecallUpdate,
           WORKFLOW_ACTIONS.assetRecallSubmit,
           WORKFLOW_ACTIONS.assetRecallConfirmHandover,
+          WORKFLOW_ACTIONS.assetRecallConfirmUpgradeReturn,
+          WORKFLOW_ACTIONS.repairUpdate,
+          WORKFLOW_ACTIONS.repairSubmit,
+          WORKFLOW_ACTIONS.repairConfirmHandover,
         ]),
       );
     },
@@ -50,6 +54,9 @@ describe('seed account purchase actions', () => {
 
     expect(itHead).toContain(WORKFLOW_ACTIONS.purchaseRequestApproveIt);
     expect(itHead).toContain(WORKFLOW_ACTIONS.assetRecallApproveIt);
+    expect(itHead).toContain(WORKFLOW_ACTIONS.assetRecallCompleteDisposal);
+    expect(itHead).toContain(WORKFLOW_ACTIONS.assetRecallProcessUpgrade);
+    expect(itHead).toContain(WORKFLOW_ACTIONS.repairApproveIt);
     expect(itHead).toContain(WORKFLOW_ACTIONS.warehouseItView);
     expect(procurementStaff).toContain(
       WORKFLOW_ACTIONS.purchaseRequestEnrichProcurement,

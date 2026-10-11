@@ -12,6 +12,6 @@ void main() {
       assetRecallStatusLabel('pending_handover_confirmations'),
       'Chờ xác nhận bàn giao',
     );
-    expect(assetRecallStatusLabel('completed'), 'Đã đổi tài sản');
+    expect(assetRecallStatusLabel('completed'), 'Đã hoàn tất');
   });
 }

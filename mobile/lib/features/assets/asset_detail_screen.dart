@@ -10,6 +10,7 @@ import '../repair_requests/repair_progress_screen.dart';
 import '../repair_requests/repair_request_form.dart';
 import '../asset_recalls/asset_recall_detail_screen.dart';
 import '../asset_recalls/asset_recall_form.dart';
+import '../asset_recalls/asset_upgrade_form.dart';
 import 'asset_status_chip.dart';
 
 class AssetDetailScreen extends StatefulWidget {
@@ -87,7 +88,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     if (created == true) await _loadRepairProgress();
   }
 
-  Future<void> _openRecallAction() async {
+  Future<void> _openRecallAction({bool upgrade = false}) async {
     final asset = _asset!;
     final activeRecall = asset['activeRecall'] == null
         ? null
@@ -97,14 +98,23 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     if (requestId == null) {
       final result = await Navigator.of(context).push<AssetRecallFormResult>(
         MaterialPageRoute(
-          builder: (_) => AssetRecallForm(
-            assetId: widget.assetId,
-            assetName: asset['name'] as String? ?? 'Tài sản',
-            assetCode: asset['assetCode'] as String?,
-            assetCategory: asset['category'] as String?,
-            assetLocation: asset['currentLocation'] as String?,
-            assetImageUrl: _imageUrl(),
-          ),
+          builder: (_) => upgrade
+              ? AssetUpgradeForm(
+                  assetId: widget.assetId,
+                  assetName: asset['name'] as String? ?? 'Tài sản',
+                  assetCode: asset['assetCode'] as String?,
+                  assetCategory: asset['category'] as String?,
+                  assetLocation: asset['currentLocation'] as String?,
+                  assetImageUrl: _imageUrl(),
+                )
+              : AssetRecallForm(
+                  assetId: widget.assetId,
+                  assetName: asset['name'] as String? ?? 'Tài sản',
+                  assetCode: asset['assetCode'] as String?,
+                  assetCategory: asset['category'] as String?,
+                  assetLocation: asset['currentLocation'] as String?,
+                  assetImageUrl: _imageUrl(),
+                ),
         ),
       );
       requestId = result?.id;
@@ -169,6 +179,10 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
 
     final history = (asset['handoverHistory'] as List<dynamic>? ?? const [])
         .cast<Object>();
+    final activeRecall = asset['activeRecall'] == null
+        ? null
+        : Map<String, dynamic>.from(asset['activeRecall'] as Map);
+    final activeRecallType = activeRecall?['type'] as String?;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Chi tiết tài sản')),
@@ -274,30 +288,6 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                   ),
                 ],
               ),
-              if (history.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                Text(
-                  'Vòng đời tài sản',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 10),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Column(
-                      children: [
-                        for (var index = 0; index < history.length; index++)
-                          _HandoverTimelineItem(
-                            entry: Map<String, dynamic>.from(
-                              history[index] as Map,
-                            ),
-                            isLast: index == history.length - 1,
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
             ],
           ],
         ),
@@ -317,21 +307,51 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.tonalIcon(
-                            onPressed: _openRecallAction,
-                            icon: const Icon(Icons.swap_horiz),
+                            onPressed:
+                                _repairProgress != null &&
+                                    asset['activeRecall'] == null
+                                ? null
+                                : () => _openRecallAction(
+                                    upgrade: activeRecallType == 'upgrade',
+                                  ),
+                            icon: Icon(
+                              activeRecallType == 'upgrade'
+                                  ? Icons.upgrade
+                                  : Icons.swap_horiz,
+                            ),
                             label: Text(
                               asset['activeRecall'] == null
-                                  ? 'Yêu cầu đổi tài sản'
-                                  : 'Xem phiếu đổi tài sản',
+                                  ? 'Đổi / báo phế tài sản'
+                                  : activeRecallType == 'upgrade'
+                                  ? 'Xem phiếu nâng cấp tài sản'
+                                  : 'Xem phiếu thu hồi tài sản',
                             ),
                           ),
                         ),
                         const SizedBox(height: 8),
+                        if (asset['activeRecall'] == null) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.tonalIcon(
+                              onPressed: _repairProgress == null
+                                  ? () => _openRecallAction(upgrade: true)
+                                  : null,
+                              icon: const Icon(Icons.upgrade),
+                              label: const Text('Yêu cầu nâng cấp tài sản'),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
                       ],
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
-                          onPressed: _checkingRepair ? null : _openRepairAction,
+                          onPressed:
+                              _checkingRepair ||
+                                  (asset['activeRecall'] != null &&
+                                      _repairProgress == null)
+                              ? null
+                              : _openRepairAction,
                           icon: _checkingRepair
                               ? const SizedBox.square(
                                   dimension: 18,

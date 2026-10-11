@@ -8,7 +8,12 @@ export class CreateMyRepairRequestDto {
 
   // Triệu chứng bắt buộc do nhân viên nhập
   @IsString()
-  @IsNotEmpty()
+  @MaxLength(2000)
+  issueDescription: string;
+}
+
+export class UpdateMyRepairRequestDto {
+  @IsString()
   @MaxLength(2000)
   issueDescription: string;
 }

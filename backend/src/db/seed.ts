@@ -1,6 +1,6 @@
 import { loadEnvFile } from 'node:process';
 import * as bcrypt from 'bcrypt';
-import { and, eq, inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema.js';
@@ -16,17 +16,6 @@ type CategorySeed = {
   trackingMode: (typeof schema.assetTrackingModeEnum.enumValues)[number];
   isPurchaseOption: boolean;
   allowsCustomType?: boolean;
-};
-
-type PurchaseSampleItem = {
-  categoryCode: string;
-  itemName: string;
-  description: string;
-  quantity: number;
-  unit: string;
-  supplierCode: string;
-  unitPriceExclVat: string;
-  vatRate: string;
 };
 
 // Tạo địa chỉ kết nối từ các biến riêng để hỗ trợ .env có biến lồng nhau
@@ -550,6 +539,46 @@ async function seedSuppliers() {
       website: 'https://example.com/viet-tin',
       status: 'Đang hợp tác',
     },
+    {
+      supplierCode: 'NCC-CELLPHONE-S',
+      legalName: 'Công ty CPTM và DVKT Diệu Phúc',
+      tradeName: 'CellphoneS',
+      taxCode: '0318001004',
+      website: 'https://example.com/cellphone-s',
+      status: 'Đang hợp tác',
+    },
+    {
+      supplierCode: 'NCC-PHONG-VU',
+      legalName: 'Công ty Cổ phần Thương mại Dịch vụ Phong Vũ',
+      tradeName: 'Phong Vũ',
+      taxCode: '0318001005',
+      website: 'https://example.com/phong-vu',
+      status: 'Đang hợp tác',
+    },
+    {
+      supplierCode: 'NCC-FPT-SHOP',
+      legalName: 'Công ty Cổ phần Bán lẻ Kỹ thuật số FPT',
+      tradeName: 'FPT Shop',
+      taxCode: '0318001006',
+      website: 'https://example.com/fpt-shop',
+      status: 'Đang hợp tác',
+    },
+    {
+      supplierCode: 'NCC-AN-PHAT',
+      legalName: 'Công ty Cổ phần Thương mại Máy tính An Phát',
+      tradeName: 'An Phát Computer',
+      taxCode: '0318001007',
+      website: 'https://example.com/an-phat',
+      status: 'Đang hợp tác',
+    },
+    {
+      supplierCode: 'NCC-HOA-PHAT',
+      legalName: 'Công ty Cổ phần Nội thất Hòa Phát',
+      tradeName: 'Nội thất Hòa Phát',
+      taxCode: '0318001008',
+      website: 'https://example.com/hoa-phat',
+      status: 'Đang hợp tác',
+    },
   ];
 
   await db
@@ -591,6 +620,7 @@ async function seedEmployees(
     ['NV006', 'Đặng Thanh Sơn', '0901000006', 'EXECUTIVE', 'EXECUTIVE', false],
     ['NV007', 'Bùi Hải Yến', '0901000007', 'PROCUREMENT', 'PROCUREMENT', true],
     ['NV008', 'Đỗ Gia Huy', '0901000008', 'WAREHOUSE', 'EMPLOYEE', false],
+    ['NV009', 'Phan Minh Hải', '0901000009', 'ACCOUNTING', 'EMPLOYEE', false],
   ] as const;
 
   for (const employee of employees) {
@@ -628,7 +658,16 @@ async function seedEmployees(
   return new Map(rows.map((row) => [row.employeeCode, row]));
 }
 
-// Thêm từ ba đến bốn tài sản cho mỗi nhân viên
+type AssetSeed = readonly [
+  assetCode: string,
+  categoryCode: string,
+  assetName: string,
+  employeeCode: string | null,
+  supplierCode: string,
+  status: string,
+];
+
+// Thêm từ sáu đến bảy tài sản cho mỗi nhân viên và mười tài sản trong kho IT
 async function seedAssets(
   employees: Map<string, typeof schema.employees.$inferSelect>,
   categories: Map<string, typeof schema.assetCategories.$inferSelect>,
@@ -638,7 +677,12 @@ async function seedAssets(
     .select()
     .from(schema.warehouses)
     .where(eq(schema.warehouses.code, 'IT_WAREHOUSE'));
-  const assets = [
+
+  if (!itWarehouse) {
+    throw new Error('Không tìm thấy Kho IT để tạo tài sản mẫu.');
+  }
+
+  const baseAssets = [
     [
       'TS001',
       'ELECTRONICS-LAPTOP',
@@ -693,7 +737,7 @@ async function seedAssets(
       'Canon imageCLASS',
       'NV002',
       'NCC-AN-KHANG',
-      'available',
+      'in_use',
     ],
     [
       'TS008',
@@ -749,7 +793,7 @@ async function seedAssets(
       'Canon imageCLASS',
       'NV004',
       'NCC-AN-KHANG',
-      'available',
+      'in_use',
     ],
     [
       'TS015',
@@ -775,7 +819,71 @@ async function seedAssets(
       'NCC-VIET-TIN',
       'repairing',
     ],
+  ] as const satisfies readonly AssetSeed[];
+
+  const assetTemplates = [
+    ['ELECTRONICS-LAPTOP', 'Dell Latitude 7440', 'NCC-MINH-PHAT'],
+    ['ELECTRONICS-LAPTOP', 'Apple MacBook Pro 14in', 'NCC-CELLPHONE-S'],
+    ['ELECTRONICS-MONITOR', 'Dell UltraSharp 27', 'NCC-PHONG-VU'],
+    ['ELECTRONICS-PRINTER', 'Canon imageCLASS', 'NCC-FPT-SHOP'],
+    ['ELECTRONICS-NETWORK', 'Bộ định tuyến Cisco ISR', 'NCC-VIET-TIN'],
+    ['ELECTRONICS-BARCODE', 'Zebra DS2208', 'NCC-AN-PHAT'],
+    ['FURNITURE-CHAIR', 'Ghế công thái học', 'NCC-HOA-PHAT'],
+    ['WAREHOUSE-EQUIPMENT-CART', 'Xe đẩy hàng inox', 'NCC-AN-KHANG'],
   ] as const;
+  const employeeTargets = [
+    ['NV001', 7],
+    ['NV002', 7],
+    ['NV003', 6],
+    ['NV004', 6],
+    ['NV005', 6],
+    ['NV006', 6],
+    ['NV007', 6],
+    ['NV008', 6],
+    ['NV009', 6],
+  ] as const;
+  const generatedAssets: AssetSeed[] = [];
+  let nextAssetNumber = baseAssets.length + 1;
+
+  for (const [
+    employeeIndex,
+    [employeeCode, targetCount],
+  ] of employeeTargets.entries()) {
+    const currentCount = baseAssets.filter(
+      (asset) => asset[3] === employeeCode,
+    ).length;
+
+    for (let index = currentCount; index < targetCount; index += 1) {
+      const template =
+        assetTemplates[(employeeIndex + index) % assetTemplates.length];
+
+      generatedAssets.push([
+        `TS${String(nextAssetNumber).padStart(3, '0')}`,
+        template[0],
+        template[1],
+        employeeCode,
+        template[2],
+        'in_use',
+      ]);
+      nextAssetNumber += 1;
+    }
+  }
+
+  for (let index = 0; index < 10; index += 1) {
+    const template = assetTemplates[index % assetTemplates.length];
+
+    generatedAssets.push([
+      `TS${String(nextAssetNumber).padStart(3, '0')}`,
+      template[0],
+      template[1],
+      null,
+      template[2],
+      'available',
+    ]);
+    nextAssetNumber += 1;
+  }
+
+  const assets: AssetSeed[] = [...baseAssets, ...generatedAssets];
 
   for (const [
     assetCode,
@@ -785,36 +893,53 @@ async function seedAssets(
     supplierCode,
     status,
   ] of assets) {
-    const employee = employees.get(employeeCode)!;
+    const employee = employeeCode ? employees.get(employeeCode) : undefined;
+
+    if (employeeCode && !employee) {
+      throw new Error(
+        `Không tìm thấy nhân viên ${employeeCode} để tạo tài sản.`,
+      );
+    }
+
+    const category = categories.get(categoryCode);
+    const supplierId = supplierIds.get(supplierCode);
+
+    if (!category || !supplierId) {
+      throw new Error(
+        `Thiếu danh mục ${categoryCode} hoặc nhà cung cấp ${supplierCode}.`,
+      );
+    }
+
+    const assetValues = {
+      qrCode: `QR-${assetCode}`,
+      assetCategoryId: category.id,
+      supplierId,
+      currentUserId: employee?.id ?? null,
+      currentManagingDepartmentId:
+        employee?.departmentId ?? itWarehouse.managingDepartmentId,
+      currentWarehouseId: employee ? null : itWarehouse.id,
+      name: assetName,
+      currentLocation: employee ? null : itWarehouse.location,
+      status,
+      initialValue: '25000000',
+      purchaseDate: '2026-01-15',
+      inServiceDate: '2026-02-01',
+    };
 
     await db
       .insert(schema.assets)
       .values({
         assetCode,
-        qrCode: `QR-${assetCode}`,
-        assetCategoryId: categories.get(categoryCode)!.id,
-        supplierId: supplierIds.get(supplierCode)!,
-        currentUserId: employee.id,
-        currentManagingDepartmentId: employee.departmentId,
-        name: assetName,
-        status,
-        initialValue: '25000000',
-        purchaseDate: '2026-01-15',
-        inServiceDate: '2026-02-01',
+        ...assetValues,
       })
-      .onConflictDoNothing({ target: schema.assets.assetCode });
+      .onConflictDoUpdate({
+        target: schema.assets.assetCode,
+        set: {
+          ...assetValues,
+          updatedAt: new Date(),
+        },
+      });
   }
-
-  // Dữ liệu mẫu `available` phải nằm trong kho để flow exchange có tài sản mẫu để đổi.
-  await db
-    .update(schema.assets)
-    .set({
-      currentUserId: null,
-      currentManagingDepartmentId: itWarehouse.managingDepartmentId,
-      currentWarehouseId: itWarehouse.id,
-      currentLocation: itWarehouse.location,
-    })
-    .where(inArray(schema.assets.assetCode, ['TS007', 'TS014']));
 
   return db
     .select()
@@ -825,299 +950,6 @@ async function seedAssets(
         assets.map((asset) => asset[0]),
       ),
     );
-}
-
-async function seedPurchaseRequestSample(
-  sample: {
-    requestCode: string;
-    status: (typeof schema.purchaseRequestStatusEnum.enumValues)[number];
-    reason: string;
-    items: readonly PurchaseSampleItem[];
-  },
-  requester: typeof schema.employees.$inferSelect,
-  categories: Map<string, typeof schema.assetCategories.$inferSelect>,
-  supplierIds: Map<string, string>,
-  procurementEmployeeId: string,
-) {
-  const requestValues = {
-    requestCode: sample.requestCode,
-    status: sample.status,
-    currentRevision: 1,
-    requesterId: requester.id,
-    departmentId: requester.departmentId,
-    createdBy: requester.id,
-    updatedBy: requester.id,
-  };
-
-  await db
-    .insert(schema.purchaseRequests)
-    .values(requestValues)
-    .onConflictDoUpdate({
-      target: schema.purchaseRequests.requestCode,
-      set: requestValues,
-    });
-
-  const [purchaseRequest] = await db
-    .select()
-    .from(schema.purchaseRequests)
-    .where(eq(schema.purchaseRequests.requestCode, sample.requestCode));
-
-  let [revision] = await db
-    .select()
-    .from(schema.purchaseRequestRevisions)
-    .where(
-      and(
-        eq(
-          schema.purchaseRequestRevisions.purchaseRequestId,
-          purchaseRequest.id,
-        ),
-        eq(schema.purchaseRequestRevisions.revisionNumber, 1),
-      ),
-    );
-
-  if (revision) {
-    [revision] = await db
-      .update(schema.purchaseRequestRevisions)
-      .set({
-        purpose: sample.reason,
-        neededByDate: '2026-10-15',
-        submittedAt: new Date('2026-09-22T02:00:00.000Z'),
-        submittedBy: requester.id,
-      })
-      .where(eq(schema.purchaseRequestRevisions.id, revision.id))
-      .returning();
-  } else {
-    [revision] = await db
-      .insert(schema.purchaseRequestRevisions)
-      .values({
-        purchaseRequestId: purchaseRequest.id,
-        revisionNumber: 1,
-        purpose: sample.reason,
-        neededByDate: '2026-10-15',
-        submittedAt: new Date('2026-09-22T02:00:00.000Z'),
-        submittedBy: requester.id,
-        createdBy: requester.id,
-      })
-      .returning();
-  }
-
-  for (const [itemIndex, item] of sample.items.entries()) {
-    const category = categories.get(item.categoryCode)!;
-    const sortOrder = itemIndex + 1;
-    const itemValues = {
-      assetCategoryId: category.id,
-      itemName: item.itemName,
-      specifications: item.description,
-      quantity: item.quantity,
-      unit: item.unit,
-      managementOwnerSnapshot: category.managementOwner,
-      trackingModeSnapshot: category.trackingMode,
-      sortOrder,
-      updatedBy: procurementEmployeeId,
-    };
-
-    let [requestItem] = await db
-      .select()
-      .from(schema.purchaseRequestItems)
-      .where(
-        and(
-          eq(schema.purchaseRequestItems.requestRevisionId, revision.id),
-          eq(schema.purchaseRequestItems.sortOrder, sortOrder),
-        ),
-      );
-
-    if (requestItem) {
-      [requestItem] = await db
-        .update(schema.purchaseRequestItems)
-        .set(itemValues)
-        .where(eq(schema.purchaseRequestItems.id, requestItem.id))
-        .returning();
-    } else {
-      [requestItem] = await db
-        .insert(schema.purchaseRequestItems)
-        .values({
-          requestRevisionId: revision.id,
-          ...itemValues,
-          createdBy: procurementEmployeeId,
-        })
-        .returning();
-    }
-
-    const fileName = `Báo giá ${sample.requestCode}-${sortOrder}.pdf`;
-    let [quoteAttachment] = await db
-      .select()
-      .from(schema.attachments)
-      .where(
-        and(
-          eq(schema.attachments.entityId, requestItem.id),
-          eq(schema.attachments.fileName, fileName),
-        ),
-      );
-
-    if (!quoteAttachment) {
-      [quoteAttachment] = await db
-        .insert(schema.attachments)
-        .values({
-          entityType: 'purchase_request_item_quote',
-          entityId: requestItem.id,
-          fileName,
-          url: `https://example.com/quotes/${sample.requestCode}-${sortOrder}.pdf`,
-          mimeType: 'application/pdf',
-          size: 32768,
-          uploadedByEmployeeId: procurementEmployeeId,
-        })
-        .returning();
-    }
-
-    const supplierId = supplierIds.get(item.supplierCode)!;
-    const [existingQuote] = await db
-      .select()
-      .from(schema.purchaseRequestQuotes)
-      .where(
-        and(
-          eq(schema.purchaseRequestQuotes.requestItemId, requestItem.id),
-          eq(schema.purchaseRequestQuotes.supplierId, supplierId),
-        ),
-      );
-    const quoteValues = {
-      attachmentId: quoteAttachment.id,
-      unitPriceExclVat: item.unitPriceExclVat,
-      vatRate: item.vatRate,
-      isSelected: true,
-      note: 'Nhà cung cấp thắng cho hạng mục này',
-      updatedBy: procurementEmployeeId,
-    };
-
-    if (existingQuote) {
-      await db
-        .update(schema.purchaseRequestQuotes)
-        .set(quoteValues)
-        .where(eq(schema.purchaseRequestQuotes.id, existingQuote.id));
-    } else {
-      await db.insert(schema.purchaseRequestQuotes).values({
-        requestItemId: requestItem.id,
-        supplierId,
-        ...quoteValues,
-        createdBy: procurementEmployeeId,
-      });
-    }
-  }
-}
-
-// Ba hồ sơ mẫu bao phủ nhánh điện tử, phi điện tử và đơn hỗn hợp.
-async function seedPurchaseWorkflowSamples(
-  employees: Map<string, typeof schema.employees.$inferSelect>,
-  categories: Map<string, typeof schema.assetCategories.$inferSelect>,
-  supplierIds: Map<string, string>,
-) {
-  const requester = employees.get('NV008')!;
-  const procurementEmployeeId = employees.get('NV004')!.id;
-  const samples = [
-    {
-      requestCode: 'PR-2026-001',
-      status: 'pending_it_head',
-      reason: 'Trang bị laptop cho nhân viên kho mới',
-      items: [
-        {
-          categoryCode: 'ELECTRONICS-LAPTOP',
-          itemName: 'Dell Latitude 7440',
-          description: 'RAM 16 GB, SSD 512 GB',
-          quantity: 2,
-          unit: 'chiếc',
-          supplierCode: 'NCC-MINH-PHAT',
-          unitPriceExclVat: '24500000',
-          vatRate: '10',
-        },
-      ],
-    },
-    {
-      requestCode: 'PR-2026-002',
-      status: 'approved',
-      reason: 'Thay ghế làm việc đã xuống cấp',
-      items: [
-        {
-          categoryCode: 'FURNITURE-CHAIR',
-          itemName: 'Ghế công thái học',
-          description: 'Ghế lưng lưới có tựa đầu',
-          quantity: 4,
-          unit: 'chiếc',
-          supplierCode: 'NCC-AN-KHANG',
-          unitPriceExclVat: '4200000',
-          vatRate: '10',
-        },
-      ],
-    },
-    {
-      requestCode: 'PR-2026-003',
-      status: 'pending_it_head',
-      reason: 'Bổ sung màn hình và giấy in cho kho',
-      items: [
-        {
-          categoryCode: 'ELECTRONICS-MONITOR',
-          itemName: 'Màn hình Dell UltraSharp 27',
-          description: 'Màn hình phục vụ đối soát hàng hóa',
-          quantity: 2,
-          unit: 'chiếc',
-          supplierCode: 'NCC-AN-KHANG',
-          unitPriceExclVat: '8900000',
-          vatRate: '10',
-        },
-        {
-          categoryCode: 'CONSUMABLES-PAPER',
-          itemName: 'Giấy in A4',
-          description: 'Định lượng 70 gsm, 500 tờ/ream',
-          quantity: 20,
-          unit: 'ream',
-          supplierCode: 'NCC-VIET-TIN',
-          unitPriceExclVat: '78000',
-          vatRate: '8',
-        },
-      ],
-    },
-  ] as const;
-
-  for (const sample of samples) {
-    await seedPurchaseRequestSample(
-      sample,
-      requester,
-      categories,
-      supplierIds,
-      procurementEmployeeId,
-    );
-  }
-}
-
-// Thêm một ảnh mẫu cho mỗi tài sản nếu chưa có
-async function seedAttachments(
-  assets: (typeof schema.assets.$inferSelect)[],
-  uploaderId: string,
-) {
-  for (const asset of assets.filter((item) =>
-    item.assetCode.startsWith('TS'),
-  )) {
-    const fileName = `Ảnh tài sản ${asset.assetCode}.png`;
-    const [existing] = await db
-      .select({ id: schema.attachments.id })
-      .from(schema.attachments)
-      .where(
-        and(
-          eq(schema.attachments.entityId, asset.id),
-          eq(schema.attachments.fileName, fileName),
-        ),
-      );
-
-    if (existing) continue;
-
-    await db.insert(schema.attachments).values({
-      entityType: 'asset',
-      entityId: asset.id,
-      fileName,
-      url: `https://placehold.co/600x400/png?text=${asset.assetCode}`,
-      mimeType: 'image/png',
-      size: 24576,
-      uploadedByEmployeeId: uploaderId,
-    });
-  }
 }
 
 // Chạy các bước theo thứ tự để bảo đảm khóa ngoại đã tồn tại
@@ -1136,11 +968,10 @@ async function main() {
   const categories = await seedCategories();
   const suppliers = await seedSuppliers();
   const employees = await seedEmployees(departments, roles);
-  const assets = await seedAssets(employees, categories, suppliers);
 
-  await seedPurchaseWorkflowSamples(employees, categories, suppliers);
-  await seedAttachments(assets, employees.get('NV001')!.id);
-  console.log('Đã thêm dữ liệu mẫu còn thiếu thành công.');
+  await seedAssets(employees, categories, suppliers);
+
+  console.log('Đã thêm dữ liệu lõi mẫu còn thiếu thành công.');
 }
 
 main()

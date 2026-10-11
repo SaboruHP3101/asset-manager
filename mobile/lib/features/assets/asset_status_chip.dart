@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 String assetStatusLabel(String status) => switch (status.toLowerCase()) {
   'in_use' || 'using' || 'active' => 'Đang sử dụng',
   'repairing' || 'fixing' => 'Đang sửa chữa',
+  'upgrading' => 'Đang nâng cấp',
   'available' => 'Sẵn sàng',
   'reserved_for_exchange' => 'Đã giữ chỗ',
+  'awaiting_disposal' => 'Chờ xử lý báo phế',
+  'disposed' => 'Đã báo phế',
   'awaiting_allocation' => 'Chờ cấp phát',
   'awaiting_reallocation' => 'Chờ phân bổ lại',
   'awaiting_allocation_confirmation' => 'Chờ xác nhận',
@@ -16,6 +19,7 @@ String assetStatusLabel(String status) => switch (status.toLowerCase()) {
 String assetStatusFilterKey(String status) => switch (status.toLowerCase()) {
   'in_use' || 'using' || 'active' => 'in_use',
   'repairing' || 'fixing' => 'repairing',
+  'upgrading' => 'upgrading',
   _ => status.toLowerCase(),
 };
 
@@ -86,10 +90,16 @@ _StatusPresentation _presentation(BuildContext context, String status) {
       Color(0xFF6A1B9A),
       Icons.bookmark_added_outlined,
     ),
+    'awaiting_disposal' => const _StatusPresentation(
+      Color(0xFFB26A00),
+      Icons.schedule_outlined,
+    ),
+    'disposed' => _StatusPresentation(colors.error, Icons.delete_outline),
     'repairing' || 'fixing' => const _StatusPresentation(
       Color(0xFFB26A00),
       Icons.build_outlined,
     ),
+    'upgrading' => const _StatusPresentation(Color(0xFF6A1B9A), Icons.upgrade),
     'awaiting_allocation' ||
     'awaiting_reallocation' ||
     'awaiting_allocation_confirmation' => const _StatusPresentation(

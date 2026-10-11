@@ -18,7 +18,8 @@ class RepairRequestsScreen extends StatefulWidget {
 class _RepairRequestsScreenState extends State<RepairRequestsScreen> {
   final _dio = ApiClient.instance.dio;
   final _tokenStorage = TokenStorage.instance;
-  List<Map<String, dynamic>> _requests = [];
+  List<Map<String, dynamic>> _mine = [];
+  List<Map<String, dynamic>> _queue = [];
   bool _loading = true;
   String? _error;
 
@@ -35,10 +36,14 @@ class _RepairRequestsScreenState extends State<RepairRequestsScreen> {
       _error = null;
     });
     try {
-      final response = await _dio.get<List<dynamic>>('/repair-requests/mine');
+      final responses = await Future.wait([
+        _dio.get<List<dynamic>>('/repair-requests/mine'),
+        _dio.get<List<dynamic>>('/repair-requests/queue'),
+      ]);
       if (!mounted) return;
       setState(() {
-        _requests = (response.data ?? []).cast<Map<String, dynamic>>();
+        _mine = (responses[0].data ?? []).cast<Map<String, dynamic>>();
+        _queue = (responses[1].data ?? []).cast<Map<String, dynamic>>();
         _loading = false;
       });
     } on DioException catch (error) {
@@ -79,64 +84,102 @@ class _RepairRequestsScreenState extends State<RepairRequestsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Yêu cầu'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: _openCreateRequest,
-            tooltip: 'Tạo yêu cầu sửa chữa',
-            icon: const Icon(Icons.add),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Báo hỏng tài sản'),
+          centerTitle: true,
+          actions: [
+            IconButton(
+              onPressed: _openCreateRequest,
+              tooltip: 'Tạo yêu cầu sửa chữa',
+              icon: const Icon(Icons.add),
+            ),
+          ],
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Phiếu của tôi'),
+              Tab(text: 'Cần xử lý'),
+            ],
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: _loadRequests,
-                child: _error != null || _requests.isEmpty
-                    ? LayoutBuilder(
-                        builder: (context, constraints) => ListView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          children: [
-                            SizedBox(
-                              height: constraints.maxHeight,
-                              child: Center(
-                                child: _error != null
-                                    ? _RequestMessage(
-                                        icon: Icons.cloud_off_outlined,
-                                        message: _error!,
-                                        buttonText: 'Thử lại',
-                                        onPressed: _loadRequests,
-                                      )
-                                    : const _RequestMessage(
-                                        icon: Icons.assignment_outlined,
-                                        message:
-                                            'Bạn chưa có yêu cầu sửa chữa nào.',
-                                      ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.all(16),
-                        children: _requests
-                            .map(
-                              (request) => RepairRequestCard(
-                                request: request,
-                                onTap: () => _openProgress(request),
-                              ),
-                            )
-                            .toList(),
-                      ),
-              ),
+        ),
+        body: SafeArea(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : TabBarView(
+                  children: [
+                    _RepairList(
+                      requests: _mine,
+                      error: _error,
+                      emptyMessage: 'Bạn chưa có yêu cầu sửa chữa nào.',
+                      onRefresh: _loadRequests,
+                      onOpen: _openProgress,
+                    ),
+                    _RepairList(
+                      requests: _queue,
+                      error: _error,
+                      emptyMessage: 'Không có phiếu cần xử lý.',
+                      onRefresh: _loadRequests,
+                      onOpen: _openProgress,
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }
+}
+
+class _RepairList extends StatelessWidget {
+  const _RepairList({
+    required this.requests,
+    required this.emptyMessage,
+    required this.onRefresh,
+    required this.onOpen,
+    this.error,
+  });
+
+  final List<Map<String, dynamic>> requests;
+  final String? error;
+  final String emptyMessage;
+  final Future<void> Function() onRefresh;
+  final void Function(Map<String, dynamic>) onOpen;
+
+  @override
+  Widget build(BuildContext context) => RefreshIndicator(
+    onRefresh: onRefresh,
+    child: requests.isEmpty
+        ? LayoutBuilder(
+            builder: (context, constraints) => ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(
+                  height: constraints.maxHeight,
+                  child: Center(
+                    child: _RequestMessage(
+                      icon: error == null
+                          ? Icons.assignment_outlined
+                          : Icons.cloud_off_outlined,
+                      message: error ?? emptyMessage,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        : ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
+              for (final request in requests)
+                RepairRequestCard(
+                  request: request,
+                  onTap: () => onOpen(request),
+                ),
+            ],
+          ),
+  );
 }
 
 class RepairRequestCard extends StatelessWidget {
@@ -151,10 +194,16 @@ class RepairRequestCard extends StatelessWidget {
 
   String _statusText(String status) {
     const labels = {
+      'draft': 'Bản nháp',
+      'pending_department_head': 'Chờ Trưởng bộ phận',
+      'pending_it_head': 'Chờ Trưởng IT',
+      'revision_required': 'Cần chỉnh sửa',
+      'pending_handover_confirmations': 'Chờ bàn giao',
       'reported': 'Đã tiếp nhận',
       'assessed': 'Đã đánh giá',
       'approval_pending': 'Chờ phê duyệt',
       'in_progress': 'Đang sửa chữa',
+      'ready_for_return': 'Chờ nhận lại tài sản',
       'completed': 'Chờ nghiệm thu',
       'confirmed': 'Đã nghiệm thu',
       'rejected': 'Yêu cầu làm lại',
@@ -227,17 +276,10 @@ class RepairRequestCard extends StatelessWidget {
 }
 
 class _RequestMessage extends StatelessWidget {
-  const _RequestMessage({
-    required this.icon,
-    required this.message,
-    this.buttonText,
-    this.onPressed,
-  });
+  const _RequestMessage({required this.icon, required this.message});
 
   final IconData icon;
   final String message;
-  final String? buttonText;
-  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -247,10 +289,6 @@ class _RequestMessage extends StatelessWidget {
         Icon(icon, size: 48, color: Theme.of(context).colorScheme.outline),
         const SizedBox(height: 12),
         Text(message, textAlign: TextAlign.center),
-        if (buttonText != null) ...[
-          const SizedBox(height: 12),
-          OutlinedButton(onPressed: onPressed, child: Text(buttonText!)),
-        ],
       ],
     );
   }

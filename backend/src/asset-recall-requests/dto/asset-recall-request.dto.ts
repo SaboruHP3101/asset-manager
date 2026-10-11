@@ -1,6 +1,9 @@
 import {
   IsBoolean,
+  IsDateString,
+  IsIn,
   IsNotEmpty,
+  IsNumberString,
   IsOptional,
   IsString,
   IsUUID,
@@ -9,6 +12,9 @@ import {
 } from 'class-validator';
 
 export class CreateAssetRecallRequestDto {
+  @IsIn(['exchange', 'upgrade', 'disposal'])
+  type: 'exchange' | 'upgrade' | 'disposal' = 'exchange';
+
   @IsUUID()
   assetId: string;
 
@@ -37,9 +43,35 @@ export class RecallDecisionDto {
 }
 
 export class ItRecallDecisionDto extends RecallDecisionDto {
-  @ValidateIf((dto: ItRecallDecisionDto) => dto.approved)
+  @IsOptional()
   @IsUUID()
   replacementAssetId?: string;
+}
+
+export class CompleteDisposalDto {
+  @IsDateString()
+  disposalDate: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  disposalMethod: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  processingResult?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  recoveryValue?: string;
+}
+
+export class CompleteUpgradeDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
+  processingResult: string;
 }
 
 export class RecallHandoverDecisionDto {

@@ -10,10 +10,11 @@ class AssetRecallsRepository {
   Future<Map<String, dynamic>> create({
     required String assetId,
     required String reason,
+    String type = 'exchange',
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/asset-recall-requests',
-      data: {'assetId': assetId, 'reason': reason},
+      data: {'type': type, 'assetId': assetId, 'reason': reason},
     );
 
     return response.data!;
@@ -96,6 +97,37 @@ class AssetRecallsRepository {
     String? reason,
   }) => _dio.post<void>(
     '/asset-recall-requests/$id/handover-decision',
+    data: {'confirmed': confirmed, 'reason': ?reason},
+  );
+
+  Future<void> completeDisposal(
+    String id, {
+    required String disposalDate,
+    required String disposalMethod,
+    String? processingResult,
+    String? recoveryValue,
+  }) => _dio.post<void>(
+    '/asset-recall-requests/$id/complete-disposal',
+    data: {
+      'disposalDate': disposalDate,
+      'disposalMethod': disposalMethod,
+      'processingResult': ?processingResult,
+      'recoveryValue': ?recoveryValue,
+    },
+  );
+
+  Future<void> completeUpgrade(String id, {required String processingResult}) =>
+      _dio.post<void>(
+        '/asset-recall-requests/$id/complete-upgrade',
+        data: {'processingResult': processingResult},
+      );
+
+  Future<void> decideUpgradeReturn(
+    String id, {
+    required bool confirmed,
+    String? reason,
+  }) => _dio.post<void>(
+    '/asset-recall-requests/$id/upgrade-return-decision',
     data: {'confirmed': confirmed, 'reason': ?reason},
   );
 

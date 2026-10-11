@@ -1,7 +1,7 @@
 import { validate } from 'class-validator';
 import {
+  CompleteDisposalDto,
   CreateAssetRecallRequestDto,
-  ItRecallDecisionDto,
   RecallHandoverDecisionDto,
 } from './asset-recall-request.dto.js';
 
@@ -14,16 +14,22 @@ describe('asset recall DTOs', () => {
     await expect(validate(dto)).resolves.toHaveLength(0);
   });
 
-  it('bắt buộc replacement asset khi Trưởng IT duyệt', async () => {
-    const dto = new ItRecallDecisionDto();
+  it('chỉ cho phép loại recall đang hỗ trợ', async () => {
+    const dto = new CreateAssetRecallRequestDto();
 
-    dto.approved = true;
+    dto.assetId = '550e8400-e29b-41d4-a716-446655440000';
+    dto.type = 'disposal';
 
-    const errors = await validate(dto);
+    await expect(validate(dto)).resolves.toHaveLength(0);
+  });
 
-    expect(
-      errors.some((error) => error.property === 'replacementAssetId'),
-    ).toBe(true);
+  it('cho phép tạo phiếu nâng cấp', async () => {
+    const dto = new CreateAssetRecallRequestDto();
+
+    dto.assetId = '550e8400-e29b-41d4-a716-446655440000';
+    dto.type = 'upgrade';
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
   });
 
   it('bắt buộc reason khi từ chối bàn giao', async () => {
@@ -34,5 +40,18 @@ describe('asset recall DTOs', () => {
     const errors = await validate(dto);
 
     expect(errors.some((error) => error.property === 'reason')).toBe(true);
+  });
+
+  it('bắt buộc ngày và phương thức khi hoàn tất báo phế', async () => {
+    const dto = new CompleteDisposalDto();
+
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'disposalDate')).toBe(
+      true,
+    );
+    expect(errors.some((error) => error.property === 'disposalMethod')).toBe(
+      true,
+    );
   });
 });

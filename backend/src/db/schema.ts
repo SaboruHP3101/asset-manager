@@ -181,10 +181,16 @@ export const transferStatusEnum = pgEnum('transfer_status', [
  * cancelled - Yêu cầu sửa chữa đã bị hủy.
  */
 export const repairStatusEnum = pgEnum('repair_status', [
+  'draft',
+  'pending_department_head',
+  'pending_it_head',
+  'revision_required',
+  'pending_handover_confirmations',
   'reported',
   'assessed',
   'approval_pending',
   'in_progress',
+  'ready_for_return',
   'completed',
   'confirmed',
   'rejected',
@@ -856,6 +862,10 @@ export const assetRecallRequests = pgTable(
       .references(() => departments.id),
     originalLocation: varchar('original_location', { length: 500 }),
     reason: text('reason'),
+    processingResult: text('processing_result'),
+    disposalMethod: varchar('disposal_method', { length: 500 }),
+    disposalDate: date('disposal_date', { mode: 'string' }),
+    recoveryValue: numeric('recovery_value'),
     departmentHeadDecision: assetRecallDecisionEnum('department_head_decision')
       .notNull()
       .default('pending'),
@@ -983,6 +993,8 @@ export const repairRequests = pgTable(
       .notNull()
       .references(() => employees.id),
     departmentId: uuid('department_id').references(() => departments.id),
+    currentRevision: integer('current_revision').notNull().default(1),
+    originalLocation: varchar('original_location', { length: 500 }),
     reportDate: date('report_date', { mode: 'string' }).notNull(),
     issueDescription: text('issue_description').notNull(),
     status: repairStatusEnum('status').notNull().default('reported'),
@@ -991,6 +1003,43 @@ export const repairRequests = pgTable(
     assessmentNotes: text('assessment_notes'),
     needsApproval: boolean('needs_approval').notNull().default(false),
     estimatedRepairCost: numeric('estimated_repair_cost'),
+    departmentHeadDecision: assetRecallDecisionEnum(
+      'department_head_decision',
+    )
+      .notNull()
+      .default('pending'),
+    departmentHeadDecidedBy: uuid('department_head_decided_by').references(
+      () => employees.id,
+    ),
+    departmentHeadDecidedAt: timestamp('department_head_decided_at', {
+      withTimezone: true,
+    }),
+    departmentHeadNote: text('department_head_note'),
+    itHeadDecision: assetRecallDecisionEnum('it_head_decision')
+      .notNull()
+      .default('pending'),
+    itHeadDecidedBy: uuid('it_head_decided_by').references(() => employees.id),
+    itHeadDecidedAt: timestamp('it_head_decided_at', { withTimezone: true }),
+    itHeadNote: text('it_head_note'),
+    employeeHandoverDecision: assetRecallDecisionEnum(
+      'employee_handover_decision',
+    )
+      .notNull()
+      .default('pending'),
+    employeeHandoverDecidedAt: timestamp('employee_handover_decided_at', {
+      withTimezone: true,
+    }),
+    employeeHandoverNote: text('employee_handover_note'),
+    itHandoverDecision: assetRecallDecisionEnum('it_handover_decision')
+      .notNull()
+      .default('pending'),
+    itHandoverDecidedBy: uuid('it_handover_decided_by').references(
+      () => employees.id,
+    ),
+    itHandoverDecidedAt: timestamp('it_handover_decided_at', {
+      withTimezone: true,
+    }),
+    itHandoverNote: text('it_handover_note'),
     approvedBy: uuid('approved_by').references(() => employees.id),
     approvedAt: timestamp('approved_at', { withTimezone: true }),
     assignedTo: uuid('assigned_to').references(() => employees.id),
@@ -1001,6 +1050,7 @@ export const repairRequests = pgTable(
     confirmedBy: uuid('confirmed_by').references(() => employees.id),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
     confirmationStatus: varchar('confirmation_status', { length: 50 }),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
     closedAt: timestamp('closed_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -1012,6 +1062,9 @@ export const repairRequests = pgTable(
     index('idx_repair_asset').on(table.assetId),
     index('idx_repair_department').on(table.departmentId),
     index('idx_repair_reporter').on(table.reporterId),
+    uniqueIndex('uq_repair_active_asset')
+      .on(table.assetId)
+      .where(sql`${table.status} not in ('closed', 'cancelled')`),
   ],
 );
 

@@ -1,32 +1,33 @@
 import {
   IsBoolean,
+  IsNotEmpty,
   IsNumberString,
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
+  ValidateIf,
 } from 'class-validator';
 
-/** Kết quả đánh giá ban đầu của IT, quyết định yêu cầu có cần duyệt chi phí hay không. */
-export class AssessRepairDto {
-  /** Mô tả chẩn đoán để kỹ thuật viên và người duyệt hiểu tình trạng tài sản. */
-  @IsString()
-  notes: string;
-
-  @IsBoolean()
-  needsApproval: boolean;
-
-  @IsNumberString()
-  @IsOptional()
-  estimatedCost?: string;
-}
-
-/** Quyết định của trưởng bộ phận đối với yêu cầu sửa chữa đang chờ duyệt. */
-export class RepairApprovalDto {
+export class RepairDecisionDto {
   @IsBoolean()
   approved: boolean;
 
+  @ValidateIf((dto: RepairDecisionDto) => !dto.approved)
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
+  @MaxLength(2000)
+  note?: string;
+}
+
+export class RepairHandoverDecisionDto {
+  @IsBoolean()
+  confirmed: boolean;
+
+  @ValidateIf((dto: RepairHandoverDecisionDto) => !dto.confirmed)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
   note?: string;
 }
 
@@ -41,6 +42,8 @@ export class AssignRepairDto {
 export class CompleteRepairDto {
   /** Mô tả công việc đã làm để người báo hỏng có cơ sở nghiệm thu. */
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
   resultNotes: string;
 
   @IsNumberString()
@@ -54,12 +57,9 @@ export class ConfirmRepairDto {
   @IsBoolean()
   accepted: boolean;
 
+  @ValidateIf((dto: ConfirmRepairDto) => !dto.accepted)
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
+  @MaxLength(2000)
   note?: string;
 }
-/** Bật nhánh approval_pending khi chi phí hoặc phạm vi sửa chữa cần trưởng bộ phận duyệt. */
-/** Chi phí ước tính là tùy chọn và dùng chuỗi để giữ chính xác kiểu numeric. */
-/** Ghi lại lý do, đặc biệt cần thiết khi từ chối và đóng yêu cầu. */
-/** Chi phí thực tế dùng cho đối soát với chi phí ước tính và báo cáo. */
-/** Cho phép người dùng giải thích lý do không chấp nhận kết quả sửa chữa. */

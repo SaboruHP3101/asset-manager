@@ -17,6 +17,8 @@ import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
 import { RequestAuditService } from '../request-audit/request-audit.service.js';
 import {
+  CompleteDisposalDto,
+  CompleteUpgradeDto,
   CreateAssetRecallRequestDto,
   ItRecallDecisionDto,
   RecallDecisionDto,
@@ -47,6 +49,7 @@ export class AssetRecallRequestsService {
       const [request] = await tx
         .insert(schema.assetRecallRequests)
         .values({
+          type: dto.type ?? 'exchange',
           assetId: dto.assetId,
           requestedBy: actor.id,
           requestingDepartmentId: actor.departmentId,
@@ -118,7 +121,7 @@ export class AssetRecallRequestsService {
       const reason = request.reason?.trim();
 
       if (!reason) {
-        throw new BadRequestException('Vui lòng nhập lý do đổi tài sản.');
+        throw new BadRequestException('Vui lòng nhập lý do thu hồi tài sản.');
       }
 
       await this.lockAsset(tx, request.assetId);
@@ -199,6 +202,18 @@ export class AssetRecallRequestsService {
           eq(schema.assetRecallRequests.itHandoverDecision, 'pending'),
         )!,
       );
+      conditions.push(
+        and(
+          eq(schema.assetRecallRequests.type, 'disposal'),
+          eq(schema.assetRecallRequests.status, 'in_progress'),
+        )!,
+      );
+      conditions.push(
+        and(
+          eq(schema.assetRecallRequests.type, 'upgrade'),
+          eq(schema.assetRecallRequests.status, 'in_progress'),
+        )!,
+      );
     }
 
     conditions.push(
@@ -206,6 +221,13 @@ export class AssetRecallRequestsService {
         eq(schema.assetRecallRequests.requestedBy, actor.id),
         eq(schema.assetRecallRequests.status, 'pending_handover_confirmations'),
         eq(schema.assetRecallRequests.employeeHandoverDecision, 'pending'),
+      )!,
+    );
+    conditions.push(
+      and(
+        eq(schema.assetRecallRequests.requestedBy, actor.id),
+        eq(schema.assetRecallRequests.type, 'upgrade'),
+        eq(schema.assetRecallRequests.status, 'ready_for_return'),
       )!,
     );
 
@@ -340,7 +362,7 @@ export class AssetRecallRequestsService {
       const now = new Date();
       let replacementAssetId: string | null = null;
 
-      if (dto.approved) {
+      if (dto.approved && request.type === 'exchange') {
         if (!dto.replacementAssetId) {
           throw new BadRequestException('Vui lòng chọn tài sản thay thế.');
         }
@@ -484,11 +506,360 @@ export class AssetRecallRequestsService {
         updated.employeeHandoverDecision === 'confirmed' &&
         updated.itHandoverDecision === 'confirmed'
       ) {
-        await this.completeExchange(tx, updated, actor, now);
+        if (updated.type === 'disposal') {
+          await this.receiveDisposal(tx, updated, actor, now);
+        } else if (updated.type === 'upgrade') {
+          await this.receiveUpgrade(tx, updated, actor, now);
+        } else {
+          await this.completeExchange(tx, updated, actor, now);
+        }
       }
     });
 
     return this.findOne(id, actor);
+  }
+
+  async completeUpgrade(
+    id: string,
+    dto: CompleteUpgradeDto,
+    actor: AuthenticatedEmployee,
+  ) {
+    this.assertItHead(actor);
+    await this.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as Database;
+
+      await this.lockRequest(tx, id);
+      const request = await this.requireRequest(tx, id, ['in_progress']);
+
+      if (request.type !== 'upgrade') {
+        throw new BadRequestException('Phiếu không phải yêu cầu nâng cấp.');
+      }
+
+      await this.lockAsset(tx, request.assetId);
+      const warehouse = await this.requireItWarehouse(tx);
+      const asset = await this.loadAsset(tx, request.assetId);
+
+      if (
+        asset.currentWarehouseId !== warehouse.id ||
+        asset.currentUserId !== null ||
+        asset.status !== 'upgrading'
+      ) {
+        throw new ConflictException('Tài sản chưa sẵn sàng để trả sau nâng cấp.');
+      }
+
+      const now = new Date();
+
+      await tx
+        .update(schema.assetRecallRequests)
+        .set({
+          status: 'ready_for_return',
+          processingResult: dto.processingResult.trim(),
+          updatedAt: now,
+          updatedBy: actor.id,
+        })
+        .where(eq(schema.assetRecallRequests.id, id));
+      await this.logAction(tx, id, actor, {
+        actionType: 'asset.recall.upgrade_completed',
+        result: 'approved',
+        previousStatus: request.status,
+        newStatus: 'ready_for_return',
+        revision: request.currentRevision,
+      });
+    });
+
+    return this.findOne(id, actor);
+  }
+
+  async decideUpgradeReturn(
+    id: string,
+    dto: RecallHandoverDecisionDto,
+    actor: AuthenticatedEmployee,
+  ) {
+    await this.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as Database;
+
+      await this.lockRequest(tx, id);
+      const request = await this.requireRequest(tx, id, ['ready_for_return']);
+
+      if (request.type !== 'upgrade' || request.requestedBy !== actor.id) {
+        throw new ForbiddenException(
+          'Chỉ người gửi phiếu được xác nhận nhận lại tài sản.',
+        );
+      }
+
+      await this.lockAsset(tx, request.assetId);
+      const warehouse = await this.requireItWarehouse(tx);
+      const asset = await this.loadAsset(tx, request.assetId);
+
+      if (
+        asset.currentWarehouseId !== warehouse.id ||
+        asset.currentUserId !== null ||
+        asset.status !== 'upgrading'
+      ) {
+        throw new ConflictException('Tài sản không còn ở kho IT.');
+      }
+
+      const now = new Date();
+
+      if (!dto.confirmed) {
+        await tx
+          .update(schema.assetRecallRequests)
+          .set({
+            status: 'in_progress',
+            processingResult: null,
+            updatedAt: now,
+            updatedBy: actor.id,
+          })
+          .where(eq(schema.assetRecallRequests.id, id));
+        await this.logAction(tx, id, actor, {
+          actionType: 'asset.recall.upgrade_return_rejected',
+          result: 'rejected',
+          previousStatus: request.status,
+          newStatus: 'in_progress',
+          reason: dto.reason,
+          revision: request.currentRevision,
+        });
+
+        return;
+      }
+
+      await tx
+        .update(schema.assets)
+        .set({
+          status: 'active',
+          currentUserId: request.requestedBy,
+          currentManagingDepartmentId: request.requestingDepartmentId,
+          currentWarehouseId: null,
+          currentLocation: request.originalLocation,
+          updatedAt: now,
+          updatedBy: actor.id,
+        })
+        .where(eq(schema.assets.id, asset.id));
+      await tx.insert(schema.assetHandoverHistory).values({
+        assetId: asset.id,
+        handoverType: 'upgrade_returned',
+        handoverFromDepartmentId: warehouse.managingDepartmentId,
+        handoverFromWarehouseId: warehouse.id,
+        receivedByEmployeeId: request.requestedBy,
+        receivedByDepartmentId: request.requestingDepartmentId,
+        handoverDate: now.toISOString().slice(0, 10),
+        status: 'completed',
+        note: `Recall request ${request.id}`,
+        createdBy: actor.id,
+        updatedBy: actor.id,
+      });
+      await tx
+        .update(schema.assetRecallRequests)
+        .set({
+          status: 'completed',
+          completedAt: now,
+          updatedAt: now,
+          updatedBy: actor.id,
+        })
+        .where(eq(schema.assetRecallRequests.id, id));
+      await this.logAction(tx, id, actor, {
+        actionType: 'asset.recall.upgrade_return_confirmed',
+        result: 'approved',
+        previousStatus: request.status,
+        newStatus: 'completed',
+        revision: request.currentRevision,
+      });
+    });
+
+    return this.findOne(id, actor);
+  }
+
+  async completeDisposal(
+    id: string,
+    dto: CompleteDisposalDto,
+    actor: AuthenticatedEmployee,
+  ) {
+    this.assertItHead(actor);
+    await this.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as Database;
+
+      // Lock request và asset để thao tác hoàn tất chỉ chạy một lần.
+      await this.lockRequest(tx, id);
+      const request = await this.requireRequest(tx, id, ['in_progress']);
+
+      if (request.type !== 'disposal') {
+        throw new BadRequestException('Phiếu không phải yêu cầu báo phế.');
+      }
+
+      await this.lockAsset(tx, request.assetId);
+      const warehouse = await this.requireItWarehouse(tx);
+      const asset = await this.loadAsset(tx, request.assetId);
+
+      if (
+        asset.currentWarehouseId !== warehouse.id ||
+        asset.currentUserId !== null ||
+        asset.status !== 'awaiting_disposal'
+      ) {
+        throw new ConflictException('Tài sản chưa sẵn sàng để báo phế.');
+      }
+
+      const now = new Date();
+
+      await tx
+        .update(schema.assets)
+        .set({
+          status: 'disposed',
+          currentUserId: null,
+          currentManagingDepartmentId: null,
+          currentWarehouseId: null,
+          currentLocation: null,
+          updatedAt: now,
+          updatedBy: actor.id,
+        })
+        .where(eq(schema.assets.id, asset.id));
+      await tx.insert(schema.assetHandoverHistory).values({
+        assetId: asset.id,
+        handoverType: 'disposed',
+        handoverFromDepartmentId: warehouse.managingDepartmentId,
+        handoverFromWarehouseId: warehouse.id,
+        handoverDate: dto.disposalDate,
+        status: 'completed',
+        note: dto.processingResult?.trim() || dto.disposalMethod.trim(),
+        createdBy: actor.id,
+        updatedBy: actor.id,
+      });
+      await tx
+        .update(schema.assetRecallRequests)
+        .set({
+          status: 'completed',
+          disposalDate: dto.disposalDate,
+          disposalMethod: dto.disposalMethod.trim(),
+          processingResult: dto.processingResult?.trim() || null,
+          recoveryValue: dto.recoveryValue ?? null,
+          completedAt: now,
+          updatedAt: now,
+          updatedBy: actor.id,
+        })
+        .where(eq(schema.assetRecallRequests.id, id));
+      await this.logAction(tx, id, actor, {
+        actionType: 'asset.recall.disposal_completed',
+        result: 'approved',
+        previousStatus: request.status,
+        newStatus: 'completed',
+        revision: request.currentRevision,
+        metadata: {
+          disposalDate: dto.disposalDate,
+          disposalMethod: dto.disposalMethod.trim(),
+          recoveryValue: dto.recoveryValue,
+        },
+      });
+    });
+
+    return this.findOne(id, actor);
+  }
+
+  private async receiveDisposal(
+    tx: Database,
+    request: RecallRecord,
+    actor: AuthenticatedEmployee,
+    now: Date,
+  ) {
+    await this.lockAsset(tx, request.assetId);
+    const warehouse = await this.requireItWarehouse(tx);
+    const asset = await this.requireOwnedItAsset(
+      tx,
+      request.assetId,
+      request.requestedBy,
+    );
+
+    // Chỉ đổi custody sau khi cả hai phía xác nhận bàn giao thực tế.
+    await tx
+      .update(schema.assets)
+      .set({
+        status: 'awaiting_disposal',
+        currentUserId: null,
+        currentManagingDepartmentId: warehouse.managingDepartmentId,
+        currentWarehouseId: warehouse.id,
+        currentLocation: warehouse.location,
+        updatedAt: now,
+        updatedBy: actor.id,
+      })
+      .where(eq(schema.assets.id, asset.id));
+    await tx.insert(schema.assetHandoverHistory).values({
+      assetId: asset.id,
+      handoverType: 'recall_to_it_warehouse',
+      handoverFromEmployeeId: request.requestedBy,
+      handoverFromDepartmentId: request.requestingDepartmentId,
+      receivedByDepartmentId: warehouse.managingDepartmentId,
+      receivedByWarehouseId: warehouse.id,
+      handoverDate: now.toISOString().slice(0, 10),
+      status: 'completed',
+      note: `Recall request ${request.id}`,
+      createdBy: actor.id,
+      updatedBy: actor.id,
+    });
+    await tx
+      .update(schema.assetRecallRequests)
+      .set({
+        status: 'in_progress',
+        updatedAt: now,
+        updatedBy: actor.id,
+      })
+      .where(eq(schema.assetRecallRequests.id, request.id));
+    await this.logAction(tx, request.id, actor, {
+      actionType: 'asset.recall.disposal_received',
+      result: 'approved',
+      previousStatus: request.status,
+      newStatus: 'in_progress',
+      revision: request.currentRevision,
+    });
+  }
+
+  private async receiveUpgrade(
+    tx: Database,
+    request: RecallRecord,
+    actor: AuthenticatedEmployee,
+    now: Date,
+  ) {
+    await this.lockAsset(tx, request.assetId);
+    const warehouse = await this.requireItWarehouse(tx);
+    const asset = await this.requireOwnedItAsset(
+      tx,
+      request.assetId,
+      request.requestedBy,
+    );
+
+    await tx
+      .update(schema.assets)
+      .set({
+        status: 'upgrading',
+        currentUserId: null,
+        currentManagingDepartmentId: warehouse.managingDepartmentId,
+        currentWarehouseId: warehouse.id,
+        currentLocation: warehouse.location,
+        updatedAt: now,
+        updatedBy: actor.id,
+      })
+      .where(eq(schema.assets.id, asset.id));
+    await tx.insert(schema.assetHandoverHistory).values({
+      assetId: asset.id,
+      handoverType: 'recall_to_it_warehouse',
+      handoverFromEmployeeId: request.requestedBy,
+      handoverFromDepartmentId: request.requestingDepartmentId,
+      receivedByDepartmentId: warehouse.managingDepartmentId,
+      receivedByWarehouseId: warehouse.id,
+      handoverDate: now.toISOString().slice(0, 10),
+      status: 'completed',
+      note: `Recall request ${request.id}`,
+      createdBy: actor.id,
+      updatedBy: actor.id,
+    });
+    await tx
+      .update(schema.assetRecallRequests)
+      .set({ status: 'in_progress', updatedAt: now, updatedBy: actor.id })
+      .where(eq(schema.assetRecallRequests.id, request.id));
+    await this.logAction(tx, request.id, actor, {
+      actionType: 'asset.recall.upgrade_received',
+      result: 'approved',
+      previousStatus: request.status,
+      newStatus: 'in_progress',
+      revision: request.currentRevision,
+    });
   }
 
   private async completeExchange(
@@ -679,7 +1050,7 @@ export class AssetRecallRequestsService {
 
     if (asset.currentUserId !== employeeId || asset.managementOwner !== 'it') {
       throw new BadRequestException(
-        'Chỉ có thể đổi thiết bị điện tử đang được giao cho bạn.',
+        'Chỉ có thể tạo phiếu cho thiết bị điện tử đang được giao cho bạn.',
       );
     }
 
@@ -707,6 +1078,20 @@ export class AssetRecallRequestsService {
 
     if (active) {
       throw new ConflictException('Tài sản đã có phiếu thu hồi chưa hoàn tất.');
+    }
+
+    const [repair] = await db
+      .select({ id: schema.repairRequests.id })
+      .from(schema.repairRequests)
+      .where(
+        and(
+          eq(schema.repairRequests.assetId, assetId),
+          sql`${schema.repairRequests.status} not in ('closed', 'cancelled')`,
+        ),
+      );
+
+    if (repair) {
+      throw new ConflictException('Tài sản đang có phiếu sửa chữa chưa hoàn tất.');
     }
   }
 
@@ -868,6 +1253,30 @@ export class AssetRecallRequestsService {
         (this.isItHead(actor) && request.itHandoverDecision === 'pending'))
     ) {
       actions.push(WORKFLOW_ACTIONS.assetRecallConfirmHandover);
+    }
+
+    if (
+      request.type === 'disposal' &&
+      request.status === 'in_progress' &&
+      this.isItHead(actor)
+    ) {
+      actions.push(WORKFLOW_ACTIONS.assetRecallCompleteDisposal);
+    }
+
+    if (
+      request.type === 'upgrade' &&
+      request.status === 'in_progress' &&
+      this.isItHead(actor)
+    ) {
+      actions.push(WORKFLOW_ACTIONS.assetRecallProcessUpgrade);
+    }
+
+    if (
+      request.type === 'upgrade' &&
+      request.status === 'ready_for_return' &&
+      request.requestedBy === actor.id
+    ) {
+      actions.push(WORKFLOW_ACTIONS.assetRecallConfirmUpgradeReturn);
     }
 
     return actions;

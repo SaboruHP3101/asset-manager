@@ -12,10 +12,14 @@ class AssetRecallRequestsScreen extends StatefulWidget {
     super.key,
     this.initialTab = AssetRecallInitialTab.mine,
     this.repository,
+    this.typeFilter,
+    this.title = 'Thu hồi tài sản',
   });
 
   final AssetRecallInitialTab initialTab;
   final AssetRecallsRepository? repository;
+  final String? typeFilter;
+  final String title;
 
   @override
   State<AssetRecallRequestsScreen> createState() =>
@@ -57,19 +61,27 @@ class _AssetRecallRequestsScreenState extends State<AssetRecallRequestsScreen>
       ]);
       if (!mounted) return;
       setState(() {
-        _mine = results[0];
-        _queue = results[1];
+        _mine = _filter(results[0]);
+        _queue = _filter(results[1]);
       });
     } on DioException catch (error) {
       if (!mounted) return;
       setState(() {
         _error = recallErrorMessage(
           error.response?.data,
-          'Không thể tải phiếu đổi tài sản.',
+          'Không thể tải phiếu thu hồi tài sản.',
         );
       });
     }
   }
+
+  List<Map<String, dynamic>> _filter(List<Map<String, dynamic>> items) => items
+      .where(
+        (item) => widget.typeFilter == null
+            ? item['type'] != 'upgrade'
+            : item['type'] == widget.typeFilter,
+      )
+      .toList();
 
   Future<void> _open(String id) async {
     await Navigator.of(context).push<void>(
@@ -84,7 +96,7 @@ class _AssetRecallRequestsScreenState extends State<AssetRecallRequestsScreen>
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Đổi tài sản'),
+      title: Text(widget.title),
       bottom: TabBar(
         controller: _tabs,
         tabs: const [
@@ -107,8 +119,24 @@ class _AssetRecallRequestsScreenState extends State<AssetRecallRequestsScreen>
         : TabBarView(
             controller: _tabs,
             children: [
-              _RecallList(items: _mine, onRefresh: _load, onOpen: _open),
-              _RecallList(items: _queue, onRefresh: _load, onOpen: _open),
+              _RecallList(
+                items: _mine,
+                emptyMessage: widget.typeFilter == 'upgrade'
+                    ? 'Chưa có phiếu nâng cấp tài sản.'
+                    : 'Chưa có phiếu thu hồi tài sản.',
+                employeeView: true,
+                onRefresh: _load,
+                onOpen: _open,
+              ),
+              _RecallList(
+                items: _queue,
+                emptyMessage: widget.typeFilter == 'upgrade'
+                    ? 'Không có phiếu nâng cấp cần xử lý.'
+                    : 'Không có phiếu thu hồi cần xử lý.',
+                employeeView: false,
+                onRefresh: _load,
+                onOpen: _open,
+              ),
             ],
           ),
   );
@@ -117,11 +145,15 @@ class _AssetRecallRequestsScreenState extends State<AssetRecallRequestsScreen>
 class _RecallList extends StatelessWidget {
   const _RecallList({
     required this.items,
+    required this.emptyMessage,
+    required this.employeeView,
     required this.onRefresh,
     required this.onOpen,
   });
 
   final List<Map<String, dynamic>>? items;
+  final String emptyMessage;
+  final bool employeeView;
   final Future<void> Function() onRefresh;
   final Future<void> Function(String id) onOpen;
 
@@ -134,11 +166,11 @@ class _RecallList extends StatelessWidget {
       child: items!.isEmpty
           ? ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              children: const [
-                SizedBox(height: 160),
-                Icon(Icons.inbox_outlined, size: 52),
-                SizedBox(height: 12),
-                Center(child: Text('Chưa có phiếu đổi tài sản.')),
+              children: [
+                const SizedBox(height: 160),
+                const Icon(Icons.inbox_outlined, size: 52),
+                const SizedBox(height: 12),
+                Center(child: Text(emptyMessage)),
               ],
             )
           : ListView.separated(
@@ -148,14 +180,25 @@ class _RecallList extends StatelessWidget {
               separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final item = items![index];
+                final status = item['status'] as String;
+                final statusLabel =
+                    employeeView &&
+                        item['type'] == 'disposal' &&
+                        status == 'in_progress'
+                    ? 'Đã bàn giao'
+                    : item['type'] == 'upgrade' && status == 'in_progress'
+                    ? 'Đang nâng cấp'
+                    : assetRecallStatusLabel(status);
 
                 return Card(
                   child: ListTile(
-                    leading: const Icon(Icons.swap_horiz),
+                    leading: Icon(switch (item['type']) {
+                      'disposal' => Icons.delete_outline,
+                      'upgrade' => Icons.upgrade,
+                      _ => Icons.swap_horiz,
+                    }),
                     title: Text(item['assetName'] as String? ?? 'Tài sản'),
-                    subtitle: Text(
-                      '${item['assetCode']} · ${assetRecallStatusLabel(item['status'] as String)}',
-                    ),
+                    subtitle: Text('${item['assetCode']} · $statusLabel'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => onOpen(item['id'] as String),
                   ),

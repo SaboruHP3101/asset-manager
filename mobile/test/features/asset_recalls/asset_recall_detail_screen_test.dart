@@ -41,6 +41,48 @@ class _FakeRepository extends AssetRecallsRepository {
   };
 }
 
+class _DisposalRepository extends AssetRecallsRepository {
+  _DisposalRepository() : super(dio: Dio());
+
+  bool completed = false;
+
+  @override
+  Future<Map<String, dynamic>> findOne(String id) async => {
+    'id': id,
+    'type': 'disposal',
+    'status': completed ? 'completed' : 'in_progress',
+    'reason': 'Thiết bị hỏng, không còn khả năng sử dụng',
+    'departmentHeadDecision': 'confirmed',
+    'itHeadDecision': 'confirmed',
+    'employeeHandoverDecision': 'confirmed',
+    'itHandoverDecision': 'confirmed',
+    'allowedActions': completed
+        ? const <String>[]
+        : const ['asset.recall.complete_disposal'],
+    'asset': {
+      'id': 'old-asset',
+      'assetCode': 'TS001',
+      'name': 'Laptop hỏng',
+      'category': 'Laptop',
+    },
+    'replacementAsset': null,
+    'requester': {'id': 'employee-id', 'name': 'Nguyễn Văn A'},
+    'department': {'id': 'department-id', 'name': 'IT'},
+    'trail': const <Map<String, dynamic>>[],
+  };
+
+  @override
+  Future<void> completeDisposal(
+    String id, {
+    required String disposalDate,
+    required String disposalMethod,
+    String? processingResult,
+    String? recoveryValue,
+  }) async {
+    completed = disposalMethod == 'Bàn giao xử lý rác điện tử';
+  }
+}
+
 void main() {
   testWidgets('hiển thị trạng thái, approval và so sánh tài sản', (
     tester,
@@ -69,4 +111,64 @@ void main() {
 
     expect(find.text('Nhân viên đã gửi phiếu'), findsOneWidget);
   });
+
+  testWidgets('Trưởng IT hoàn tất báo phế', (tester) async {
+    final repository = _DisposalRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AssetRecallDetailScreen(
+          requestId: 'recall-id',
+          repository: repository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tài sản báo phế'), findsOneWidget);
+    expect(find.text('Đang xử lý báo phế'), findsOneWidget);
+    await tester.tap(find.text('Hoàn tất báo phế'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Phương thức xử lý *'),
+      'Bàn giao xử lý rác điện tử',
+    );
+    await tester.pump();
+    await tester.tap(find.text('Hoàn tất').last);
+    await tester.pumpAndSettle();
+
+    expect(repository.completed, isTrue);
+    expect(find.text('Đã hoàn tất'), findsOneWidget);
+  });
+
+  testWidgets('nhân viên thấy đã bàn giao khi không còn action', (
+    tester,
+  ) async {
+    final repository = _DisposalRepository()..completed = true;
+    final request = await repository.findOne('recall-id');
+    request['status'] = 'in_progress';
+    request['allowedActions'] = const <String>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AssetRecallDetailScreen(
+          requestId: 'recall-id',
+          repository: _StaticRepository(request),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đã bàn giao'), findsOneWidget);
+    expect(find.text('Bạn đã hoàn tất bàn giao.'), findsOneWidget);
+  });
+}
+
+class _StaticRepository extends AssetRecallsRepository {
+  _StaticRepository(this.request) : super(dio: Dio());
+
+  final Map<String, dynamic> request;
+
+  @override
+  Future<Map<String, dynamic>> findOne(String id) async => request;
 }

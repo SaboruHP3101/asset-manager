@@ -22,6 +22,8 @@ class AssetRecallForm extends StatefulWidget {
     this.assetImageUrl,
     this.requestId,
     this.initialReason = '',
+    this.initialType = 'exchange',
+    this.fixedType,
     this.revisionRequired = false,
     this.repository,
   });
@@ -34,6 +36,8 @@ class AssetRecallForm extends StatefulWidget {
   final String? assetImageUrl;
   final String? requestId;
   final String initialReason;
+  final String initialType;
+  final String? fixedType;
   final bool revisionRequired;
   final AssetRecallsRepository? repository;
 
@@ -46,12 +50,14 @@ class _AssetRecallFormState extends State<AssetRecallForm> {
   late final TextEditingController _reasonController;
   late final AssetRecallsRepository _repository;
   bool _saving = false;
+  late String _type;
 
   @override
   void initState() {
     super.initState();
     _repository = widget.repository ?? AssetRecallsRepository();
     _reasonController = TextEditingController(text: widget.initialReason);
+    _type = widget.fixedType ?? widget.initialType;
   }
 
   @override
@@ -65,6 +71,7 @@ class _AssetRecallFormState extends State<AssetRecallForm> {
         ? await _repository.create(
             assetId: widget.assetId,
             reason: _reasonController.text.trim(),
+            type: _type,
           )
         : await _repository.update(
             id: widget.requestId!,
@@ -94,7 +101,7 @@ class _AssetRecallFormState extends State<AssetRecallForm> {
           content: Text(
             recallErrorMessage(
               error.response?.data,
-              'Không thể lưu phiếu đổi tài sản.',
+              'Không thể lưu phiếu thu hồi tài sản.',
             ),
           ),
         ),
@@ -113,19 +120,26 @@ class _AssetRecallFormState extends State<AssetRecallForm> {
           assetName: widget.assetName,
           assetCode: widget.assetCode,
           reason: _reasonController.text.trim(),
+          type: _type,
         ),
       )) ??
       false;
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Phiếu đổi tài sản')),
+    appBar: AppBar(
+      title: Text(switch (_type) {
+        'disposal' => 'Phiếu báo phế',
+        'upgrade' => 'Phiếu nâng cấp',
+        _ => 'Phiếu đổi tài sản',
+      }),
+    ),
     body: Form(
       key: _formKey,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const _RecallProgress(),
+          _RecallProgress(type: _type),
           const SizedBox(height: 16),
           Card(
             clipBehavior: Clip.antiAlias,
@@ -149,8 +163,6 @@ class _AssetRecallFormState extends State<AssetRecallForm> {
                           Text('Danh mục: ${widget.assetCategory}'),
                         if (widget.assetLocation?.isNotEmpty == true)
                           Text('Vị trí: ${widget.assetLocation}'),
-                        const SizedBox(height: 8),
-                        const _ManagedByItBadge(),
                       ],
                     ),
                   ),
@@ -159,21 +171,44 @@ class _AssetRecallFormState extends State<AssetRecallForm> {
             ),
           ),
           const SizedBox(height: 16),
+          if (widget.fixedType == null && widget.initialType != 'upgrade')
+            DropdownButtonFormField<String>(
+              initialValue: _type,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Loại yêu cầu',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'exchange', child: Text('Đổi tài sản')),
+                DropdownMenuItem(
+                  value: 'disposal',
+                  child: Text('Báo phế tài sản'),
+                ),
+              ],
+              onChanged: widget.requestId == null
+                  ? (value) => setState(() => _type = value!)
+                  : null,
+            ),
+          const SizedBox(height: 16),
           TextFormField(
             controller: _reasonController,
             minLines: 4,
             maxLines: 7,
             maxLength: 2000,
-            decoration: const InputDecoration(
-              labelText: 'Lý do đổi tài sản',
+            decoration: InputDecoration(
+              labelText: switch (_type) {
+                'disposal' => 'Lý do báo phế tài sản',
+                'upgrade' => 'Mục tiêu nâng cấp tài sản',
+                _ => 'Lý do đổi tài sản',
+              },
               hintText: 'Mô tả nhu cầu và tình trạng tài sản hiện tại',
               helperText: 'Có thể để trống khi lưu nháp.',
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(),
               alignLabelWithHint: true,
             ),
-            validator: (value) => value?.trim().isEmpty ?? true
-                ? 'Vui lòng nhập lý do đổi tài sản.'
-                : null,
+            validator: (value) =>
+                value?.trim().isEmpty ?? true ? 'Vui lòng nhập lý do.' : null,
           ),
         ],
       ),
@@ -211,7 +246,9 @@ class _AssetRecallFormState extends State<AssetRecallForm> {
 }
 
 class _RecallProgress extends StatelessWidget {
-  const _RecallProgress();
+  const _RecallProgress({required this.type});
+
+  final String type;
 
   @override
   Widget build(BuildContext context) {
@@ -228,10 +265,11 @@ class _RecallProgress extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Quy trình đổi tài sản',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          Text(switch (type) {
+            'disposal' => 'Quy trình báo phế tài sản',
+            'upgrade' => 'Quy trình nâng cấp tài sản',
+            _ => 'Quy trình đổi tài sản',
+          }, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -294,33 +332,6 @@ class _AssetThumbnail extends StatelessWidget {
   );
 }
 
-class _ManagedByItBadge extends StatelessWidget {
-  const _ManagedByItBadge();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.secondaryContainer,
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.computer_outlined, size: 18),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            'Thiết bị do IT quản lý',
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelMedium,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 class _AssetPlaceholder extends StatelessWidget {
   const _AssetPlaceholder();
 
@@ -336,11 +347,13 @@ class _RecallReviewSheet extends StatelessWidget {
     required this.assetName,
     required this.assetCode,
     required this.reason,
+    required this.type,
   });
 
   final String assetName;
   final String? assetCode;
   final String reason;
+  final String type;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -360,11 +373,21 @@ class _RecallReviewSheet extends StatelessWidget {
           const SizedBox(height: 16),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const CircleAvatar(child: Icon(Icons.swap_horiz)),
+            leading: CircleAvatar(
+              child: Icon(switch (type) {
+                'disposal' => Icons.delete_outline,
+                'upgrade' => Icons.upgrade,
+                _ => Icons.swap_horiz,
+              }),
+            ),
             title: Text(assetName),
             subtitle: assetCode?.isNotEmpty == true
                 ? Text('Mã tài sản: $assetCode')
-                : const Text('Tài sản cần đổi'),
+                : Text(switch (type) {
+                    'disposal' => 'Tài sản đề nghị báo phế',
+                    'upgrade' => 'Tài sản cần nâng cấp',
+                    _ => 'Tài sản cần đổi',
+                  }),
           ),
           const Divider(height: 24),
           Text('Lý do', style: Theme.of(context).textTheme.labelLarge),

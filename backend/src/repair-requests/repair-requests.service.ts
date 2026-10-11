@@ -1,36 +1,46 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import {
   and,
   asc,
   desc,
-  DrizzleQueryError,
   eq,
   inArray,
   notInArray,
+  or,
+  sql,
+  type SQL,
 } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
-import { CreateRepairRequestDto } from './dto/create-repair-request.dto.js';
-import { UpdateRepairRequestDto } from './dto/update-repair-request.dto.js';
 import { RepairRequest } from './entities/repair-request.entity.js';
-import { CreateMyRepairRequestDto } from './dto/create-my-repair-request.dto.js';
+import {
+  CreateMyRepairRequestDto,
+  UpdateMyRepairRequestDto,
+} from './dto/create-my-repair-request.dto.js';
 import { RequestAuditService } from '../request-audit/request-audit.service.js';
 import {
-  AssessRepairDto,
   AssignRepairDto,
   CompleteRepairDto,
   ConfirmRepairDto,
-  RepairApprovalDto,
+  RepairDecisionDto,
+  RepairHandoverDecisionDto,
 } from './dto/repair-workflow.dto.js';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
+import {
+  WORKFLOW_ACTIONS,
+  type WorkflowAction,
+} from '../auth/workflow-actions.config.js';
+
+type Database = NodePgDatabase<typeof schema>;
+type RepairRecord = typeof schema.repairRequests.$inferSelect;
 
 @Injectable()
 export class RepairRequestsService {
@@ -40,45 +50,6 @@ export class RepairRequestsService {
     private readonly audit: RequestAuditService,
   ) {}
 
-  async create(
-    createRepairRequestDto: CreateRepairRequestDto,
-    actor: AuthenticatedEmployee,
-  ) {
-    try {
-      return await this.db.transaction(async (tx) => {
-        const db = tx as unknown as NodePgDatabase<typeof schema>;
-        const [newRecord] = await db
-          .insert(schema.repairRequests)
-          .values({
-            ...createRepairRequestDto,
-            reporterId: actor.id,
-            departmentId: actor.departmentId,
-            status: 'reported',
-          })
-          .returning();
-
-        await this.audit.log(db, {
-          requestType: 'repair',
-          requestId: newRecord.id,
-          actionType: 'reported',
-          approvedBy: newRecord.reporterId,
-          approverRole: actor.roleName,
-          status: 'approved',
-        });
-
-        return new RepairRequest(newRecord);
-      });
-    } catch (error: unknown) {
-      if (error instanceof DrizzleQueryError) {
-        throw new ConflictException(
-          'Dữ liệu yêu cầu sửa chữa đã tồn tại hoặc chứa tham chiếu không hợp lệ',
-        );
-      }
-
-      throw new InternalServerErrorException('Không thể tạo yêu cầu sửa chữa');
-    }
-  }
-
   // Tạo yêu cầu pending và lưu thông tin ảnh, video đi kèm
   async createMine(
     actor: AuthenticatedEmployee,
@@ -86,8 +57,16 @@ export class RepairRequestsService {
     files: Express.Multer.File[],
   ) {
     const [asset] = await this.db
-      .select({ id: schema.assets.id })
+      .select({
+        id: schema.assets.id,
+        currentLocation: schema.assets.currentLocation,
+        managementOwner: schema.assetCategories.managementOwner,
+      })
       .from(schema.assets)
+      .innerJoin(
+        schema.assetCategories,
+        eq(schema.assets.assetCategoryId, schema.assetCategories.id),
+      )
       .where(
         and(
           eq(schema.assets.id, dto.assetId),
@@ -95,8 +74,10 @@ export class RepairRequestsService {
         ),
       );
 
-    if (!asset) {
-      throw new NotFoundException('Không tìm thấy tài sản được quản lý.');
+    if (!asset || asset.managementOwner !== 'it') {
+      throw new NotFoundException(
+        'Chỉ có thể sửa chữa thiết bị điện tử đang được giao cho bạn.',
+      );
     }
 
     // Mỗi tài sản chỉ có một luồng sửa chữa đang hoạt động để timeline và trạng
@@ -107,7 +88,6 @@ export class RepairRequestsService {
       .where(
         and(
           eq(schema.repairRequests.assetId, dto.assetId),
-          eq(schema.repairRequests.reporterId, actor.id),
           notInArray(schema.repairRequests.status, ['closed', 'cancelled']),
         ),
       );
@@ -118,6 +98,21 @@ export class RepairRequestsService {
       );
     }
 
+
+    const [activeRecall] = await this.db
+      .select({ id: schema.assetRecallRequests.id })
+      .from(schema.assetRecallRequests)
+      .where(
+        and(
+          eq(schema.assetRecallRequests.assetId, dto.assetId),
+          sql`${schema.assetRecallRequests.status} <> 'completed'`,
+        ),
+      );
+
+    if (activeRecall) {
+      throw new ConflictException('Tài sản đang có phiếu thu hồi chưa hoàn tất.');
+    }
+
     return this.db.transaction(async (tx) => {
       const [request] = await tx
         .insert(schema.repairRequests)
@@ -125,9 +120,10 @@ export class RepairRequestsService {
           assetId: dto.assetId,
           reporterId: actor.id,
           departmentId: actor.departmentId,
+          originalLocation: asset.currentLocation,
           reportDate: new Date().toISOString().slice(0, 10),
           issueDescription: dto.issueDescription,
-          status: 'reported',
+          status: 'draft',
         })
         .returning();
 
@@ -148,10 +144,12 @@ export class RepairRequestsService {
       await this.audit.log(tx as unknown as NodePgDatabase<typeof schema>, {
         requestType: 'repair',
         requestId: request.id,
-        actionType: 'reported',
+        actionType: 'repair.draft_created',
         approvedBy: actor.id,
         approverRole: actor.roleName,
-        status: 'approved',
+        status: 'pending',
+        previousStatus: 'draft',
+        newStatus: 'draft',
         metadata: { attachmentCount: files.length },
       });
 
@@ -159,43 +157,394 @@ export class RepairRequestsService {
     });
   }
 
+  async updateMine(
+    id: string,
+    dto: UpdateMyRepairRequestDto,
+    actor: AuthenticatedEmployee,
+  ) {
+    await this.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as Database;
+
+      await this.lockRequest(tx, id);
+      const request = await this.requireStatus(tx, id, [
+        'draft',
+        'revision_required',
+      ]);
+
+      this.assertOwner(request, actor);
+      await tx
+        .update(schema.repairRequests)
+        .set({
+          issueDescription: dto.issueDescription.trim(),
+          updatedAt: new Date(),
+          updatedBy: actor.id,
+        })
+        .where(eq(schema.repairRequests.id, id));
+      await this.logAction(tx, request, actor, 'repair.draft_updated', 'pending');
+    });
+
+    return this.findOneForActor(id, actor);
+  }
+
+  async submit(id: string, actor: AuthenticatedEmployee) {
+    await this.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as Database;
+
+      await this.lockRequest(tx, id);
+      const request = await this.requireStatus(tx, id, [
+        'draft',
+        'revision_required',
+      ]);
+
+      this.assertOwner(request, actor);
+
+      if (!request.issueDescription.trim()) {
+        throw new BadRequestException('Vui lòng mô tả tình trạng tài sản.');
+      }
+
+      await this.lockAsset(tx, request.assetId);
+      await this.requireOwnedItAsset(tx, request.assetId, actor.id);
+      const now = new Date();
+      const revision =
+        request.status === 'revision_required'
+          ? request.currentRevision + 1
+          : request.currentRevision;
+
+      await tx
+        .update(schema.repairRequests)
+        .set({
+          status: 'pending_department_head',
+          currentRevision: revision,
+          departmentHeadDecision: 'pending',
+          departmentHeadDecidedBy: null,
+          departmentHeadDecidedAt: null,
+          departmentHeadNote: null,
+          itHeadDecision: 'pending',
+          itHeadDecidedBy: null,
+          itHeadDecidedAt: null,
+          itHeadNote: null,
+          employeeHandoverDecision: 'pending',
+          employeeHandoverDecidedAt: null,
+          employeeHandoverNote: null,
+          itHandoverDecision: 'pending',
+          itHandoverDecidedBy: null,
+          itHandoverDecidedAt: null,
+          itHandoverNote: null,
+          submittedAt: now,
+          updatedAt: now,
+          updatedBy: actor.id,
+        })
+        .where(eq(schema.repairRequests.id, id));
+      await this.logAction(
+        tx,
+        request,
+        actor,
+        'repair.submitted',
+        'pending',
+        'pending_department_head',
+        undefined,
+        revision,
+      );
+    });
+
+    return this.findOneForActor(id, actor);
+  }
+
+  async findQueue(actor: AuthenticatedEmployee) {
+    const conditions = [];
+
+    if (actor.isDepartmentHead) {
+      conditions.push(
+        and(
+          eq(schema.repairRequests.status, 'pending_department_head'),
+          eq(schema.repairRequests.departmentId, actor.departmentId),
+        )!,
+      );
+    }
+
+    if (this.isItHead(actor)) {
+      conditions.push(eq(schema.repairRequests.status, 'pending_it_head'));
+      conditions.push(
+        and(
+          eq(schema.repairRequests.status, 'pending_handover_confirmations'),
+          eq(schema.repairRequests.itHandoverDecision, 'pending'),
+        )!,
+      );
+      conditions.push(eq(schema.repairRequests.status, 'in_progress'));
+    } else if (actor.departmentName === 'IT') {
+      conditions.push(
+        and(
+          eq(schema.repairRequests.status, 'in_progress'),
+          eq(schema.repairRequests.assignedTo, actor.id),
+        )!,
+      );
+    }
+
+    conditions.push(
+      and(
+        eq(schema.repairRequests.reporterId, actor.id),
+        or(
+          and(
+            eq(schema.repairRequests.status, 'pending_handover_confirmations'),
+            eq(schema.repairRequests.employeeHandoverDecision, 'pending'),
+          ),
+          eq(schema.repairRequests.status, 'ready_for_return'),
+        ),
+      )!,
+    );
+
+    return this.findSummaries(or(...conditions)!);
+  }
+
+  async findItAssignees(actor: AuthenticatedEmployee) {
+    this.assertItHead(actor);
+
+    return this.db
+      .select({
+        id: schema.employees.id,
+        name: schema.employees.fullName,
+        email: schema.employees.email,
+      })
+      .from(schema.employees)
+      .innerJoin(
+        schema.departments,
+        eq(schema.employees.departmentId, schema.departments.id),
+      )
+      .where(
+        and(
+          eq(schema.departments.name, 'IT'),
+          eq(schema.employees.isActive, true),
+        ),
+      )
+      .orderBy(asc(schema.employees.fullName));
+  }
+
+  async findOneForActor(id: string, actor: AuthenticatedEmployee) {
+    const request = await this.requireStatus(this.db, id);
+
+    if (!this.canView(request, actor)) {
+      throw new ForbiddenException('Bạn không được xem phiếu sửa chữa này.');
+    }
+
+    const [asset, trail] = await Promise.all([
+      this.loadAsset(this.db, request.assetId),
+      this.audit.findTrail('repair', id),
+    ]);
+
+    return {
+      ...request,
+      asset,
+      timeline: trail,
+      allowedActions: this.allowedActions(request, actor),
+    };
+  }
+
+  async decideDepartment(
+    id: string,
+    dto: RepairDecisionDto,
+    actor: AuthenticatedEmployee,
+  ) {
+    await this.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as Database;
+
+      await this.lockRequest(tx, id);
+      const request = await this.requireStatus(tx, id, [
+        'pending_department_head',
+      ]);
+
+      if (!actor.isDepartmentHead || actor.departmentId !== request.departmentId) {
+        throw new ForbiddenException('Bạn không được duyệt phiếu của bộ phận khác.');
+      }
+
+      const now = new Date();
+      const status = dto.approved ? 'pending_it_head' : 'revision_required';
+
+      await tx
+        .update(schema.repairRequests)
+        .set({
+          status,
+          departmentHeadDecision: dto.approved ? 'confirmed' : 'rejected',
+          departmentHeadDecidedBy: actor.id,
+          departmentHeadDecidedAt: now,
+          departmentHeadNote: dto.note?.trim() || null,
+          updatedAt: now,
+          updatedBy: actor.id,
+        })
+        .where(eq(schema.repairRequests.id, id));
+      await this.logAction(
+        tx,
+        request,
+        actor,
+        'repair.department_decision',
+        dto.approved ? 'approved' : 'rejected',
+        status,
+        dto.note,
+      );
+    });
+
+    return this.findOneForActor(id, actor);
+  }
+
+  async decideIt(
+    id: string,
+    dto: RepairDecisionDto,
+    actor: AuthenticatedEmployee,
+  ) {
+    this.assertItHead(actor);
+    await this.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as Database;
+
+      await this.lockRequest(tx, id);
+      const request = await this.requireStatus(tx, id, ['pending_it_head']);
+      const now = new Date();
+      const status = dto.approved
+        ? 'pending_handover_confirmations'
+        : 'revision_required';
+
+      await tx
+        .update(schema.repairRequests)
+        .set({
+          status,
+          itHeadDecision: dto.approved ? 'confirmed' : 'rejected',
+          itHeadDecidedBy: actor.id,
+          itHeadDecidedAt: now,
+          itHeadNote: dto.note?.trim() || null,
+          updatedAt: now,
+          updatedBy: actor.id,
+        })
+        .where(eq(schema.repairRequests.id, id));
+      await this.logAction(
+        tx,
+        request,
+        actor,
+        'repair.it_decision',
+        dto.approved ? 'approved' : 'rejected',
+        status,
+        dto.note,
+      );
+    });
+
+    return this.findOneForActor(id, actor);
+  }
+
+  async decideHandover(
+    id: string,
+    dto: RepairHandoverDecisionDto,
+    actor: AuthenticatedEmployee,
+  ) {
+    await this.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as Database;
+
+      await this.lockRequest(tx, id);
+      const request = await this.requireStatus(tx, id, [
+        'pending_handover_confirmations',
+      ]);
+      const side = this.handoverSide(request, actor);
+      const now = new Date();
+
+      if (!dto.confirmed) {
+        await tx
+          .update(schema.repairRequests)
+          .set({
+            status: 'revision_required',
+            ...(side === 'employee'
+              ? {
+                  employeeHandoverDecision: 'rejected' as const,
+                  employeeHandoverDecidedAt: now,
+                  employeeHandoverNote: dto.note?.trim() || null,
+                }
+              : {
+                  itHandoverDecision: 'rejected' as const,
+                  itHandoverDecidedBy: actor.id,
+                  itHandoverDecidedAt: now,
+                  itHandoverNote: dto.note?.trim() || null,
+                }),
+            updatedAt: now,
+            updatedBy: actor.id,
+          })
+          .where(eq(schema.repairRequests.id, id));
+        await this.logAction(
+          tx,
+          request,
+          actor,
+          `repair.${side}_handover_rejected`,
+          'rejected',
+          'revision_required',
+          dto.note,
+        );
+
+        return;
+      }
+
+      const [updated] = await tx
+        .update(schema.repairRequests)
+        .set({
+          ...(side === 'employee'
+            ? {
+                employeeHandoverDecision: 'confirmed' as const,
+                employeeHandoverDecidedAt: now,
+                employeeHandoverNote: dto.note?.trim() || null,
+              }
+            : {
+                itHandoverDecision: 'confirmed' as const,
+                itHandoverDecidedBy: actor.id,
+                itHandoverDecidedAt: now,
+                itHandoverNote: dto.note?.trim() || null,
+              }),
+          updatedAt: now,
+          updatedBy: actor.id,
+        })
+        .where(eq(schema.repairRequests.id, id))
+        .returning();
+
+      await this.logAction(
+        tx,
+        request,
+        actor,
+        `repair.${side}_handover_confirmed`,
+        'approved',
+      );
+
+      if (
+        updated.employeeHandoverDecision === 'confirmed' &&
+        updated.itHandoverDecision === 'confirmed'
+      ) {
+        await this.receiveForRepair(tx, updated, actor, now);
+      }
+    });
+
+    return this.findOneForActor(id, actor);
+  }
+
   /**
    * Trả yêu cầu gần nhất của một tài sản cùng audit trail để mobile quyết định
    * hiển thị nút tạo mới hay màn hình tiến trình. Chỉ chủ tài sản được phép xem.
    */
-  async findMyLatestByAsset(employeeId: string, assetId: string) {
-    const [asset] = await this.db
-      .select({ id: schema.assets.id })
-      .from(schema.assets)
-      .where(
-        and(
-          eq(schema.assets.id, assetId),
-          eq(schema.assets.currentUserId, employeeId),
-        ),
-      );
-
-    if (!asset) {
-      throw new NotFoundException('Không tìm thấy tài sản được quản lý.');
-    }
-
+  async findMyLatestByAsset(
+    actor: AuthenticatedEmployee,
+    assetId: string,
+  ) {
     const [request] = await this.db
       .select()
       .from(schema.repairRequests)
       .where(
         and(
           eq(schema.repairRequests.assetId, assetId),
-          eq(schema.repairRequests.reporterId, employeeId),
+          eq(schema.repairRequests.reporterId, actor.id),
         ),
       )
       .orderBy(desc(schema.repairRequests.createdAt))
       .limit(1);
 
-    if (!request) return null;
+    if (!request) {
+      await this.requireOwnedItAsset(this.db, assetId, actor.id);
 
-    return {
-      request: new RepairRequest(request),
-      timeline: await this.audit.findTrail('repair', request.id),
-    };
+      return null;
+    }
+
+    const detail = await this.findOneForActor(request.id, actor);
+
+    return { request: detail, timeline: detail.timeline };
   }
 
   /** Lấy toàn bộ yêu cầu của nhân viên kèm thông tin tài sản để dựng list card. */
@@ -281,7 +630,7 @@ export class RepairRequestsService {
   private async requireStatus(
     db: NodePgDatabase<typeof schema>,
     id: string,
-    expected: (typeof schema.repairStatusEnum.enumValues)[number],
+    expected?: (typeof schema.repairStatusEnum.enumValues)[number][],
   ) {
     const [request] = await db
       .select()
@@ -294,105 +643,42 @@ export class RepairRequestsService {
       );
     }
 
-    if (request.status !== expected) {
+    if (expected && !expected.includes(request.status)) {
       throw new BadRequestException(
-        `Yêu cầu phải ở trạng thái ${expected}, trạng thái hiện tại là ${request.status}`,
+        `Không thể thực hiện ở trạng thái ${request.status}.`,
       );
     }
 
     return request;
   }
 
-  /**
-   * IT đánh giá hư hỏng và chọn nhánh xử lý. Chi phí cần phê duyệt sẽ đi qua
-   * approval_pending; trường hợp đơn giản có thể chuyển thẳng sang in_progress.
-   */
-  async assess(id: string, dto: AssessRepairDto, actor: AuthenticatedEmployee) {
-    return this.db.transaction(async (tx) => {
-      const db = tx as unknown as NodePgDatabase<typeof schema>;
-
-      await this.requireStatus(db, id, 'reported');
-      const status = dto.needsApproval ? 'approval_pending' : 'in_progress';
-      const [request] = await db
-        .update(schema.repairRequests)
-        .set({
-          status,
-          assessedBy: actor.id,
-          assessedAt: new Date(),
-          assessmentNotes: dto.notes,
-          needsApproval: dto.needsApproval,
-          estimatedRepairCost: dto.estimatedCost,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.repairRequests.id, id))
-        .returning();
-
-      await this.audit.log(db, {
-        requestType: 'repair',
-        requestId: id,
-        actionType: 'assessed',
-        approvedBy: actor.id,
-        approverRole: actor.roleName,
-        status: 'approved',
-        metadata: {
-          needsApproval: dto.needsApproval,
-          estimatedCost: dto.estimatedCost,
-        },
-      });
-
-      return new RepairRequest(request);
-    });
-  }
-
-  /** Trưởng bộ phận duyệt chi phí hoặc đóng yêu cầu khi không chấp thuận. */
-  async approveDepartment(
-    id: string,
-    dto: RepairApprovalDto,
-    actor: AuthenticatedEmployee,
-  ) {
-    return this.db.transaction(async (tx) => {
-      const db = tx as unknown as NodePgDatabase<typeof schema>;
-      const current = await this.requireStatus(db, id, 'approval_pending');
-
-      if (current.departmentId !== actor.departmentId) {
-        throw new BadRequestException(
-          'Không thể duyệt sửa chữa của phòng ban khác',
-        );
-      }
-
-      const status = dto.approved ? 'in_progress' : 'closed';
-      const [request] = await db
-        .update(schema.repairRequests)
-        .set({
-          status,
-          ...(dto.approved
-            ? { approvedBy: actor.id, approvedAt: new Date() }
-            : { closedAt: new Date() }),
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.repairRequests.id, id))
-        .returning();
-
-      await this.audit.log(db, {
-        requestType: 'repair',
-        requestId: id,
-        actionType: dto.approved ? 'approval_confirmed' : 'cancelled',
-        approvedBy: actor.id,
-        approverRole: actor.roleName,
-        status: dto.approved ? 'approved' : 'rejected',
-        notes: dto.note,
-      });
-
-      return new RepairRequest(request);
-    });
-  }
-
   /** Phân công kỹ thuật viên khi yêu cầu đã sẵn sàng xử lý. */
   async assign(id: string, dto: AssignRepairDto, actor: AuthenticatedEmployee) {
+    this.assertItHead(actor);
+
     return this.db.transaction(async (tx) => {
       const db = tx as unknown as NodePgDatabase<typeof schema>;
 
-      await this.requireStatus(db, id, 'in_progress');
+      await this.lockRequest(db, id);
+      await this.requireStatus(db, id, ['in_progress']);
+
+      const [assignee] = await db
+        .select({
+          id: schema.employees.id,
+          isActive: schema.employees.isActive,
+          departmentName: schema.departments.name,
+        })
+        .from(schema.employees)
+        .innerJoin(
+          schema.departments,
+          eq(schema.employees.departmentId, schema.departments.id),
+        )
+        .where(eq(schema.employees.id, dto.assignedTo));
+
+      if (!assignee || !assignee.isActive || assignee.departmentName !== 'IT') {
+        throw new BadRequestException('Chỉ có thể phân công nhân viên IT đang hoạt động.');
+      }
+
       const [request] = await db
         .update(schema.repairRequests)
         .set({
@@ -426,11 +712,24 @@ export class RepairRequestsService {
     return this.db.transaction(async (tx) => {
       const db = tx as unknown as NodePgDatabase<typeof schema>;
 
-      await this.requireStatus(db, id, 'in_progress');
+      await this.lockRequest(db, id);
+      const current = await this.requireStatus(db, id, ['in_progress']);
+
+      if (
+        (!current.assignedTo && !this.isItHead(actor)) ||
+        (current.assignedTo !== null &&
+          current.assignedTo !== actor.id &&
+          !this.isItHead(actor))
+      ) {
+        throw new ForbiddenException(
+          'Chỉ kỹ thuật viên được phân công hoặc Trưởng IT được hoàn tất.',
+        );
+      }
+
       const [request] = await db
         .update(schema.repairRequests)
         .set({
-          status: 'completed',
+          status: 'ready_for_return',
           completedAt: new Date(),
           resultNotes: dto.resultNotes,
           repairCost: dto.actualCost,
@@ -446,6 +745,8 @@ export class RepairRequestsService {
         approvedBy: actor.id,
         approverRole: actor.roleName,
         status: 'approved',
+        previousStatus: current.status,
+        newStatus: 'ready_for_return',
         metadata: { actualCost: dto.actualCost },
       });
 
@@ -464,7 +765,9 @@ export class RepairRequestsService {
   ) {
     return this.db.transaction(async (tx) => {
       const db = tx as unknown as NodePgDatabase<typeof schema>;
-      const current = await this.requireStatus(db, id, 'completed');
+
+      await this.lockRequest(db, id);
+      const current = await this.requireStatus(db, id, ['ready_for_return']);
 
       if (current.reporterId !== actor.id) {
         throw new BadRequestException(
@@ -474,6 +777,47 @@ export class RepairRequestsService {
 
       const now = new Date();
       const status = dto.accepted ? 'closed' : 'in_progress';
+
+      await this.lockAsset(db, current.assetId);
+      const warehouse = await this.requireItWarehouse(db);
+      const asset = await this.loadAsset(db, current.assetId);
+
+      if (
+        asset.currentWarehouseId !== warehouse.id ||
+        asset.currentUserId !== null ||
+        asset.status !== 'repairing'
+      ) {
+        throw new ConflictException('Tài sản không còn ở kho IT.');
+      }
+
+      if (dto.accepted) {
+        await db
+          .update(schema.assets)
+          .set({
+            status: 'active',
+            currentUserId: current.reporterId,
+            currentManagingDepartmentId: current.departmentId,
+            currentWarehouseId: null,
+            currentLocation: current.originalLocation,
+            updatedAt: now,
+            updatedBy: actor.id,
+          })
+          .where(eq(schema.assets.id, asset.id));
+        await db.insert(schema.assetHandoverHistory).values({
+          assetId: asset.id,
+          handoverType: 'repair_returned',
+          handoverFromDepartmentId: warehouse.managingDepartmentId,
+          handoverFromWarehouseId: warehouse.id,
+          receivedByEmployeeId: current.reporterId,
+          receivedByDepartmentId: current.departmentId,
+          handoverDate: now.toISOString().slice(0, 10),
+          status: 'completed',
+          note: `Repair request ${current.id}`,
+          createdBy: actor.id,
+          updatedBy: actor.id,
+        });
+      }
+
       const [request] = await db
         .update(schema.repairRequests)
         .set({
@@ -482,7 +826,9 @@ export class RepairRequestsService {
           confirmedAt: now,
           confirmationStatus: dto.accepted ? 'approved' : 'rejected',
           closedAt: dto.accepted ? now : null,
-          completedAt: dto.accepted ? undefined : null,
+          completedAt: dto.accepted ? current.completedAt : null,
+          resultNotes: dto.accepted ? current.resultNotes : null,
+          repairCost: dto.accepted ? current.repairCost : null,
           updatedAt: now,
         })
         .where(eq(schema.repairRequests.id, id))
@@ -495,6 +841,8 @@ export class RepairRequestsService {
         approvedBy: actor.id,
         approverRole: actor.roleName,
         status: dto.accepted ? 'approved' : 'rejected',
+        previousStatus: current.status,
+        newStatus: status,
         notes: dto.note,
       });
 
@@ -502,84 +850,265 @@ export class RepairRequestsService {
     });
   }
 
-  async findAll() {
-    const records = await this.db.select().from(schema.repairRequests);
+  private async receiveForRepair(
+    db: Database,
+    request: RepairRecord,
+    actor: AuthenticatedEmployee,
+    now: Date,
+  ) {
+    await this.lockAsset(db, request.assetId);
+    const asset = await this.requireOwnedItAsset(
+      db,
+      request.assetId,
+      request.reporterId,
+    );
+    const warehouse = await this.requireItWarehouse(db);
 
-    return records.map((record) => new RepairRequest(record));
+    // Custody chỉ thay đổi sau khi cả hai bên xác nhận bàn giao thực tế.
+    await db
+      .update(schema.assets)
+      .set({
+        status: 'repairing',
+        currentUserId: null,
+        currentManagingDepartmentId: warehouse.managingDepartmentId,
+        currentWarehouseId: warehouse.id,
+        currentLocation: warehouse.location,
+        updatedAt: now,
+        updatedBy: actor.id,
+      })
+      .where(eq(schema.assets.id, asset.id));
+    await db.insert(schema.assetHandoverHistory).values({
+      assetId: asset.id,
+      handoverType: 'repair_to_it_warehouse',
+      handoverFromEmployeeId: request.reporterId,
+      handoverFromDepartmentId: request.departmentId,
+      receivedByDepartmentId: warehouse.managingDepartmentId,
+      receivedByWarehouseId: warehouse.id,
+      handoverDate: now.toISOString().slice(0, 10),
+      status: 'completed',
+      note: `Repair request ${request.id}`,
+      createdBy: actor.id,
+      updatedBy: actor.id,
+    });
+    await db
+      .update(schema.repairRequests)
+      .set({ status: 'in_progress', updatedAt: now, updatedBy: actor.id })
+      .where(eq(schema.repairRequests.id, request.id));
+    await this.logAction(
+      db,
+      request,
+      actor,
+      'repair.received',
+      'approved',
+      'in_progress',
+    );
   }
 
-  async findOne(id: string) {
-    const [record] = await this.db
-      .select()
+  private async findSummaries(condition: SQL<unknown>) {
+    return this.db
+      .select({
+        id: schema.repairRequests.id,
+        assetId: schema.repairRequests.assetId,
+        assetCode: schema.assets.assetCode,
+        assetName: schema.assets.name,
+        status: schema.repairRequests.status,
+        issueDescription: schema.repairRequests.issueDescription,
+        reportDate: schema.repairRequests.reportDate,
+        createdAt: schema.repairRequests.createdAt,
+      })
       .from(schema.repairRequests)
-      .where(eq(schema.repairRequests.id, id));
+      .innerJoin(
+        schema.assets,
+        eq(schema.repairRequests.assetId, schema.assets.id),
+      )
+      .where(condition)
+      .orderBy(desc(schema.repairRequests.createdAt));
+  }
 
-    if (!record) {
-      throw new NotFoundException(
-        `Không tìm thấy yêu cầu sửa chữa có ID ${id}`,
+  private async loadAsset(db: Database, id: string) {
+    const [asset] = await db
+      .select({
+        id: schema.assets.id,
+        assetCode: schema.assets.assetCode,
+        name: schema.assets.name,
+        status: schema.assets.status,
+        currentLocation: schema.assets.currentLocation,
+        currentUserId: schema.assets.currentUserId,
+        currentWarehouseId: schema.assets.currentWarehouseId,
+        managementOwner: schema.assetCategories.managementOwner,
+        category: schema.assetCategories.name,
+      })
+      .from(schema.assets)
+      .innerJoin(
+        schema.assetCategories,
+        eq(schema.assets.assetCategoryId, schema.assetCategories.id),
+      )
+      .where(eq(schema.assets.id, id));
+
+    if (!asset) throw new NotFoundException('Không tìm thấy tài sản.');
+
+    return asset;
+  }
+
+  private async requireOwnedItAsset(
+    db: Database,
+    assetId: string,
+    employeeId: string,
+  ) {
+    const asset = await this.loadAsset(db, assetId);
+
+    if (asset.currentUserId !== employeeId || asset.managementOwner !== 'it') {
+      throw new BadRequestException(
+        'Chỉ có thể sửa chữa thiết bị điện tử đang được giao cho bạn.',
       );
     }
 
-    return new RepairRequest(record);
+    return asset;
   }
 
-  async update(id: string, updateRepairRequestDto: UpdateRepairRequestDto) {
-    try {
-      const [updatedRecord] = await this.db
-        .update(schema.repairRequests)
-        .set({
-          ...updateRepairRequestDto,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.repairRequests.id, id))
-        .returning();
-
-      if (!updatedRecord) {
-        throw new NotFoundException(
-          `Không tìm thấy yêu cầu sửa chữa có ID ${id}`,
-        );
-      }
-
-      return new RepairRequest(updatedRecord);
-    } catch (error: unknown) {
-      if (error instanceof NotFoundException) throw error;
-
-      if (error instanceof DrizzleQueryError) {
-        throw new ConflictException(
-          'Dữ liệu yêu cầu sửa chữa đã tồn tại hoặc chứa tham chiếu không hợp lệ',
-        );
-      }
-
-      throw new InternalServerErrorException(
-        'Không thể cập nhật yêu cầu sửa chữa',
+  private async requireItWarehouse(db: Database) {
+    const [warehouse] = await db
+      .select()
+      .from(schema.warehouses)
+      .where(
+        and(
+          eq(schema.warehouses.code, 'IT_WAREHOUSE'),
+          eq(schema.warehouses.isActive, true),
+        ),
       );
+
+    if (!warehouse) throw new NotFoundException('Không tìm thấy kho IT.');
+
+    return warehouse;
+  }
+
+  private allowedActions(
+    request: RepairRecord,
+    actor: AuthenticatedEmployee,
+  ): WorkflowAction[] {
+    const actions: WorkflowAction[] = [];
+
+    if (
+      request.reporterId === actor.id &&
+      ['draft', 'revision_required'].includes(request.status)
+    ) {
+      actions.push(WORKFLOW_ACTIONS.repairUpdate, WORKFLOW_ACTIONS.repairSubmit);
+    }
+
+    if (
+      request.status === 'pending_department_head' &&
+      actor.isDepartmentHead &&
+      actor.departmentId === request.departmentId
+    ) {
+      actions.push(WORKFLOW_ACTIONS.repairApproveDepartment);
+    }
+
+    if (request.status === 'pending_it_head' && this.isItHead(actor)) {
+      actions.push(WORKFLOW_ACTIONS.repairApproveIt);
+    }
+
+    if (
+      request.status === 'pending_handover_confirmations' &&
+      ((request.reporterId === actor.id &&
+        request.employeeHandoverDecision === 'pending') ||
+        (this.isItHead(actor) && request.itHandoverDecision === 'pending'))
+    ) {
+      actions.push(WORKFLOW_ACTIONS.repairConfirmHandover);
+    }
+
+    if (request.status === 'in_progress' && this.isItHead(actor)) {
+      actions.push(WORKFLOW_ACTIONS.repairAssign, WORKFLOW_ACTIONS.repairComplete);
+    } else if (
+      request.status === 'in_progress' &&
+      request.assignedTo === actor.id
+    ) {
+      actions.push(WORKFLOW_ACTIONS.repairComplete);
+    }
+
+    if (request.status === 'ready_for_return' && request.reporterId === actor.id) {
+      actions.push(WORKFLOW_ACTIONS.repairConfirmResult);
+    }
+
+    return actions;
+  }
+
+  private canView(request: RepairRecord, actor: AuthenticatedEmployee) {
+    return (
+      request.reporterId === actor.id ||
+      (actor.isDepartmentHead && actor.departmentId === request.departmentId) ||
+      actor.departmentName === 'IT'
+    );
+  }
+
+  private assertOwner(request: RepairRecord, actor: AuthenticatedEmployee) {
+    if (request.reporterId !== actor.id) {
+      throw new ForbiddenException('Chỉ người tạo mới được sửa phiếu.');
     }
   }
 
-  async remove(id: string) {
-    try {
-      const deletedRecords = await this.db
-        .delete(schema.repairRequests)
-        .where(eq(schema.repairRequests.id, id))
-        .returning({ deletedId: schema.repairRequests.id });
-
-      if (deletedRecords.length === 0) {
-        throw new NotFoundException(
-          `Không tìm thấy yêu cầu sửa chữa có ID ${id}`,
-        );
-      }
-
-      return { deleted: true };
-    } catch (error: unknown) {
-      if (error instanceof NotFoundException) throw error;
-
-      if (error instanceof DrizzleQueryError) {
-        throw new ConflictException(
-          'Không thể xóa yêu cầu sửa chữa vì dữ liệu đang được tham chiếu',
-        );
-      }
-
-      throw new InternalServerErrorException('Không thể xóa yêu cầu sửa chữa');
+  private assertItHead(actor: AuthenticatedEmployee) {
+    if (!this.isItHead(actor)) {
+      throw new ForbiddenException('Chỉ Trưởng IT được thực hiện thao tác này.');
     }
   }
+
+  private isItHead(actor: AuthenticatedEmployee) {
+    return actor.isDepartmentHead && actor.departmentName === 'IT';
+  }
+
+  private handoverSide(
+    request: RepairRecord,
+    actor: AuthenticatedEmployee,
+  ): 'employee' | 'it' {
+    if (
+      request.reporterId === actor.id &&
+      request.employeeHandoverDecision === 'pending'
+    ) {
+      return 'employee';
+    }
+
+    if (this.isItHead(actor) && request.itHandoverDecision === 'pending') {
+      return 'it';
+    }
+
+    throw new ForbiddenException('Bạn không có xác nhận bàn giao đang chờ.');
+  }
+
+  private lockAsset(db: Database, id: string) {
+    return db.execute(sql`select id from assets where id = ${id} for update`);
+  }
+
+  private lockRequest(db: Database, id: string) {
+    return db.execute(
+      sql`select id from repair_requests where id = ${id} for update`,
+    );
+  }
+
+  private logAction(
+    db: Database,
+    request: RepairRecord,
+    actor: AuthenticatedEmployee,
+    actionType: string,
+    status: 'approved' | 'rejected' | 'pending',
+    newStatus = request.status,
+    reason?: string,
+    revision = request.currentRevision,
+  ) {
+    return this.audit.log(db, {
+      requestType: 'repair',
+      requestId: request.id,
+      workflowRevision: revision,
+      actionType,
+      approvedBy: actor.id,
+      approverRole: actor.roleName,
+      actorDepartmentId: actor.departmentId,
+      actorIsDepartmentHead: actor.isDepartmentHead,
+      status,
+      previousStatus: request.status,
+      newStatus,
+      reason,
+      notes: reason,
+    });
+  }
+
 }

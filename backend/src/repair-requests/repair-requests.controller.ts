@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -12,10 +11,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
-  ApiConflictResponse,
-  ApiCreatedResponse,
-  ApiNotFoundResponse,
-  ApiOkResponse,
   ApiTags,
   ApiConsumes,
 } from '@nestjs/swagger';
@@ -25,16 +20,16 @@ import { extname } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { RepairRequestsService } from './repair-requests.service.js';
-import { CreateRepairRequestDto } from './dto/create-repair-request.dto.js';
-import { UpdateRepairRequestDto } from './dto/update-repair-request.dto.js';
-import { RepairRequest } from './entities/repair-request.entity.js';
-import { CreateMyRepairRequestDto } from './dto/create-my-repair-request.dto.js';
 import {
-  AssessRepairDto,
+  CreateMyRepairRequestDto,
+  UpdateMyRepairRequestDto,
+} from './dto/create-my-repair-request.dto.js';
+import {
   AssignRepairDto,
   CompleteRepairDto,
   ConfirmRepairDto,
-  RepairApprovalDto,
+  RepairDecisionDto,
+  RepairHandoverDecisionDto,
 } from './dto/repair-workflow.dto.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import {
@@ -93,23 +88,21 @@ export class RepairRequestsController {
     return this.repairRequestsService.createMine(actor, dto, files ?? []);
   }
 
-  @Post()
-  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairReport)
-  @ApiCreatedResponse({ type: RepairRequest })
-  @ApiConflictResponse({
-    description: 'Dữ liệu đã tồn tại hoặc có tham chiếu không hợp lệ',
-  })
-  create(
-    @Body() dto: CreateRepairRequestDto,
-    @CurrentEmployee() actor: AuthenticatedEmployee,
-  ) {
-    return this.repairRequestsService.create(dto, actor);
-  }
-
   /** Danh sách yêu cầu sửa chữa do nhân viên hiện tại tạo. */
   @Get('mine')
   findMine(@CurrentEmployee() actor: AuthenticatedEmployee) {
     return this.repairRequestsService.findMine(actor.id);
+  }
+
+  @Get('queue')
+  findQueue(@CurrentEmployee() actor: AuthenticatedEmployee) {
+    return this.repairRequestsService.findQueue(actor);
+  }
+
+  @Get('it-assignees')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairAssign)
+  findItAssignees(@CurrentEmployee() actor: AuthenticatedEmployee) {
+    return this.repairRequestsService.findItAssignees(actor);
   }
 
   /** Timeline của đúng yêu cầu được chọn trong danh sách cá nhân. */
@@ -127,28 +120,65 @@ export class RepairRequestsController {
     @Param('assetId', ParseUUIDPipe) assetId: string,
     @CurrentEmployee() actor: AuthenticatedEmployee,
   ) {
-    return this.repairRequestsService.findMyLatestByAsset(actor.id, assetId);
+    return this.repairRequestsService.findMyLatestByAsset(actor, assetId);
   }
 
-  /** Endpoint riêng cho từng hành động để service có thể kiểm soát thứ tự trạng thái. */
-  @Post(':id/assess')
-  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairAssess)
-  assess(
+  @Patch(':id')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairUpdate)
+  updateMine(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: AssessRepairDto,
+    @Body() dto: UpdateMyRepairRequestDto,
     @CurrentEmployee() actor: AuthenticatedEmployee,
   ) {
-    return this.repairRequestsService.assess(id, dto, actor);
+    return this.repairRequestsService.updateMine(id, dto, actor);
   }
 
-  @Post(':id/approve-department')
+  @Post(':id/submit')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairSubmit)
+  submit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairRequestsService.submit(id, actor);
+  }
+
+  @Post(':id/resubmit')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairSubmit)
+  resubmit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairRequestsService.submit(id, actor);
+  }
+
+  @Post(':id/department-decision')
   @RequireWorkflowAction(WORKFLOW_ACTIONS.repairApproveDepartment)
-  approveDepartment(
+  decideDepartment(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: RepairApprovalDto,
+    @Body() dto: RepairDecisionDto,
     @CurrentEmployee() actor: AuthenticatedEmployee,
   ) {
-    return this.repairRequestsService.approveDepartment(id, dto, actor);
+    return this.repairRequestsService.decideDepartment(id, dto, actor);
+  }
+
+  @Post(':id/it-decision')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairApproveIt)
+  decideIt(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RepairDecisionDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairRequestsService.decideIt(id, dto, actor);
+  }
+
+  @Post(':id/handover-decision')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.repairConfirmHandover)
+  decideHandover(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RepairHandoverDecisionDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairRequestsService.decideHandover(id, dto, actor);
   }
 
   @Post(':id/assign')
@@ -181,44 +211,11 @@ export class RepairRequestsController {
     return this.repairRequestsService.confirmResult(id, dto, actor);
   }
 
-  @Get()
-  @ApiOkResponse({ type: RepairRequest, isArray: true })
-  findAll() {
-    return this.repairRequestsService.findAll();
-  }
-
   @Get(':id')
-  @ApiOkResponse({ type: RepairRequest })
-  @ApiNotFoundResponse({ description: 'Không tìm thấy yêu cầu sửa chữa' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.repairRequestsService.findOne(id);
-  }
-
-  @Patch(':id')
-  @ApiOkResponse({ type: RepairRequest })
-  @ApiConflictResponse({
-    description: 'Dữ liệu đã tồn tại hoặc có tham chiếu không hợp lệ',
-  })
-  @ApiNotFoundResponse({ description: 'Không tìm thấy yêu cầu sửa chữa' })
-  update(
+  findOne(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateRepairRequestDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
   ) {
-    return this.repairRequestsService.update(id, dto);
-  }
-
-  @Delete(':id')
-  @ApiOkResponse({
-    schema: {
-      example: { deleted: true },
-      properties: { deleted: { type: 'boolean' } },
-    },
-  })
-  @ApiConflictResponse({
-    description: 'Không thể xóa vì dữ liệu đang được tham chiếu',
-  })
-  @ApiNotFoundResponse({ description: 'Không tìm thấy yêu cầu sửa chữa' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.repairRequestsService.remove(id);
+    return this.repairRequestsService.findOneForActor(id, actor);
   }
 }

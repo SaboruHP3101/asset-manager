@@ -5,7 +5,7 @@ import '../../features/assets/assets_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/login/login_screen.dart';
 import '../../features/profile/profile_screen.dart';
-import '../../features/repair_requests/repair_requests_screen.dart';
+import '../../features/requests/my_requests_screen.dart';
 import '../auth/auth_session.dart';
 import '../storage/token_storage.dart';
 
@@ -41,7 +41,7 @@ class _MainLayoutState extends State<MainLayout> {
             onScanAssets: _openAssetScanner,
           ),
           const AssetsScreen(),
-          const RepairRequestsScreen(),
+          const MyRequestsScreen(),
           ProfileScreen(),
         ];
       });
@@ -74,7 +74,7 @@ class _MainLayoutState extends State<MainLayout> {
     setState(() {
       // Tạo lại màn Yêu cầu để phản ánh request vừa tạo từ tab Tài sản.
       if (index == 2) {
-        _screens![2] = RepairRequestsScreen(key: UniqueKey());
+        _screens![2] = MyRequestsScreen(key: UniqueKey());
       }
       _currentIndex = index;
     });
@@ -122,7 +122,7 @@ class _MainLayoutState extends State<MainLayout> {
           NavigationDestination(
             icon: Icon(Icons.assignment_outlined),
             selectedIcon: Icon(Icons.assignment),
-            label: 'Yêu cầu',
+            label: 'Đơn yêu cầu',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

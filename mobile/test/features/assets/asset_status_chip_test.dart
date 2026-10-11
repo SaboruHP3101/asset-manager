@@ -8,6 +8,7 @@ void main() {
   test('chuyển trạng thái kỹ thuật thành nhãn tiếng Việt', () {
     expect(assetStatusLabel('active'), 'Đang sử dụng');
     expect(assetStatusLabel('repairing'), 'Đang sửa chữa');
+    expect(assetStatusLabel('upgrading'), 'Đang nâng cấp');
     expect(assetStatusLabel('awaiting_allocation'), 'Chờ cấp phát');
     expect(
       assetStatusLabel('awaiting_allocation_confirmation'),

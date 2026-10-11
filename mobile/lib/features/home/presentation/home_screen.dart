@@ -7,6 +7,7 @@ import '../../../core/utils/department_labels.dart';
 import '../../../core/widgets/status_card.dart';
 import '../../asset_allocations/asset_allocation_queue_screen.dart';
 import '../../asset_recalls/asset_recall_requests_screen.dart';
+import '../../asset_recalls/asset_upgrade_requests_screen.dart';
 import '../../purchase_orders/purchase_orders_screen.dart';
 import '../../purchase_receipts/purchase_inspection_queue_screen.dart';
 import '../../purchase_requests/purchase_requests_screen.dart';
@@ -153,6 +154,41 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadSummary();
   }
 
+  Future<void> _openRecallQueue() async {
+    final screen = await showModalBottomSheet<Widget>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.swap_horiz),
+              title: const Text('Đổi / báo phế tài sản'),
+              onTap: () => Navigator.pop(
+                context,
+                const AssetRecallRequestsScreen(
+                  initialTab: AssetRecallInitialTab.queue,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.upgrade),
+              title: const Text('Nâng cấp tài sản'),
+              onTap: () => Navigator.pop(
+                context,
+                const AssetUpgradeRequestsScreen(
+                  initialTab: AssetRecallInitialTab.queue,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (screen != null && mounted) await _open(screen);
+  }
+
   List<_HomeTask> get _visibleTasks {
     final dashboard = _dashboard;
     if (dashboard == null) return const [];
@@ -197,15 +233,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       if (dashboard.recallTasks > 0)
         _HomeTask(
-          title: 'Đổi tài sản cần xử lý',
+          title: 'Thu hồi tài sản cần xử lý',
           subtitle: 'Duyệt hoặc xác nhận bàn giao',
           count: dashboard.recallTasks,
           icon: Icons.swap_horiz,
-          onTap: () => _open(
-            const AssetRecallRequestsScreen(
-              initialTab: AssetRecallInitialTab.queue,
-            ),
-          ),
+          onTap: _openRecallQueue,
         ),
     ];
   }
@@ -236,9 +268,15 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     if (_actions.contains('asset.recall.create'))
       _QuickAction(
-        title: 'Đổi tài sản',
+        title: 'Đổi / báo phế',
         icon: Icons.swap_horiz,
         onTap: () => _open(const AssetRecallRequestsScreen()),
+      ),
+    if (_actions.contains('asset.recall.create'))
+      _QuickAction(
+        title: 'Nâng cấp',
+        icon: Icons.upgrade,
+        onTap: () => _open(const AssetUpgradeRequestsScreen()),
       ),
     if (_actions.contains('warehouse.it.view'))
       _QuickAction(

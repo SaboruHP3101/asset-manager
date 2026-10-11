@@ -9,9 +9,18 @@ import 'package:video_player/video_player.dart';
 import '../../core/network/api_client.dart';
 
 class RepairRequestForm extends StatefulWidget {
-  const RepairRequestForm({this.initialAssetId, super.key});
+  const RepairRequestForm({
+    this.initialAssetId,
+    this.requestId,
+    this.initialDescription = '',
+    this.revisionRequired = false,
+    super.key,
+  });
 
   final String? initialAssetId;
+  final String? requestId;
+  final String initialDescription;
+  final bool revisionRequired;
 
   @override
   State<RepairRequestForm> createState() => _RepairRequestFormState();
@@ -33,6 +42,7 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
   void initState() {
     super.initState();
     _assetId = widget.initialAssetId;
+    _descriptionController.text = widget.initialDescription;
     // Tải danh sách tài sản cho dropdown dùng chung
     _loadAssets();
   }
@@ -67,6 +77,7 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
           .map((request) => request['assetId']?.toString())
           .whereType<String>()
           .toSet();
+      if (widget.requestId != null) activeAssetIds.remove(_assetId);
       final availableAssets = assets
           .where((asset) => !activeAssetIds.contains(asset['id']?.toString()))
           .toList();
@@ -170,25 +181,51 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
   }
 
   // Gửi dữ liệu và các tệp đã chọn bằng multipart form
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _save({required bool submit}) async {
+    if (submit && !_formKey.currentState!.validate()) return;
+    if (submit && !await _review()) return;
     setState(() => _submitting = true);
 
     try {
-      final files = <MultipartFile>[];
-      for (final file in _media) {
-        files.add(await MultipartFile.fromFile(file.path, filename: file.name));
+      String requestId;
+
+      if (widget.requestId == null) {
+        final files = <MultipartFile>[];
+        for (final file in _media) {
+          files.add(
+            await MultipartFile.fromFile(file.path, filename: file.name),
+          );
+        }
+        final form = FormData.fromMap({
+          'assetId': _assetId,
+          'issueDescription': _descriptionController.text.trim(),
+          'files': files,
+        });
+        final response = await _dio.post<Map<String, dynamic>>(
+          '/repair-requests/mine',
+          data: form,
+        );
+        requestId = response.data!['id'] as String;
+      } else {
+        requestId = widget.requestId!;
+        await _dio.patch<void>(
+          '/repair-requests/$requestId',
+          data: {'issueDescription': _descriptionController.text.trim()},
+        );
       }
-      final form = FormData.fromMap({
-        'assetId': _assetId,
-        'issueDescription': _descriptionController.text.trim(),
-        'files': files,
-      });
-      await _dio.post('/repair-requests/mine', data: form);
+
+      if (submit) {
+        final action = widget.revisionRequired ? 'resubmit' : 'submit';
+        await _dio.post<void>('/repair-requests/$requestId/$action');
+      }
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Đã gửi yêu cầu sửa chữa.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            submit ? 'Đã gửi yêu cầu sửa chữa.' : 'Đã lưu bản nháp.',
+          ),
+        ),
+      );
       Navigator.pop(context, true);
     } on DioException catch (error) {
       if (!mounted) return;
@@ -205,6 +242,52 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  Future<bool> _review() async {
+    final asset = _assets.cast<Map<String, dynamic>?>().firstWhere(
+      (item) => item?['id'] == _assetId,
+      orElse: () => null,
+    );
+
+    return (await showModalBottomSheet<bool>(
+          context: context,
+          showDragHandle: true,
+          builder: (context) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Kiểm tra phiếu sửa chữa',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '${asset?['assetCode'] ?? ''} · ${asset?['name'] ?? ''}',
+                  ),
+                  const SizedBox(height: 8),
+                  Text(_descriptionController.text.trim()),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Sau khi gửi, phiếu sẽ được chuyển đến Trưởng bộ phận.',
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Xác nhận gửi'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        )) ??
+        false;
   }
 
   // Lấy tên tệp gọn để hiển thị trong danh sách
@@ -365,18 +448,36 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    FilledButton.icon(
-                      onPressed: _submitting || _assets.isEmpty
-                          ? null
-                          : _submit,
-                      icon: _submitting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.send_outlined),
-                      label: const Text('Gửi yêu cầu sửa chữa'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _submitting || _assets.isEmpty
+                                ? null
+                                : () => _save(submit: false),
+                            child: const Text('Lưu nháp'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: FilledButton.icon(
+                            onPressed: _submitting || _assets.isEmpty
+                                ? null
+                                : () => _save(submit: true),
+                            icon: _submitting
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.send_outlined),
+                            label: const Text('Kiểm tra & gửi'),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
