@@ -6,11 +6,18 @@ import {
   Patch,
   Param,
   Delete,
+  ForbiddenException,
+  UseGuards,
+  ParseUUIDPipe,
+  ValidationPipe,
 } from '@nestjs/common';
 import { EmployeesService } from './employees.service.js';
 import { CreateEmployeeDto } from './dto/create-employee.dto.js';
 import { UpdateEmployeeDto } from './dto/update-employee.dto.js';
 import { ApiTags } from '@nestjs/swagger';
+import { CurrentEmployee } from '../auth/current-employee.decorator.js';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
+import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 
 @ApiTags('employees')
 @Controller('employees')
@@ -18,12 +25,22 @@ export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}
 
   @Post()
-  create(@Body() createEmployeeDto: CreateEmployeeDto) {
+  @UseGuards(JwtAuthGuard)
+  create(
+    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+    createEmployeeDto: CreateEmployeeDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    this.assertIt(actor);
+
     return this.employeesService.create(createEmployeeDto);
   }
 
   @Get()
-  findAll() {
+  @UseGuards(JwtAuthGuard)
+  findAll(@CurrentEmployee() actor: AuthenticatedEmployee) {
+    this.assertIt(actor);
+
     return this.employeesService.findAll();
   }
 
@@ -33,15 +50,26 @@ export class EmployeesController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
   update(
-    @Param('id') id: string,
-    @Body() updateEmployeeDto: UpdateEmployeeDto,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+    updateEmployeeDto: UpdateEmployeeDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
   ) {
+    this.assertIt(actor);
+
     return this.employeesService.update(id, updateEmployeeDto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.employeesService.remove(id);
+  }
+
+  private assertIt(actor: AuthenticatedEmployee) {
+    if (actor.departmentName !== 'IT') {
+      throw new ForbiddenException('Chỉ phòng IT được quản lý nhân viên.');
+    }
   }
 }

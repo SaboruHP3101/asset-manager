@@ -13,6 +13,18 @@ import * as schema from '../db/schema.js';
 import { Employee } from './entities/employee.entity.js';
 import { DrizzleQueryError, eq } from 'drizzle-orm';
 
+const employeeFields = {
+  id: schema.employees.id,
+  employeeCode: schema.employees.employeeCode,
+  fullName: schema.employees.fullName,
+  email: schema.employees.email,
+  phoneNumber: schema.employees.phoneNumber,
+  departmentId: schema.employees.departmentId,
+  roleId: schema.employees.roleId,
+  isDepartmentHead: schema.employees.isDepartmentHead,
+  isActive: schema.employees.isActive,
+};
+
 @Injectable()
 export class EmployeesService {
   constructor(
@@ -24,14 +36,14 @@ export class EmployeesService {
       const [newEmployee] = await this.db
         .insert(schema.employees)
         .values(createEmployeeDto)
-        .returning();
+        .returning(employeeFields);
 
-      return new Employee(newEmployee);
-    } catch (error: any) {
-      console.log(error);
-
+      return newEmployee;
+    } catch (error: unknown) {
       if (error instanceof DrizzleQueryError) {
-        throw new ConflictException();
+        throw new ConflictException(
+          'Mã nhân viên hoặc email đã tồn tại, hoặc phòng ban/vai trò không hợp lệ.',
+        );
       }
 
       throw new InternalServerErrorException();
@@ -39,7 +51,7 @@ export class EmployeesService {
   }
 
   async findAll() {
-    return (await this.db.select().from(schema.employees)) as Employee[];
+    return this.db.select(employeeFields).from(schema.employees);
   }
 
   async findOne(id: string) {
@@ -67,17 +79,29 @@ export class EmployeesService {
   }
 
   async update(id: string, updateEmployeeDto: UpdateEmployeeDto) {
-    const [updatedEmployee] = await this.db
-      .update(schema.employees)
-      .set(updateEmployeeDto)
-      .where(eq(schema.employees.id, id))
-      .returning();
+    try {
+      const [updatedEmployee] = await this.db
+        .update(schema.employees)
+        .set({ ...updateEmployeeDto, updatedAt: new Date() })
+        .where(eq(schema.employees.id, id))
+        .returning(employeeFields);
 
-    if (!updatedEmployee) {
-      throw new NotFoundException(`Employee with ID ${id} not found`);
+      if (!updatedEmployee) {
+        throw new NotFoundException(`Employee with ID ${id} not found`);
+      }
+
+      return updatedEmployee;
+    } catch (error: unknown) {
+      if (error instanceof NotFoundException) throw error;
+
+      if (error instanceof DrizzleQueryError) {
+        throw new ConflictException(
+          'Mã nhân viên hoặc email đã tồn tại, hoặc phòng ban/vai trò không hợp lệ.',
+        );
+      }
+
+      throw new InternalServerErrorException('Không thể cập nhật nhân viên.');
     }
-
-    return new Employee(updatedEmployee);
   }
 
   async remove(id: string) {
