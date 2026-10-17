@@ -9,6 +9,9 @@ import {
   Post,
   Headers,
   Query,
+  ForbiddenException,
+  UseGuards,
+  ValidationPipe,
 } from '@nestjs/common';
 import {
   ApiConflictResponse,
@@ -22,6 +25,9 @@ import { CreateAssetDto } from './dto/create-asset.dto.js';
 import { UpdateAssetDto } from './dto/update-asset.dto.js';
 import { Asset } from './entities/asset.entity.js';
 import { AuthService } from '../auth/auth.service.js';
+import { CurrentEmployee } from '../auth/current-employee.decorator.js';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
+import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 
 @ApiTags('assets')
 @Controller('assets')
@@ -41,8 +47,13 @@ export class AssetsController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   @ApiOkResponse({ type: Asset, isArray: true })
-  findAll() {
+  findAll(@CurrentEmployee() actor: AuthenticatedEmployee) {
+    if (actor.departmentName !== 'IT') {
+      throw new ForbiddenException('Chỉ phòng IT được xem danh sách tài sản.');
+    }
+
     return this.assetsService.findAll();
   }
 
@@ -86,12 +97,22 @@ export class AssetsController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiOkResponse({ type: Asset })
   @ApiConflictResponse({
     description: 'Dữ liệu đã tồn tại hoặc có tham chiếu không hợp lệ',
   })
   @ApiNotFoundResponse({ description: 'Không tìm thấy tài sản' })
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateAssetDto) {
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+    dto: UpdateAssetDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    if (actor.departmentName !== 'IT') {
+      throw new ForbiddenException('Chỉ phòng IT được cập nhật tài sản.');
+    }
+
     return this.assetsService.update(id, dto);
   }
 

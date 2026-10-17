@@ -199,11 +199,7 @@ export default function EmployeeDialog({
                 )}
               />
               {errors.departmentId ? (
-                <p
-                  id="department-error"
-                  role="alert"
-                  className="text-sm text-destructive"
-                >
+                <p role="alert" className="text-sm text-destructive">
                   {errors.departmentId.message}
                 </p>
               ) : null}
@@ -227,7 +223,7 @@ export default function EmployeeDialog({
           </fieldset>
           {options.isPending ? (
             <p role="status" className="text-sm text-muted-foreground">
-              Đang tải phòng ban…
+              Đang tải phòng ban...
             </p>
           ) : options.isError ? (
             <Alert variant="destructive">
@@ -267,7 +263,7 @@ export default function EmployeeDialog({
               Đóng
             </Button>
             <Button type="submit" disabled={save.isPending || !hasOptions}>
-              {save.isPending ? "Đang lưu…" : "Lưu"}
+              {save.isPending ? "Đang lưu..." : "Lưu"}
             </Button>
           </DialogFooter>
         </form>

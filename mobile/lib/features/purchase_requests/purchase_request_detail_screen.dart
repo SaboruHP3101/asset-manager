@@ -553,7 +553,7 @@ class _RequestActionBar extends StatelessWidget {
                                 : const Icon(Icons.request_quote_outlined),
                             label: Text(
                               addingQuote
-                                  ? 'Đang lưu báo giá…'
+                                  ? 'Đang lưu báo giá...'
                                   : 'Thêm báo giá',
                             ),
                           ),

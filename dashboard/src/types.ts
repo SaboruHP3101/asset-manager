@@ -17,4 +17,28 @@ export type EmployeeFormValue = Pick<
 
 export type Department = { id: string; name: string };
 
-export type Asset = {};
+export type Asset = {
+  id: string;
+  assetCode: string;
+  name: string | null;
+  category: string | null;
+  assignedTo: string | null;
+  department: string | null;
+  location: string | null;
+  status: string;
+  assetCategoryId: string;
+  supplierId: string;
+  initialValue: string;
+  purchaseDate: string;
+  inServiceDate: string;
+};
+
+export type AssetFormValue = Pick<
+  Asset,
+  | "assetCode"
+  | "assetCategoryId"
+  | "supplierId"
+  | "initialValue"
+  | "purchaseDate"
+  | "inServiceDate"
+> & { name: string };

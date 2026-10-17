@@ -649,7 +649,7 @@ class _PurchaseOrderActionBar extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.save_outlined),
-                label: Text(saving ? 'Đang lưu…' : 'Lưu nháp'),
+                label: Text(saving ? 'Đang lưu...' : 'Lưu nháp'),
               ),
             ),
           ],

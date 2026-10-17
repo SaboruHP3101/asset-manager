@@ -23,7 +23,7 @@ export default function EmployeesPage() {
   const [editing, setEditing] = useState<Employee | null | undefined>();
   const [activating, setActivating] = useState<Employee | null>(null);
   const employees = useQuery({
-    queryKey: ["employees", token],
+    queryKey: ["employees"],
     queryFn: ({ signal }) => getEmployees(signal),
     enabled: Boolean(token),
     retry: false,
@@ -55,7 +55,7 @@ export default function EmployeesPage() {
               onClick={() => employees.refetch()}
               disabled={employees.isFetching}
             >
-              {employees.isFetching ? "Đang tải…" : "Thử lại"}
+              {employees.isFetching ? "Đang tải..." : "Thử lại"}
             </Button>
           </AlertDescription>
         </Alert>
@@ -92,7 +92,7 @@ export default function EmployeesPage() {
               {employees.isPending ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-32 text-center">
-                    <p role="status">Đang tải nhân viên…</p>
+                    <p role="status">Đang tải nhân viên...</p>
                   </TableCell>
                 </TableRow>
               ) : employees.data.length === 0 ? (

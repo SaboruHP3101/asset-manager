@@ -381,7 +381,7 @@ class _PurchaseRequestFormState extends State<PurchaseRequestFormScreen> {
                                 )
                               : const Icon(Icons.delete_outline),
                           label: Text(
-                            _deleting ? 'Đang xóa bản nháp…' : 'Xóa bản nháp',
+                            _deleting ? 'Đang xóa bản nháp...' : 'Xóa bản nháp',
                           ),
                         ),
                       ),
@@ -724,7 +724,8 @@ class _ItemCard extends StatelessWidget {
                           maxLines: 2,
                           decoration: const InputDecoration(
                             labelText: 'Mô tả / thông số *',
-                            hintText: 'Cấu hình, kích thước, yêu cầu kỹ thuật…',
+                            hintText:
+                                'Cấu hình, kích thước, yêu cầu kỹ thuật...',
                           ),
                           onChanged: (_) => onChanged(),
                           validator: _required,
@@ -1040,7 +1041,7 @@ class _ActionBar extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.fact_check_outlined),
-                label: Text(saving ? 'Đang lưu…' : 'Kiểm tra & gửi'),
+                label: Text(saving ? 'Đang lưu...' : 'Kiểm tra & gửi'),
               ),
             ),
           ],

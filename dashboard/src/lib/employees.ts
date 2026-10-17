@@ -39,13 +39,7 @@ async function request<TData = unknown>(
 }
 
 export async function getEmployees(signal?: AbortSignal) {
-  const data = await request<Employee[]>("/employees", { signal });
-
-  if (!Array.isArray(data)) {
-    throw new Error("Dữ liệu nhân viên không hợp lệ. Vui lòng thử lại.");
-  }
-
-  return data;
+  return request<Employee[]>("/employees", { signal });
 }
 
 export async function saveEmployee(
@@ -72,24 +66,7 @@ const departmentLabels: Record<string, string> = {
 };
 
 async function getOptions(path: string, signal: AbortSignal) {
-  const data = await request(path, { signal });
-
-  if (
-    !Array.isArray(data) ||
-    !data.every(
-      (item: unknown): item is Option =>
-        typeof item === "object" &&
-        item !== null &&
-        "id" in item &&
-        typeof item.id === "string" &&
-        "name" in item &&
-        typeof item.name === "string"
-    )
-  ) {
-    throw new Error("Không thể tải dữ liệu phòng ban. Vui lòng thử lại.");
-  }
-
-  return data;
+  return request<Option[]>(path, { signal });
 }
 
 export async function getEmployeeOptions(signal: AbortSignal) {

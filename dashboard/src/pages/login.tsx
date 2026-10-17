@@ -70,8 +70,6 @@ export default function LoginPage() {
                     type="email"
                     autoComplete="username"
                     placeholder="it@company.com"
-                    aria-invalid={Boolean(errors.email)}
-                    aria-describedby={errors.email ? "email-error" : undefined}
                     {...register("email", {
                       required: "Vui lòng nhập email.",
                       maxLength: {
@@ -85,11 +83,7 @@ export default function LoginPage() {
                     })}
                   />
                   {errors.email ? (
-                    <p
-                      id="email-error"
-                      role="alert"
-                      className="text-sm text-destructive"
-                    >
+                    <p className="text-sm text-destructive">
                       {errors.email.message}
                     </p>
                   ) : null}
@@ -100,10 +94,6 @@ export default function LoginPage() {
                     id="password"
                     type="password"
                     autoComplete="current-password"
-                    aria-invalid={Boolean(errors.password)}
-                    aria-describedby={
-                      errors.password ? "password-error" : undefined
-                    }
                     {...register("password", {
                       required: "Vui lòng nhập mật khẩu.",
                       maxLength: {
@@ -113,11 +103,7 @@ export default function LoginPage() {
                     })}
                   />
                   {errors.password ? (
-                    <p
-                      id="password-error"
-                      role="alert"
-                      className="text-sm text-destructive"
-                    >
+                    <p className="text-sm text-destructive">
                       {errors.password.message}
                     </p>
                   ) : null}
@@ -137,7 +123,7 @@ export default function LoginPage() {
                   {mutation.isPending ? (
                     <>
                       <LoaderCircle className="animate-spin" />
-                      Đang đăng nhập…
+                      Đang đăng nhập...
                     </>
                   ) : (
                     <>

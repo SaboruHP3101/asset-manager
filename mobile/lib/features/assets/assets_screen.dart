@@ -242,7 +242,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
                     children: [
                       Text(
                         _loading
-                            ? 'Đang cập nhật tài sản…'
+                            ? 'Đang cập nhật tài sản...'
                             : 'Bạn đang quản lý ${visibleAssets.length} tài sản',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),

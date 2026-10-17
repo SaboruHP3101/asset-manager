@@ -11,6 +11,7 @@ import {
   desc,
   DrizzleQueryError,
   eq,
+  getTableColumns,
   ilike,
   inArray,
   notInArray,
@@ -51,7 +52,34 @@ export class AssetsService {
   }
 
   async findAll() {
-    const records = await this.db.select().from(schema.assets);
+    const records = await this.db
+      .select({
+        ...getTableColumns(schema.assets),
+        name: sql<string>`coalesce(${schema.assets.name}, ${schema.assetCategories.name})`,
+        category: schema.assetCategories.name,
+        assignedTo: schema.employees.fullName,
+        department: schema.departments.name,
+        location: sql<
+          string | null
+        >`coalesce(${schema.warehouses.name}, ${schema.assets.currentLocation})`,
+      })
+      .from(schema.assets)
+      .leftJoin(
+        schema.assetCategories,
+        eq(schema.assets.assetCategoryId, schema.assetCategories.id),
+      )
+      .leftJoin(
+        schema.employees,
+        eq(schema.assets.currentUserId, schema.employees.id),
+      )
+      .leftJoin(
+        schema.departments,
+        eq(schema.assets.currentManagingDepartmentId, schema.departments.id),
+      )
+      .leftJoin(
+        schema.warehouses,
+        eq(schema.assets.currentWarehouseId, schema.warehouses.id),
+      );
 
     return records.map((record) => new Asset(record));
   }

@@ -6,6 +6,7 @@ import OverviewPage from "@/pages/overview";
 import ResourcesPage from "@/pages/resources";
 import NotFoundPage from "@/pages/not-found";
 import EmployeesPage from "@/pages/employees";
+import AssetsPage from "@/pages/assets";
 
 export function App() {
   return (
@@ -21,6 +22,8 @@ export function App() {
               element={
                 page.path === "/employees" ? (
                   <EmployeesPage />
+                ) : page.path === "/assets" ? (
+                  <AssetsPage />
                 ) : (
                   <ResourcesPage />
                 )

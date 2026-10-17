@@ -75,7 +75,7 @@ export default function EmployeeActivationDialog({
             disabled={save.isPending}
             onClick={() => save.mutate()}
           >
-            {save.isPending ? "Đang lưu…" : action}
+            {save.isPending ? "Đang lưu..." : action}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

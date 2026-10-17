@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={value}>
       {token && profile.isPending ? (
         <div className="grid min-h-svh place-items-center" role="status">
-          Đang tải…
+          Đang tải...
         </div>
       ) : token && profile.isError ? (
         <div className="grid min-h-svh place-items-center p-6">
@@ -118,10 +118,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth requires AuthProvider");
+
   return context;
 }
 
 export function RequireAuth() {
   const { token } = useAuth();
+
   return token ? <Outlet /> : <Navigate to="/login" replace />;
 }
