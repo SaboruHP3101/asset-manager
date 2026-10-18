@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Pencil, Plus, ToggleLeft, ToggleRight } from "lucide-react";
+import {
+  CircleCheck,
+  CircleMinus,
+  Pencil,
+  Plus,
+  ToggleLeft,
+  ToggleRight,
+} from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { getEmployees } from "@/lib/employees";
 import EmployeeDialog from "@/components/employee-dialog";
@@ -117,7 +124,24 @@ export default function EmployeesPage() {
                       {employee.isDepartmentHead ? "Có" : "Không"}
                     </TableCell>
                     <TableCell>
-                      {employee.isActive ? "Đang hoạt động" : "Ngừng hoạt động"}
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ${employee.isActive ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}
+                      >
+                        {employee.isActive ? (
+                          <CircleCheck
+                            className="size-3 shrink-0"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <CircleMinus
+                            className="size-3 shrink-0"
+                            aria-hidden="true"
+                          />
+                        )}
+                        {employee.isActive
+                          ? "Đang hoạt động"
+                          : "Ngừng hoạt động"}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">

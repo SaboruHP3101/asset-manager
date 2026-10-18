@@ -9,11 +9,13 @@ import NotFoundPage from "@/pages/not-found";
 import EmployeesPage from "@/pages/employees";
 import AssetsPage from "@/pages/assets";
 import AssetCategoriesPage from "@/pages/asset-categories";
+import WarehousePage from "@/pages/warehouse";
 
 const resourceElements: Record<string, ReactNode> = {
   "/employees": <EmployeesPage />,
   "/assets": <AssetsPage />,
   "/asset-categories": <AssetCategoriesPage />,
+  "/warehouse": <WarehousePage />,
 };
 
 export function App() {

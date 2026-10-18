@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Pencil } from "lucide-react";
 import AssetEditDialog from "@/components/asset-edit-dialog";
+import AssetStatusChip from "@/components/asset-status-chip";
 import type { Asset } from "@/types";
 import { useAuth } from "@/components/auth-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -15,11 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  assetDepartmentLabels,
-  assetStatusLabels,
-  getAssets,
-} from "@/lib/assets";
+import { assetDepartmentLabels, getAssets } from "@/lib/assets";
 
 export default function AssetsPage() {
   const { token } = useAuth();
@@ -110,8 +107,7 @@ export default function AssetsPage() {
                     </TableCell>
                     <TableCell>{asset.location || "—"}</TableCell>
                     <TableCell>
-                      {assetStatusLabels[asset.status.toLowerCase()] ??
-                        "Chưa xác định"}
+                      <AssetStatusChip status={asset.status} />
                     </TableCell>
                     <TableCell>
                       <Button

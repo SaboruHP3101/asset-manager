@@ -81,8 +81,8 @@ export default function AssetCategoryDialog({
           </DialogTitle>
           <DialogDescription>
             {category
-              ? "Đơn vị quản lý và chế độ theo dõi sẽ được cố định sau khi tạo."
-              : "Tạo danh mục tài sản cấp gốc."}
+              ? "Lưu ý: Đơn vị quản lý và chế độ theo dõi sẽ không thể sửa được sau khi tạo."
+              : "Tạo danh mục tài sản."}
           </DialogDescription>
         </DialogHeader>
         <form
