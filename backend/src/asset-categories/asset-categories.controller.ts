@@ -7,6 +7,12 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  ForbiddenException,
+  UseGuards,
+  ValidationPipe,
+  Query,
+  DefaultValuePipe,
+  ParseBoolPipe,
 } from '@nestjs/common';
 import {
   ApiConflictResponse,
@@ -19,6 +25,9 @@ import { AssetCategoriesService } from './asset-categories.service.js';
 import { CreateAssetCategoryDto } from './dto/create-asset-category.dto.js';
 import { UpdateAssetCategoryDto } from './dto/update-asset-category.dto.js';
 import { AssetCategory } from './entities/asset-category.entity.js';
+import { CurrentEmployee } from '../auth/current-employee.decorator.js';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
+import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 
 @ApiTags('asset-categories')
 @Controller('asset-categories')
@@ -28,11 +37,18 @@ export class AssetCategoriesController {
   ) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   @ApiCreatedResponse({ type: AssetCategory })
   @ApiConflictResponse({
     description: 'Mã danh mục đã tồn tại hoặc danh mục cha không hợp lệ',
   })
-  create(@Body() createAssetCategoryDto: CreateAssetCategoryDto) {
+  create(
+    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+    createAssetCategoryDto: CreateAssetCategoryDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    this.requireIT(actor);
+
     return this.assetCategoriesService.create(createAssetCategoryDto);
   }
 
@@ -56,6 +72,7 @@ export class AssetCategoriesController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiOkResponse({ type: AssetCategory })
   @ApiConflictResponse({
     description: 'Mã danh mục đã tồn tại hoặc danh mục cha không hợp lệ',
@@ -63,12 +80,20 @@ export class AssetCategoriesController {
   @ApiNotFoundResponse({ description: 'Không tìm thấy danh mục tài sản' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateAssetCategoryDto: UpdateAssetCategoryDto,
+    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+    updateAssetCategoryDto: UpdateAssetCategoryDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
   ) {
+    this.requireIT(actor);
+
     return this.assetCategoriesService.update(id, updateAssetCategoryDto);
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiConflictResponse({
+    description: 'Danh mục có danh mục con hoặc dữ liệu tham chiếu',
+  })
   @ApiOkResponse({
     schema: {
       example: { deleted: true },
@@ -76,7 +101,21 @@ export class AssetCategoriesController {
     },
   })
   @ApiNotFoundResponse({ description: 'Không tìm thấy danh mục tài sản' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.assetCategoriesService.remove(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+    @Query('force', new DefaultValuePipe(false), ParseBoolPipe) force = false,
+  ) {
+    this.requireIT(actor);
+
+    return this.assetCategoriesService.remove(id, force);
+  }
+
+  private requireIT(actor: AuthenticatedEmployee) {
+    if (actor.departmentName !== 'IT') {
+      throw new ForbiddenException(
+        'Chỉ phòng IT được quản lý danh mục tài sản.',
+      );
+    }
   }
 }

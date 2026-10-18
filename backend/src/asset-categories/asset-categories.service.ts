@@ -1,11 +1,12 @@
 import {
   ConflictException,
+  BadRequestException,
   Inject,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { asc, DrizzleQueryError, eq } from 'drizzle-orm';
+import { and, asc, DrizzleQueryError, eq, inArray, isNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
@@ -31,7 +32,7 @@ export class AssetCategoriesService {
     } catch (error: unknown) {
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
-          'Mã danh mục tài sản đã tồn tại hoặc danh mục cha không hợp lệ',
+          'Mã danh mục tài sản đã tồn tại. Vui lòng chọn mã khác.',
         );
       }
 
@@ -73,14 +74,23 @@ export class AssetCategoriesService {
   }
 
   async update(id: string, updateAssetCategoryDto: UpdateAssetCategoryDto) {
+    await this.requireRoot(id);
+
     try {
       const [updatedAssetCategory] = await this.db
         .update(schema.assetCategories)
         .set({
-          ...updateAssetCategoryDto,
+          code: updateAssetCategoryDto.code,
+          name: updateAssetCategoryDto.name,
+          description: updateAssetCategoryDto.description,
           updatedAt: new Date(),
         })
-        .where(eq(schema.assetCategories.id, id))
+        .where(
+          and(
+            eq(schema.assetCategories.id, id),
+            isNull(schema.assetCategories.parentCategoryId),
+          ),
+        )
         .returning();
 
       if (!updatedAssetCategory) {
@@ -97,7 +107,7 @@ export class AssetCategoriesService {
 
       if (error instanceof DrizzleQueryError) {
         throw new ConflictException(
-          'Mã danh mục tài sản đã tồn tại hoặc danh mục cha không hợp lệ',
+          'Mã danh mục tài sản đã tồn tại. Vui lòng chọn mã khác.',
         );
       }
 
@@ -107,11 +117,79 @@ export class AssetCategoriesService {
     }
   }
 
-  async remove(id: string) {
-    const deletedAssetCategories = await this.db
-      .delete(schema.assetCategories)
-      .where(eq(schema.assetCategories.id, id))
-      .returning({ deletedId: schema.assetCategories.id });
+  async remove(id: string, force = false) {
+    await this.requireRoot(id);
+
+    if (!force) {
+      const children = await this.db
+        .select({
+          id: schema.assetCategories.id,
+          code: schema.assetCategories.code,
+          name: schema.assetCategories.name,
+        })
+        .from(schema.assetCategories)
+        .where(eq(schema.assetCategories.parentCategoryId, id));
+
+      if (children.length > 0) {
+        throw new ConflictException({
+          message:
+            'Danh mục đang có danh mục con. Chọn xóa cả cha và con để tiếp tục.',
+          children,
+        });
+      }
+    }
+
+    let deletedAssetCategories: { deletedId: string }[];
+
+    try {
+      if (force) {
+        deletedAssetCategories = await this.db.transaction(async (tx) => {
+          const categories = await tx
+            .select({
+              id: schema.assetCategories.id,
+              parentCategoryId: schema.assetCategories.parentCategoryId,
+            })
+            .from(schema.assetCategories);
+          const ids = new Set([id]);
+
+          for (const parentId of ids) {
+            for (const category of categories) {
+              if (category.parentCategoryId === parentId) ids.add(category.id);
+            }
+          }
+
+          return tx
+            .delete(schema.assetCategories)
+            .where(inArray(schema.assetCategories.id, [...ids]))
+            .returning({ deletedId: schema.assetCategories.id });
+        });
+      } else {
+        deletedAssetCategories = await this.db
+          .delete(schema.assetCategories)
+          .where(
+            and(
+              eq(schema.assetCategories.id, id),
+              isNull(schema.assetCategories.parentCategoryId),
+            ),
+          )
+          .returning({ deletedId: schema.assetCategories.id });
+      }
+    } catch (error: unknown) {
+      if (
+        error instanceof DrizzleQueryError &&
+        error.cause &&
+        'code' in error.cause &&
+        error.cause.code === '23503'
+      ) {
+        throw new ConflictException(
+          'Không thể xóa vì danh mục có danh mục con hoặc đang được dữ liệu khác tham chiếu.',
+        );
+      }
+
+      throw new InternalServerErrorException(
+        'Không thể xóa danh mục tài sản. Vui lòng thử lại.',
+      );
+    }
 
     if (deletedAssetCategories.length === 0) {
       throw new NotFoundException(
@@ -120,5 +198,15 @@ export class AssetCategoriesService {
     }
 
     return { deleted: true };
+  }
+
+  private async requireRoot(id: string) {
+    const category = await this.findOne(id);
+
+    if (category.parentCategoryId !== null) {
+      throw new BadRequestException(
+        'Chỉ được quản lý danh mục tài sản cấp gốc.',
+      );
+    }
   }
 }

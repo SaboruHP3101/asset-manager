@@ -1,6 +1,9 @@
-import { PartialType } from '@nestjs/swagger';
+import { OmitType, PartialType } from '@nestjs/swagger';
 import { CreateAssetCategoryDto } from './create-asset-category.dto.js';
 
 export class UpdateAssetCategoryDto extends PartialType(
-  CreateAssetCategoryDto,
+  OmitType(CreateAssetCategoryDto, [
+    'managementOwner',
+    'trackingMode',
+  ] as const),
 ) {}

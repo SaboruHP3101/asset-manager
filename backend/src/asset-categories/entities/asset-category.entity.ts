@@ -4,6 +4,8 @@ export class AssetCategory {
   name: string;
   parentCategoryId?: string | null;
   description?: string | null;
+  managementOwner: 'it' | 'procurement';
+  trackingMode: 'individual_asset' | 'consumable';
   isPurchaseOption: boolean;
   allowsCustomType: boolean;
   createdAt: Date;

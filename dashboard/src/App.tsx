@@ -1,4 +1,5 @@
 import { Route, Routes } from "react-router";
+import type { ReactNode } from "react";
 import { RequireAuth } from "@/components/auth-provider";
 import { MainLayout, resourcePages } from "@/components/main-layout";
 import LoginPage from "@/pages/login";
@@ -7,6 +8,13 @@ import ResourcesPage from "@/pages/resources";
 import NotFoundPage from "@/pages/not-found";
 import EmployeesPage from "@/pages/employees";
 import AssetsPage from "@/pages/assets";
+import AssetCategoriesPage from "@/pages/asset-categories";
+
+const resourceElements: Record<string, ReactNode> = {
+  "/employees": <EmployeesPage />,
+  "/assets": <AssetsPage />,
+  "/asset-categories": <AssetCategoriesPage />,
+};
 
 export function App() {
   return (
@@ -19,15 +27,7 @@ export function App() {
             <Route
               key={page.path}
               path={page.path}
-              element={
-                page.path === "/employees" ? (
-                  <EmployeesPage />
-                ) : page.path === "/assets" ? (
-                  <AssetsPage />
-                ) : (
-                  <ResourcesPage />
-                )
-              }
+              element={resourceElements[page.path] ?? <ResourcesPage />}
             />
           ))}
           <Route path="*" element={<NotFoundPage />} />

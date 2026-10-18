@@ -1,10 +1,10 @@
 import {
-  IsBoolean,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
-  IsUUID,
   MaxLength,
+  Matches,
 } from 'class-validator';
 
 export class CreateAssetCategoryDto {
@@ -12,31 +12,24 @@ export class CreateAssetCategoryDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
+  @Matches(/\S/)
   code: string;
 
   /** Tên hiển thị của danh mục tài sản. */
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
+  @Matches(/\S/)
   name: string;
-
-  /** UUID của danh mục cha, dùng cho cấu trúc danh mục phân cấp. */
-  @IsUUID()
-  @IsOptional()
-  parentCategoryId?: string;
 
   /** Mô tả tùy chọn của danh mục tài sản. */
   @IsString()
   @IsOptional()
   description?: string;
 
-  /** Cho phép nhân viên chọn danh mục này khi tạo đề nghị mua. */
-  @IsBoolean()
-  @IsOptional()
-  isPurchaseOption?: boolean;
+  @IsIn(['it', 'procurement'])
+  managementOwner: 'it' | 'procurement';
 
-  /** Yêu cầu người dùng mô tả loại tài sản khi chọn danh mục này. */
-  @IsBoolean()
-  @IsOptional()
-  allowsCustomType?: boolean;
+  @IsIn(['individual_asset', 'consumable'])
+  trackingMode: 'individual_asset' | 'consumable';
 }
