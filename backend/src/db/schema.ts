@@ -1149,22 +1149,122 @@ export const assetLiquidationItems = pgTable('asset_liquidation_items', {
   updatedBy: updatedBy(),
 });
 
-export const assetDepreciations = pgTable('asset_depreciations', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  assetId: uuid('asset_id')
-    .notNull()
-    .references(() => assets.id),
-  fromDate: date('from_date', { mode: 'string' }).notNull(),
-  toDate: date('to_date', { mode: 'string' }).notNull(),
-  openingValue: numeric('opening_value').notNull(),
-  depreciationAmount: numeric('depreciation_amount').notNull(),
-  remainingValue: numeric('remaining_value').notNull(),
-  depreciationMethod: varchar('depreciation_method', { length: 100 }).notNull(),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-  createdBy: createdBy(),
-  updatedBy: updatedBy(),
-});
+export const depreciationSettings = pgTable(
+  'depreciation_settings',
+  {
+    id: integer('id').primaryKey().default(1),
+    firstMonth: date('first_month', { mode: 'string' }).notNull(),
+  },
+  (table) => [check('depreciation_settings_singleton', sql`${table.id} = 1`)],
+);
+
+export const assetDepreciationProfiles = pgTable(
+  'asset_depreciation_profiles',
+  {
+    assetId: uuid('asset_id')
+      .primaryKey()
+      .references(() => assets.id),
+    originalCost: numeric('original_cost', {
+      precision: 18,
+      scale: 0,
+    }).notNull(),
+    openingValue: numeric('opening_value', {
+      precision: 18,
+      scale: 0,
+    }).notNull(),
+    firstMonth: date('first_month', { mode: 'string' }).notNull(),
+    startDate: date('start_date', { mode: 'string' }).notNull(),
+    termMonths: integer('term_months').notNull(),
+    remainingMonths: integer('remaining_months').notNull(),
+    stopDate: date('stop_date', { mode: 'string' }),
+    updatedAt: updatedAt(),
+    updatedBy: updatedBy(),
+  },
+  (table) => [
+    check(
+      'depreciation_profile_values',
+      sql`${table.originalCost} > 0 and ${table.openingValue} >= 0 and ${table.openingValue} <= ${table.originalCost}`,
+    ),
+    check(
+      'depreciation_profile_term',
+      sql`${table.remainingMonths} > 0 and ${table.remainingMonths} <= ${table.termMonths} and ${table.termMonths} <= 1200`,
+    ),
+    check(
+      'depreciation_profile_dates',
+      sql`${table.stopDate} is null or ${table.stopDate} >= ${table.startDate}`,
+    ),
+  ],
+);
+
+export type DepreciationLine = {
+  assetId: string;
+  assetCode: string;
+  name: string | null;
+  originalCost: string;
+  termMonths: number;
+  openingValue: string;
+  depreciationAmount: string;
+  remainingValue: string;
+  fromDate: string;
+  toDate: string;
+};
+
+export const depreciationPeriods = pgTable(
+  'depreciation_periods',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    month: date('month', { mode: 'string' }).notNull().unique(),
+    status: varchar('status', { length: 30 })
+      .$type<'draft' | 'pending_approval' | 'recorded'>()
+      .notNull()
+      .default('draft'),
+    lines: jsonb('lines').$type<DepreciationLine[]>().notNull().default([]),
+    calculatedAt: timestamp('calculated_at', { withTimezone: true }),
+    submittedBy: uuid('submitted_by').references(() => employees.id),
+    returnReason: text('return_reason'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    check(
+      'depreciation_period_status',
+      sql`${table.status} in ('draft', 'pending_approval', 'recorded')`,
+    ),
+    check(
+      'depreciation_period_month',
+      sql`extract(day from ${table.month}) = 1`,
+    ),
+  ],
+);
+
+export const assetDepreciations = pgTable(
+  'asset_depreciations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    periodId: uuid('period_id').references(() => depreciationPeriods.id),
+    assetId: uuid('asset_id')
+      .notNull()
+      .references(() => assets.id),
+    fromDate: date('from_date', { mode: 'string' }).notNull(),
+    toDate: date('to_date', { mode: 'string' }).notNull(),
+    openingValue: numeric('opening_value').notNull(),
+    depreciationAmount: numeric('depreciation_amount').notNull(),
+    remainingValue: numeric('remaining_value').notNull(),
+    depreciationMethod: varchar('depreciation_method', {
+      length: 100,
+    }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    createdBy: createdBy(),
+    updatedBy: updatedBy(),
+  },
+  (table) => [
+    uniqueIndex('uq_depreciation_period_asset').on(
+      table.periodId,
+      table.assetId,
+    ),
+  ],
+);
 
 export const attachments = pgTable('attachments', {
   id: uuid('id').primaryKey().defaultRandom(),

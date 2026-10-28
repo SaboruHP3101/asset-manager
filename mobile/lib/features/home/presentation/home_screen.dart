@@ -6,6 +6,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/utils/department_labels.dart';
 import '../../../core/widgets/status_card.dart';
 import '../../asset_allocations/asset_allocation_queue_screen.dart';
+import '../../asset_depreciations/depreciation_screens.dart';
 import '../../asset_recalls/asset_recall_requests_screen.dart';
 import '../../asset_recalls/asset_upgrade_requests_screen.dart';
 import '../../purchase_orders/purchase_orders_screen.dart';
@@ -243,6 +244,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<_QuickAction> get _quickActions => [
+    if (_actions.contains('depreciation.view'))
+      _QuickAction(
+        title: 'Khấu hao',
+        icon: Icons.trending_down,
+        onTap: () => _open(DepreciationPeriodsScreen(profile: widget.profile)),
+      ),
     if (widget.onScanAssets != null || widget.onOpenAssets != null)
       _QuickAction(
         title: 'Quét mã QR',

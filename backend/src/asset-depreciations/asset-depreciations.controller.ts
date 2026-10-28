@@ -1,79 +1,110 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   ParseUUIDPipe,
-  Patch,
   Post,
+  Put,
+  UseGuards,
+  ValidationPipe,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { CurrentEmployee } from '../auth/current-employee.decorator.js';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import {
-  ApiConflictResponse,
-  ApiCreatedResponse,
-  ApiNotFoundResponse,
-  ApiOkResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+  RequireWorkflowAction,
+  WorkflowActionGuard,
+} from '../auth/workflow-action.guard.js';
+import { WORKFLOW_ACTIONS } from '../auth/workflow-actions.config.js';
+import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 import { AssetDepreciationsService } from './asset-depreciations.service.js';
-import { CreateAssetDepreciationDto } from './dto/create-asset-depreciation.dto.js';
-import { UpdateAssetDepreciationDto } from './dto/update-asset-depreciation.dto.js';
-import { AssetDepreciation } from './entities/asset-depreciation.entity.js';
+import {
+  DepreciationDecisionDto,
+  DepreciationProfileDto,
+  DepreciationSettingsDto,
+} from './dto/depreciation-workflow.dto.js';
 
 @ApiTags('asset-depreciations')
 @Controller('asset-depreciations')
+@UseGuards(JwtAuthGuard, WorkflowActionGuard)
 export class AssetDepreciationsController {
-  constructor(
-    private readonly assetDepreciationsService: AssetDepreciationsService,
-  ) {}
+  constructor(private readonly service: AssetDepreciationsService) {}
 
-  @Post()
-  @ApiCreatedResponse({ type: AssetDepreciation })
-  @ApiConflictResponse({
-    description: 'Dữ liệu đã tồn tại hoặc có tham chiếu không hợp lệ',
-  })
-  create(@Body() dto: CreateAssetDepreciationDto) {
-    return this.assetDepreciationsService.create(dto);
+  @Get('settings')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.depreciationView)
+  getSettings(@CurrentEmployee() actor: AuthenticatedEmployee) {
+    return this.service.getSettings(actor);
   }
 
-  @Get()
-  @ApiOkResponse({ type: AssetDepreciation, isArray: true })
-  findAll() {
-    return this.assetDepreciationsService.findAll();
-  }
-
-  @Get(':id')
-  @ApiOkResponse({ type: AssetDepreciation })
-  @ApiNotFoundResponse({ description: 'Không tìm thấy khấu hao tài sản' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.assetDepreciationsService.findOne(id);
-  }
-
-  @Patch(':id')
-  @ApiOkResponse({ type: AssetDepreciation })
-  @ApiConflictResponse({
-    description: 'Dữ liệu đã tồn tại hoặc có tham chiếu không hợp lệ',
-  })
-  @ApiNotFoundResponse({ description: 'Không tìm thấy khấu hao tài sản' })
-  update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateAssetDepreciationDto,
+  @Post('settings')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.depreciationPrepare)
+  initialize(
+    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+    dto: DepreciationSettingsDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
   ) {
-    return this.assetDepreciationsService.update(id, dto);
+    return this.service.initialize(dto, actor);
   }
 
-  @Delete(':id')
-  @ApiOkResponse({
-    schema: {
-      example: { deleted: true },
-      properties: { deleted: { type: 'boolean' } },
-    },
-  })
-  @ApiConflictResponse({
-    description: 'Không thể xóa vì dữ liệu đang được tham chiếu',
-  })
-  @ApiNotFoundResponse({ description: 'Không tìm thấy khấu hao tài sản' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.assetDepreciationsService.remove(id);
+  @Get('assets')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.depreciationView)
+  listAssets(@CurrentEmployee() actor: AuthenticatedEmployee) {
+    return this.service.listAssets(actor);
+  }
+
+  @Put('assets/:id/configuration')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.depreciationPrepare)
+  configureAsset(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+    dto: DepreciationProfileDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.service.configureAsset(id, dto, actor);
+  }
+
+  @Get('periods')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.depreciationView)
+  findAll(@CurrentEmployee() actor: AuthenticatedEmployee) {
+    return this.service.findAll(actor);
+  }
+
+  @Get('periods/:id')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.depreciationView)
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.service.findOne(id, actor);
+  }
+
+  @Post('periods/:id/recalculate')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.depreciationPrepare)
+  recalculate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.service.recalculate(id, actor);
+  }
+
+  @Post('periods/:id/submit')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.depreciationPrepare)
+  submit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.service.submit(id, actor);
+  }
+
+  @Post('periods/:id/decision')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.depreciationApprove)
+  decide(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+    dto: DepreciationDecisionDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.service.decide(id, dto, actor);
   }
 }

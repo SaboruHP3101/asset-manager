@@ -15,6 +15,17 @@ const seedAccounts = [
 ] as const;
 
 describe('seed account purchase actions', () => {
+  it('separates Accounting preparation from head approval by department', () => {
+    const staff = getAllowedWorkflowActions('EMPLOYEE', false, 'ACCOUNTING');
+    const head = getAllowedWorkflowActions('ACCOUNTING', true, 'ACCOUNTING');
+    const moved = getAllowedWorkflowActions('ACCOUNTING', true, 'IT');
+
+    expect(staff).toContain(WORKFLOW_ACTIONS.depreciationPrepare);
+    expect(staff).not.toContain(WORKFLOW_ACTIONS.depreciationApprove);
+    expect(head).toContain(WORKFLOW_ACTIONS.depreciationApprove);
+    expect(head).not.toContain(WORKFLOW_ACTIONS.depreciationPrepare);
+    expect(moved).not.toContain(WORKFLOW_ACTIONS.depreciationView);
+  });
   it.each(seedAccounts)(
     '%s luôn có action tự phục vụ',
     (_code, role, department, isHead) => {

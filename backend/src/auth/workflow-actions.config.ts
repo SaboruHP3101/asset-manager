@@ -50,6 +50,9 @@ export const WORKFLOW_ACTIONS = {
   assetRecallConfirmUpgradeReturn: 'asset.recall.confirm_upgrade_return',
   assetRecallCompleteDisposal: 'asset.recall.complete_disposal',
   warehouseItView: 'warehouse.it.view',
+  depreciationView: 'depreciation.view',
+  depreciationPrepare: 'depreciation.prepare',
+  depreciationApprove: 'depreciation.approve',
 } as const;
 
 export type WorkflowAction =
@@ -166,6 +169,14 @@ export function getAllowedWorkflowActions(
       ...departmentActions,
       ...(isDepartmentHead ? DEPARTMENT_HEAD_ACTIONS : []),
       ...departmentHeadPurchaseActions,
+      ...(departmentName === 'ACCOUNTING'
+        ? [
+            WORKFLOW_ACTIONS.depreciationView,
+            isDepartmentHead
+              ? WORKFLOW_ACTIONS.depreciationApprove
+              : WORKFLOW_ACTIONS.depreciationPrepare,
+          ]
+        : []),
     ]),
   ];
 }

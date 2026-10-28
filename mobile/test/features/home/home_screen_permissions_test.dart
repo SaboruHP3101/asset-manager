@@ -24,6 +24,33 @@ Widget _home({
 );
 
 void main() {
+  for (final canView in [false, true]) {
+    testWidgets('depreciation shortcut follows view permission: $canView', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _home(
+          profile: AuthenticatedProfile(
+            department: 'ACCOUNTING',
+            isDepartmentHead: false,
+            allowedActions: canView
+                ? {'depreciation.view', 'depreciation.prepare'}
+                : {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Thao tác nhanh'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.drag(find.byType(ListView), const Offset(0, -250));
+      await tester.pumpAndSettle();
+      expect(find.text('Khấu hao'), canView ? findsOneWidget : findsNothing);
+    });
+  }
+
   testWidgets('nhân viên thường không thấy công việc nghiệp vụ chuyên môn', (
     tester,
   ) async {

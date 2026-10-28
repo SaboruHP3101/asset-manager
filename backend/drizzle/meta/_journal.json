@@ -50,6 +50,13 @@
       "when": 1791696882004,
       "tag": "0006_slimy_abomination",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792502091273,
+      "tag": "0007_monthly-depreciation",
+      "breakpoints": true
     }
   ]
 }

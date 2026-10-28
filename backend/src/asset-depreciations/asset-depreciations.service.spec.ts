@@ -1,19 +1,67 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { DRIZZLE } from '../drizzle/drizzle.module.js';
+import { ForbiddenException, Logger } from '@nestjs/common';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { vi } from 'vitest';
+import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
+import * as schema from '../db/schema.js';
 import { AssetDepreciationsService } from './asset-depreciations.service.js';
 
+const actor: AuthenticatedEmployee = {
+  id: 'staff',
+  email: 'staff@example.com',
+  roleId: 'role',
+  roleName: 'EMPLOYEE',
+  departmentId: 'department',
+  departmentName: 'ACCOUNTING',
+  isDepartmentHead: false,
+};
+
 describe('AssetDepreciationsService', () => {
-  let service: AssetDepreciationsService;
+  const database = { transaction: vi.fn() };
+  const service = new AssetDepreciationsService(
+    database as unknown as NodePgDatabase<typeof schema>,
+  );
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AssetDepreciationsService,
-        { provide: DRIZZLE, useValue: {} },
-      ],
-    }).compile();
-
-    service = module.get<AssetDepreciationsService>(AssetDepreciationsService);
+  afterEach(() => {
+    service.onModuleDestroy();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
-  it('should be defined', () => expect(service).toBeDefined());
+
+  it('rejects another department before accessing data', async () => {
+    await expect(
+      service.findAll({ ...actor, departmentName: 'IT' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(database.transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects approval by staff and preparation by the head', async () => {
+    await expect(
+      service.decide('period', { decision: 'approve' }, actor),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      service.submit('period', { ...actor, isDepartmentHead: true }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('retries scheduler failures and cancels the timer on shutdown', async () => {
+    vi.useFakeTimers();
+    const scheduled = new AssetDepreciationsService(
+      database as unknown as NodePgDatabase<typeof schema>,
+    );
+    const ensure = vi
+      .spyOn(scheduled, 'ensureDuePeriods')
+      .mockRejectedValueOnce(new Error('database offline'))
+      .mockResolvedValue(undefined);
+    const log = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+
+    scheduled.onApplicationBootstrap();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(log).toHaveBeenCalledOnce();
+    expect(ensure).toHaveBeenCalledTimes(2);
+    scheduled.onModuleDestroy();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(ensure).toHaveBeenCalledTimes(2);
+  });
 });

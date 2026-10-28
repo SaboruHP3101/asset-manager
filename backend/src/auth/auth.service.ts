@@ -161,8 +161,6 @@ export class AuthService {
 
       if (!profile) throw new UnauthorizedException('Account not found.');
 
-      // Trả quyền đã phân giải để Flutter hiển thị đúng nút hành động mà không
-      // phải sao chép bảng role-to-action sang mã Dart.
       return {
         ...profile,
         allowedActions: getAllowedWorkflowActions(
