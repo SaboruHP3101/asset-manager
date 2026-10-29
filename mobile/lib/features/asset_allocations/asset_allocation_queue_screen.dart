@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/textarea_decoration.dart';
 import '../../core/utils/department_labels.dart';
 import 'asset_allocation_models.dart';
 import 'asset_allocations_repository.dart';
@@ -434,7 +435,6 @@ class _AllocationTaskCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     child: InkWell(
-      borderRadius: BorderRadius.circular(12),
       onTap: disabled ? null : () => onChanged(!selected),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -740,9 +740,12 @@ Future<String?> _rejectionReason(BuildContext context) async {
         controller: controller,
         autofocus: true,
         maxLines: 3,
-        decoration: const InputDecoration(
-          labelText: 'Lý do bắt buộc',
-          border: OutlineInputBorder(),
+        decoration: textareaDecoration(
+          context,
+          const InputDecoration(
+            labelText: 'Lý do bắt buộc',
+            border: OutlineInputBorder(),
+          ),
         ),
       ),
       actions: [

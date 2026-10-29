@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/purchase_receipts/purchase_receipt_form.dart';
 import 'package:mobile/features/purchase_receipts/purchase_receipt_models.dart';
 import 'package:mobile/features/purchase_receipts/purchase_receipts_repository.dart';
@@ -35,6 +36,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseReceiptFormScreen(
           orderId: 'order-id',
           repository: _FakeRepository(),
@@ -72,6 +74,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseReceiptFormScreen(
           orderId: 'order-id',
           repository: _FakeRepository(),

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/asset_recalls/asset_recall_form.dart';
 import 'package:mobile/features/asset_recalls/asset_recalls_repository.dart';
 import 'package:mobile/features/asset_recalls/asset_upgrade_form.dart';
@@ -36,6 +37,7 @@ class _FakeRepository extends AssetRecallsRepository {
 }
 
 Widget _form(_FakeRepository repository) => MaterialApp(
+  theme: buildAppTheme(),
   home: AssetRecallForm(
     assetId: 'asset-id',
     assetName: 'MacBook Pro',
@@ -129,6 +131,7 @@ void main() {
     final repository = _FakeRepository();
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: AssetUpgradeForm(
           assetId: 'asset-id',
           assetName: 'MacBook Pro',

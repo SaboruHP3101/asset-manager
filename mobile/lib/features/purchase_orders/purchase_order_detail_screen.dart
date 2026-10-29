@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/textarea_decoration.dart';
 import 'purchase_order_form.dart';
 import 'purchase_order_models.dart';
 import 'purchase_orders_repository.dart';
@@ -340,8 +341,9 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
                       reason = value;
                       setSheetState(() {});
                     },
-                    decoration: const InputDecoration(
-                      labelText: 'Lý do bắt buộc',
+                    decoration: textareaDecoration(
+                      context,
+                      const InputDecoration(labelText: 'Lý do bắt buộc'),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -399,7 +401,10 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
           autofocus: true,
           maxLines: 3,
           onChanged: (value) => reason = value,
-          decoration: const InputDecoration(labelText: 'Lý do bắt buộc'),
+          decoration: textareaDecoration(
+            context,
+            const InputDecoration(labelText: 'Lý do bắt buộc'),
+          ),
         ),
         actions: [
           TextButton(

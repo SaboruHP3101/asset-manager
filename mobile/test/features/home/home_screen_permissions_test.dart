@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/auth/auth_session.dart';
 import 'package:mobile/features/home/presentation/home_screen.dart';
 
@@ -16,6 +17,7 @@ Widget _home({
   required AuthenticatedProfile profile,
   HomeDashboardData dashboard = _dashboardWithEveryTask,
 }) => MaterialApp(
+  theme: buildAppTheme(),
   home: HomeScreen(
     key: ValueKey(dashboard),
     profile: profile,

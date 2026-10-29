@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/requests/my_requests_screen.dart';
 
 final _items = [
@@ -30,6 +31,7 @@ final _items = [
 ];
 
 Widget _screen() => MaterialApp(
+  theme: buildAppTheme(),
   home: MyRequestsScreen(
     loader: () async => MyRequestsData(
       mine: _items,

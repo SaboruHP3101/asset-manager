@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/auth/auth_session.dart';
 import 'package:mobile/features/asset_allocations/asset_allocation_models.dart';
 import 'package:mobile/features/asset_allocations/asset_allocations_repository.dart';
@@ -88,6 +89,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseHubScreen(
           profile: const AuthenticatedProfile(
             department: 'BUSINESS',
@@ -138,6 +140,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseHubScreen(
           profile: const AuthenticatedProfile(
             department: 'PROCUREMENT',
@@ -184,6 +187,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseHubScreen(
           profile: const AuthenticatedProfile(
             department: 'BUSINESS',

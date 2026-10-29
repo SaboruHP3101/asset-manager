@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/purchase_orders/purchase_order_detail_screen.dart';
 import 'package:mobile/features/purchase_orders/purchase_order_models.dart';
 import 'package:mobile/features/purchase_orders/purchase_orders_repository.dart';
@@ -139,6 +140,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseOrderDetailScreen(
           orderId: detail.id,
           repository: _FakeRepository(detail),
@@ -165,6 +167,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseOrderDetailScreen(
           orderId: detail.id,
           repository: _FakeRepository(detail),
@@ -204,6 +207,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseOrderDetailScreen(
           orderId: initial.id,
           repository: repository,
@@ -246,6 +250,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseOrderDetailScreen(
           orderId: 'order-id',
           repository: repository,
@@ -299,6 +304,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseOrderDetailScreen(
           orderId: 'order-id',
           repository: repository,
@@ -341,6 +347,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseOrderDetailScreen(
           orderId: 'order-id',
           repository: repository,
@@ -370,6 +377,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseOrderDetailScreen(
           orderId: 'order-id',
           repository: repository,

@@ -261,11 +261,6 @@ class _AssetsScreenState extends State<AssetsScreen> {
                                   tooltip: 'Xóa tìm kiếm',
                                   icon: const Icon(Icons.clear),
                                 ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                          filled: true,
                         ),
                         onChanged: (_) => setState(() {}),
                         onSubmitted: (_) => _loadAssets(),
@@ -416,7 +411,7 @@ class AssetCard extends StatelessWidget {
               Hero(
                 tag: 'asset-image-$assetId',
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(16),
                   child: SizedBox.square(
                     dimension: 88,
                     child: _AssetImage(imageUrl: imageUrl, iconSize: 34),

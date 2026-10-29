@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'core/theme/app_theme.dart';
 import 'features/login/login_screen.dart';
 
 void main() {
@@ -15,10 +16,7 @@ class MainApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'My Flutter App',
       home: const LoginScreen(),
-      theme: ThemeData(
-        textTheme: TextTheme().apply(bodyColor: Colors.black),
-        useMaterial3: true,
-      ),
+      theme: buildAppTheme(),
     );
   }
 }

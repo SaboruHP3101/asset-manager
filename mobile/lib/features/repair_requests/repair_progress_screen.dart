@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/theme/textarea_decoration.dart';
 import '../../core/widgets/vertical_timeline.dart';
 import 'repair_request_form.dart';
 
@@ -158,9 +159,12 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
             minLines: 3,
             maxLines: 6,
             onChanged: (text) => setDialogState(() => value = text.trim()),
-            decoration: InputDecoration(
-              labelText: label,
-              border: const OutlineInputBorder(),
+            decoration: textareaDecoration(
+              context,
+              InputDecoration(
+                labelText: label,
+                border: const OutlineInputBorder(),
+              ),
             ),
           ),
           actions: [

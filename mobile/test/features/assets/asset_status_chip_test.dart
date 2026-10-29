@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/assets/asset_detail_screen.dart';
 import 'package:mobile/features/assets/asset_status_chip.dart';
 import 'package:mobile/features/assets/assets_screen.dart';
@@ -21,8 +22,9 @@ void main() {
 
   testWidgets('mã tài sản được render thành QR', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(body: AssetQrCodeView(data: 'asset-qr-id')),
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: const Scaffold(body: AssetQrCodeView(data: 'asset-qr-id')),
       ),
     );
 
@@ -41,6 +43,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: Scaffold(
           body: AssetCard(
             asset: const {

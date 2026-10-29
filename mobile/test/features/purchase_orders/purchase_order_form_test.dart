@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/purchase_orders/purchase_order_form.dart';
 import 'package:mobile/features/purchase_orders/purchase_order_models.dart';
 import 'package:mobile/features/purchase_orders/purchase_orders_repository.dart';
@@ -37,6 +38,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseOrderFormScreen(
           repository: _FakeRepository(),
           initialRequestId: 'request-id',
@@ -61,6 +63,7 @@ void main() {
   testWidgets('chọn hạng mục cập nhật tóm tắt và cho phép lưu', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseOrderFormScreen(
           repository: _FakeRepository(),
           initialRequestId: 'request-id',

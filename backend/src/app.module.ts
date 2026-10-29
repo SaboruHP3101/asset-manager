@@ -32,6 +32,7 @@ import { PurchaseReceiptsModule } from './purchase-receipts/purchase-receipts.mo
 import { AssetAllocationsModule } from './asset-allocations/asset-allocations.module.js';
 import { AssetRecallRequestsModule } from './asset-recall-requests/asset-recall-requests.module.js';
 import { WarehousesModule } from './warehouses/warehouses.module.js';
+import { ChatModule } from './chat/chat.module.js';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { WarehousesModule } from './warehouses/warehouses.module.js';
       expandVariables: true, // Thêm dòng này để NestJS tự dịch các biến ${} trong file .env
     }),
     DrizzleModule,
+    ChatModule,
     RequestAuditModule,
     NotificationsModule,
     PurchaseRequestsModule,

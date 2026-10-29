@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/purchase_orders/purchase_order_models.dart';
 import 'package:mobile/features/purchase_orders/purchase_orders_repository.dart';
 import 'package:mobile/features/purchase_orders/purchase_orders_screen.dart';
@@ -28,6 +29,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseOrdersScreen(
           repository: _FakeRepository(),
           allowedActions: const {
@@ -50,6 +52,7 @@ void main() {
   testWidgets('Trưởng Thu mua dùng chung tab cần xử lý', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseOrdersScreen(
           repository: _FakeRepository(),
           allowedActions: const {
@@ -88,6 +91,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseOrdersScreen(
           repository: repository,
           allowedActions: const {

@@ -8,7 +8,6 @@ import {
   integer,
   jsonb,
   numeric,
-  index,
   pgEnum,
   pgTable,
   text,
@@ -249,34 +248,27 @@ export const employees = pgTable('employees', {
   updatedBy: updatedBy(),
 });
 
-export const assetCategories = pgTable(
-  'asset_categories',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    code: varchar('code', { length: 100 }).notNull().unique(),
-    name: varchar('name', { length: 255 }).notNull(),
-    parentCategoryId: uuid('parent_category_id').references(
-      (): AnyPgColumn => assetCategories.id,
-    ),
-    description: text('description'),
-    managementOwner: assetManagementOwnerEnum('management_owner')
-      .notNull()
-      .default('procurement'),
-    trackingMode: assetTrackingModeEnum('tracking_mode')
-      .notNull()
-      .default('individual_asset'),
-    isPurchaseOption: boolean('is_purchase_option').notNull().default(false),
-    allowsCustomType: boolean('allows_custom_type').notNull().default(false),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-    createdBy: createdBy(),
-    updatedBy: updatedBy(),
-  },
-  (table) => [
-    index('idx_asset_category_management_owner').on(table.managementOwner),
-    index('idx_asset_category_tracking_mode').on(table.trackingMode),
-  ],
-);
+export const assetCategories = pgTable('asset_categories', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  code: varchar('code', { length: 100 }).notNull().unique(),
+  name: varchar('name', { length: 255 }).notNull(),
+  parentCategoryId: uuid('parent_category_id').references(
+    (): AnyPgColumn => assetCategories.id,
+  ),
+  description: text('description'),
+  managementOwner: assetManagementOwnerEnum('management_owner')
+    .notNull()
+    .default('procurement'),
+  trackingMode: assetTrackingModeEnum('tracking_mode')
+    .notNull()
+    .default('individual_asset'),
+  isPurchaseOption: boolean('is_purchase_option').notNull().default(false),
+  allowsCustomType: boolean('allows_custom_type').notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+  createdBy: createdBy(),
+  updatedBy: updatedBy(),
+});
 
 export const suppliers = pgTable('suppliers', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -315,30 +307,22 @@ export const supplierAddresses = pgTable('supplier_addresses', {
   country: varchar('country', { length: 255 }).notNull(),
 });
 
-export const purchaseRequests = pgTable(
-  'purchase_requests',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    requestCode: varchar('request_code', { length: 100 }).notNull().unique(),
-    status: purchaseRequestStatusEnum('status').notNull().default('draft'),
-    currentRevision: integer('current_revision').notNull().default(1),
-    requesterId: uuid('requester_id')
-      .notNull()
-      .references(() => employees.id),
-    departmentId: uuid('department_id')
-      .notNull()
-      .references(() => departments.id),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-    createdBy: createdBy(),
-    updatedBy: updatedBy(),
-  },
-  (table) => [
-    index('idx_purchase_request_status').on(table.status),
-    index('idx_purchase_department').on(table.departmentId),
-    index('idx_purchase_requester').on(table.requesterId),
-  ],
-);
+export const purchaseRequests = pgTable('purchase_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  requestCode: varchar('request_code', { length: 100 }).notNull().unique(),
+  status: purchaseRequestStatusEnum('status').notNull().default('draft'),
+  currentRevision: integer('current_revision').notNull().default(1),
+  requesterId: uuid('requester_id')
+    .notNull()
+    .references(() => employees.id),
+  departmentId: uuid('department_id')
+    .notNull()
+    .references(() => departments.id),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+  createdBy: createdBy(),
+  updatedBy: updatedBy(),
+});
 
 export const purchaseRequestRevisions = pgTable(
   'purchase_request_revisions',
@@ -364,7 +348,6 @@ export const purchaseRequestRevisions = pgTable(
       table.purchaseRequestId,
       table.revisionNumber,
     ),
-    index('idx_purchase_request_revision_request').on(table.purchaseRequestId),
     check(
       'chk_purchase_request_revision_positive',
       sql`${table.revisionNumber} > 0`,
@@ -407,7 +390,6 @@ export const purchaseRequestItems = pgTable(
       table.requestRevisionId,
       table.sortOrder,
     ),
-    index('idx_purchase_request_item_revision').on(table.requestRevisionId),
     check('chk_purchase_request_item_quantity', sql`${table.quantity} > 0`),
     check('chk_purchase_request_item_sort_order', sql`${table.sortOrder} > 0`),
   ],
@@ -446,7 +428,6 @@ export const purchaseRequestQuotes = pgTable(
     uniqueIndex('uq_purchase_request_quote_selected')
       .on(table.requestItemId)
       .where(sql`${table.isSelected} = true`),
-    index('idx_purchase_request_quote_item').on(table.requestItemId),
     check(
       'chk_purchase_request_quote_price',
       sql`${table.unitPriceExclVat} >= 0`,
@@ -477,49 +458,41 @@ export const purchaseContracts = pgTable('purchase_contracts', {
   updatedBy: updatedBy(),
 });
 
-export const purchaseOrders = pgTable(
-  'purchase_orders',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    purchaseOrderCode: varchar('purchase_order_code', { length: 100 })
-      .notNull()
-      .unique(),
-    purchaseRequestId: uuid('purchase_request_id')
-      .notNull()
-      .references(() => purchaseRequests.id),
-    requestRevisionId: uuid('request_revision_id')
-      .notNull()
-      .references(() => purchaseRequestRevisions.id),
-    contractId: uuid('contract_id').references(() => purchaseContracts.id),
-    supplierId: uuid('supplier_id')
-      .notNull()
-      .references(() => suppliers.id),
-    createdByEmployeeId: uuid('created_by_employee_id')
-      .notNull()
-      .references(() => employees.id),
-    orderDate: date('order_date', { mode: 'string' }).notNull(),
-    expectedDeliveryDate: date('expected_delivery_date', {
-      mode: 'string',
-    }).notNull(),
-    status: purchaseOrderStatusEnum('status').notNull().default('draft'),
-    submittedAt: timestamp('submitted_at', { withTimezone: true }),
-    submittedBy: uuid('submitted_by').references(() => employees.id),
-    approvedAt: timestamp('approved_at', { withTimezone: true }),
-    approvedBy: uuid('approved_by').references(() => employees.id),
-    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
-    cancelledBy: uuid('cancelled_by').references(() => employees.id),
-    cancellationReason: text('cancellation_reason'),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-    createdBy: createdBy(),
-    updatedBy: updatedBy(),
-  },
-  (table) => [
-    index('idx_purchase_order_request').on(table.purchaseRequestId),
-    index('idx_purchase_order_revision').on(table.requestRevisionId),
-    index('idx_purchase_order_status').on(table.status),
-  ],
-);
+export const purchaseOrders = pgTable('purchase_orders', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  purchaseOrderCode: varchar('purchase_order_code', { length: 100 })
+    .notNull()
+    .unique(),
+  purchaseRequestId: uuid('purchase_request_id')
+    .notNull()
+    .references(() => purchaseRequests.id),
+  requestRevisionId: uuid('request_revision_id')
+    .notNull()
+    .references(() => purchaseRequestRevisions.id),
+  contractId: uuid('contract_id').references(() => purchaseContracts.id),
+  supplierId: uuid('supplier_id')
+    .notNull()
+    .references(() => suppliers.id),
+  createdByEmployeeId: uuid('created_by_employee_id')
+    .notNull()
+    .references(() => employees.id),
+  orderDate: date('order_date', { mode: 'string' }).notNull(),
+  expectedDeliveryDate: date('expected_delivery_date', {
+    mode: 'string',
+  }).notNull(),
+  status: purchaseOrderStatusEnum('status').notNull().default('draft'),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }),
+  submittedBy: uuid('submitted_by').references(() => employees.id),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+  approvedBy: uuid('approved_by').references(() => employees.id),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  cancelledBy: uuid('cancelled_by').references(() => employees.id),
+  cancellationReason: text('cancellation_reason'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+  createdBy: createdBy(),
+  updatedBy: updatedBy(),
+});
 
 export const purchaseOrderItems = pgTable(
   'purchase_order_items',
@@ -556,53 +529,42 @@ export const purchaseOrderItems = pgTable(
     updatedBy: updatedBy(),
   },
   (table) => [
-    index('idx_purchase_order_item_order').on(table.purchaseOrderId),
-    index('idx_purchase_order_item_request_item').on(
-      table.purchaseRequestItemId,
-    ),
     check('chk_purchase_order_item_quantity', sql`${table.quantity} > 0`),
   ],
 );
 
-export const purchaseReceipts = pgTable(
-  'purchase_receipts',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    receiptCode: varchar('receipt_code', { length: 100 }).notNull().unique(),
-    purchaseOrderId: uuid('purchase_order_id')
-      .notNull()
-      .references(() => purchaseOrders.id),
-    status: purchaseReceiptStatusEnum('status')
-      .notNull()
-      .default('pending_inspection'),
-    deliveryDate: date('delivery_date', { mode: 'string' }).notNull(),
-    deliveryNoteNumber: varchar('delivery_note_number', {
-      length: 100,
-    }).notNull(),
-    deliveryNoteAttachmentId: uuid('delivery_note_attachment_id')
-      .notNull()
-      .references((): AnyPgColumn => attachments.id),
-    invoiceAttachmentId: uuid('invoice_attachment_id').references(
-      (): AnyPgColumn => attachments.id,
-    ),
-    warrantyAttachmentId: uuid('warranty_attachment_id').references(
-      (): AnyPgColumn => attachments.id,
-    ),
-    recordedBy: uuid('recorded_by')
-      .notNull()
-      .references(() => employees.id),
-    inspectedAt: timestamp('inspected_at', { withTimezone: true }),
-    inspectedBy: uuid('inspected_by').references(() => employees.id),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-    createdBy: createdBy(),
-    updatedBy: updatedBy(),
-  },
-  (table) => [
-    index('idx_purchase_receipt_order').on(table.purchaseOrderId),
-    index('idx_purchase_receipt_status').on(table.status),
-  ],
-);
+export const purchaseReceipts = pgTable('purchase_receipts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  receiptCode: varchar('receipt_code', { length: 100 }).notNull().unique(),
+  purchaseOrderId: uuid('purchase_order_id')
+    .notNull()
+    .references(() => purchaseOrders.id),
+  status: purchaseReceiptStatusEnum('status')
+    .notNull()
+    .default('pending_inspection'),
+  deliveryDate: date('delivery_date', { mode: 'string' }).notNull(),
+  deliveryNoteNumber: varchar('delivery_note_number', {
+    length: 100,
+  }).notNull(),
+  deliveryNoteAttachmentId: uuid('delivery_note_attachment_id')
+    .notNull()
+    .references((): AnyPgColumn => attachments.id),
+  invoiceAttachmentId: uuid('invoice_attachment_id').references(
+    (): AnyPgColumn => attachments.id,
+  ),
+  warrantyAttachmentId: uuid('warranty_attachment_id').references(
+    (): AnyPgColumn => attachments.id,
+  ),
+  recordedBy: uuid('recorded_by')
+    .notNull()
+    .references(() => employees.id),
+  inspectedAt: timestamp('inspected_at', { withTimezone: true }),
+  inspectedBy: uuid('inspected_by').references(() => employees.id),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+  createdBy: createdBy(),
+  updatedBy: updatedBy(),
+});
 
 export const purchaseReceiptItems = pgTable(
   'purchase_receipt_items',
@@ -639,7 +601,6 @@ export const purchaseReceiptItems = pgTable(
       table.purchaseReceiptId,
       table.purchaseOrderItemId,
     ),
-    index('idx_purchase_receipt_item_receipt').on(table.purchaseReceiptId),
     check(
       'chk_purchase_receipt_item_delivered_quantity',
       sql`${table.deliveredQuantity} > 0`,
@@ -687,7 +648,6 @@ export const purchaseReceiptUnits = pgTable(
       table.purchaseReceiptItemId,
       table.sequenceNumber,
     ),
-    index('idx_purchase_receipt_unit_item').on(table.purchaseReceiptItemId),
     check(
       'chk_purchase_receipt_unit_sequence',
       sql`${table.sequenceNumber} > 0`,
@@ -798,8 +758,6 @@ export const assetAllocations = pgTable(
     uniqueIndex('uq_asset_allocation_pending')
       .on(table.assetId)
       .where(sql`${table.status} = 'pending_confirmations'`),
-    index('idx_asset_allocation_recipient').on(table.recipientId),
-    index('idx_asset_allocation_department').on(table.departmentId),
     check('chk_asset_allocation_attempt', sql`${table.attemptNumber} > 0`),
     check(
       'chk_asset_allocation_target',
@@ -866,7 +824,9 @@ export const assetRecallRequests = pgTable(
     disposalMethod: varchar('disposal_method', { length: 500 }),
     disposalDate: date('disposal_date', { mode: 'string' }),
     recoveryValue: numeric('recovery_value'),
-    departmentHeadDecision: assetRecallDecisionEnum('department_head_decision')
+    departmentHeadDecision: assetRecallDecisionEnum(
+      'department_head_decision',
+    )
       .notNull()
       .default('pending'),
     departmentHeadDecidedBy: uuid('department_head_decided_by').references(
@@ -909,10 +869,6 @@ export const assetRecallRequests = pgTable(
     updatedBy: updatedBy(),
   },
   (table) => [
-    index('idx_asset_recall_status').on(table.status),
-    index('idx_asset_recall_requester').on(table.requestedBy),
-    index('idx_asset_recall_department').on(table.requestingDepartmentId),
-    index('idx_asset_recall_asset').on(table.assetId),
     uniqueIndex('uq_asset_recall_active_asset')
       .on(table.assetId)
       .where(sql`${table.status} <> 'completed'`),
@@ -928,59 +884,48 @@ export const assetRecallRequests = pgTable(
   ],
 );
 
-export const transferRequests = pgTable(
-  'transfer_requests',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    status: transferStatusEnum('status').notNull().default('requested'),
-    assetId: uuid('asset_id')
-      .notNull()
-      .references(() => assets.id),
-    initiatedBy: uuid('initiated_by')
-      .notNull()
-      .references(() => employees.id),
-    fromDepartmentId: uuid('from_department_id')
-      .notNull()
-      .references(() => departments.id),
-    toDepartmentId: uuid('to_department_id')
-      .notNull()
-      .references(() => departments.id),
-    toUserId: uuid('to_user_id').references(() => employees.id),
-    newLocation: varchar('new_location', { length: 500 }),
-    reason: text('reason').notNull(),
-    deptHeadApprovedBy: uuid('dept_head_approved_by').references(
-      () => employees.id,
-    ),
-    deptHeadApprovedAt: timestamp('dept_head_approved_at', {
-      withTimezone: true,
-    }),
-    assetTeamVerifiedBy: uuid('asset_team_verified_by').references(
-      () => employees.id,
-    ),
-    assetTeamVerifiedAt: timestamp('asset_team_verified_at', {
-      withTimezone: true,
-    }),
-    senderConfirmedBy: uuid('sender_confirmed_by').references(
-      () => employees.id,
-    ),
-    senderConfirmedAt: timestamp('sender_confirmed_at', { withTimezone: true }),
-    receiverConfirmedBy: uuid('receiver_confirmed_by').references(
-      () => employees.id,
-    ),
-    receiverConfirmedAt: timestamp('receiver_confirmed_at', {
-      withTimezone: true,
-    }),
-    completedAt: timestamp('completed_at', { withTimezone: true }),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  (table) => [
-    index('idx_transfer_status').on(table.status),
-    index('idx_transfer_asset').on(table.assetId),
-    index('idx_transfer_from_department').on(table.fromDepartmentId),
-    index('idx_transfer_to_department').on(table.toDepartmentId),
-  ],
-);
+export const transferRequests = pgTable('transfer_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  status: transferStatusEnum('status').notNull().default('requested'),
+  assetId: uuid('asset_id')
+    .notNull()
+    .references(() => assets.id),
+  initiatedBy: uuid('initiated_by')
+    .notNull()
+    .references(() => employees.id),
+  fromDepartmentId: uuid('from_department_id')
+    .notNull()
+    .references(() => departments.id),
+  toDepartmentId: uuid('to_department_id')
+    .notNull()
+    .references(() => departments.id),
+  toUserId: uuid('to_user_id').references(() => employees.id),
+  newLocation: varchar('new_location', { length: 500 }),
+  reason: text('reason').notNull(),
+  deptHeadApprovedBy: uuid('dept_head_approved_by').references(
+    () => employees.id,
+  ),
+  deptHeadApprovedAt: timestamp('dept_head_approved_at', {
+    withTimezone: true,
+  }),
+  assetTeamVerifiedBy: uuid('asset_team_verified_by').references(
+    () => employees.id,
+  ),
+  assetTeamVerifiedAt: timestamp('asset_team_verified_at', {
+    withTimezone: true,
+  }),
+  senderConfirmedBy: uuid('sender_confirmed_by').references(() => employees.id),
+  senderConfirmedAt: timestamp('sender_confirmed_at', { withTimezone: true }),
+  receiverConfirmedBy: uuid('receiver_confirmed_by').references(
+    () => employees.id,
+  ),
+  receiverConfirmedAt: timestamp('receiver_confirmed_at', {
+    withTimezone: true,
+  }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
 
 export const repairRequests = pgTable(
   'repair_requests',
@@ -1003,9 +948,7 @@ export const repairRequests = pgTable(
     assessmentNotes: text('assessment_notes'),
     needsApproval: boolean('needs_approval').notNull().default(false),
     estimatedRepairCost: numeric('estimated_repair_cost'),
-    departmentHeadDecision: assetRecallDecisionEnum(
-      'department_head_decision',
-    )
+    departmentHeadDecision: assetRecallDecisionEnum('department_head_decision')
       .notNull()
       .default('pending'),
     departmentHeadDecidedBy: uuid('department_head_decided_by').references(
@@ -1058,46 +1001,34 @@ export const repairRequests = pgTable(
     updatedBy: updatedBy(),
   },
   (table) => [
-    index('idx_repair_status').on(table.status),
-    index('idx_repair_asset').on(table.assetId),
-    index('idx_repair_department').on(table.departmentId),
-    index('idx_repair_reporter').on(table.reporterId),
     uniqueIndex('uq_repair_active_asset')
       .on(table.assetId)
       .where(sql`${table.status} not in ('closed', 'cancelled')`),
   ],
 );
 
-export const requestApprovals = pgTable(
-  'request_approvals',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    requestType: varchar('request_type', { length: 50 }).notNull(),
-    requestId: uuid('request_id').notNull(),
-    workflowRevision: integer('workflow_revision'),
-    actionType: varchar('action_type', { length: 50 }).notNull(),
-    approverRole: varchar('approver_role', { length: 50 }).notNull(),
-    approvedBy: uuid('approved_by')
-      .notNull()
-      .references(() => employees.id),
-    actorDepartmentId: uuid('actor_department_id').references(
-      () => departments.id,
-    ),
-    actorIsDepartmentHead: boolean('actor_is_department_head'),
-    status: varchar('status', { length: 50 }).notNull(),
-    previousStatus: varchar('previous_status', { length: 100 }),
-    newStatus: varchar('new_status', { length: 100 }),
-    reason: text('reason'),
-    notes: text('notes'),
-    metadata: jsonb('metadata'),
-    createdAt: createdAt(),
-  },
-  (table) => [
-    index('idx_request_approval_type').on(table.requestType),
-    index('idx_request_approval_request').on(table.requestId),
-    index('idx_request_approval_created_at').on(table.createdAt),
-  ],
-);
+export const requestApprovals = pgTable('request_approvals', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  requestType: varchar('request_type', { length: 50 }).notNull(),
+  requestId: uuid('request_id').notNull(),
+  workflowRevision: integer('workflow_revision'),
+  actionType: varchar('action_type', { length: 50 }).notNull(),
+  approverRole: varchar('approver_role', { length: 50 }).notNull(),
+  approvedBy: uuid('approved_by')
+    .notNull()
+    .references(() => employees.id),
+  actorDepartmentId: uuid('actor_department_id').references(
+    () => departments.id,
+  ),
+  actorIsDepartmentHead: boolean('actor_is_department_head'),
+  status: varchar('status', { length: 50 }).notNull(),
+  previousStatus: varchar('previous_status', { length: 100 }),
+  newStatus: varchar('new_status', { length: 100 }),
+  reason: text('reason'),
+  notes: text('notes'),
+  metadata: jsonb('metadata'),
+  createdAt: createdAt(),
+});
 
 export const assetInventories = pgTable('asset_inventories', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -1281,31 +1212,20 @@ export const attachments = pgTable('attachments', {
   updatedAt: updatedAt(),
 });
 
-export const notifications = pgTable(
-  'notifications',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    recipientId: uuid('recipient_id')
-      .notNull()
-      .references(() => employees.id),
-    eventType: varchar('event_type', { length: 100 }).notNull(),
-    title: varchar('title', { length: 255 }).notNull(),
-    body: text('body').notNull(),
-    entityType: varchar('entity_type', { length: 100 }).notNull(),
-    entityId: uuid('entity_id').notNull(),
-    metadata: jsonb('metadata'),
-    readAt: timestamp('read_at', { withTimezone: true }),
-    createdAt: createdAt(),
-  },
-  (table) => [
-    index('idx_notification_recipient').on(table.recipientId),
-    index('idx_notification_recipient_read').on(
-      table.recipientId,
-      table.readAt,
-    ),
-    index('idx_notification_entity').on(table.entityType, table.entityId),
-  ],
-);
+export const notifications = pgTable('notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  recipientId: uuid('recipient_id')
+    .notNull()
+    .references(() => employees.id),
+  eventType: varchar('event_type', { length: 100 }).notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  body: text('body').notNull(),
+  entityType: varchar('entity_type', { length: 100 }).notNull(),
+  entityId: uuid('entity_id').notNull(),
+  metadata: jsonb('metadata'),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  createdAt: createdAt(),
+});
 
 export const approvalHistory = pgTable('approval_history', {
   id: uuid('id').primaryKey().defaultRandom(),

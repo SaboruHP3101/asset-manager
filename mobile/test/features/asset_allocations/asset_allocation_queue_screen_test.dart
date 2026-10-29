@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/asset_allocations/asset_allocation_models.dart';
 import 'package:mobile/features/asset_allocations/asset_allocation_queue_screen.dart';
 import 'package:mobile/features/asset_allocations/asset_allocations_repository.dart';
@@ -47,6 +48,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: AssetAllocationQueueScreen(repository: _QueueRepository(tasks)),
       ),
     );

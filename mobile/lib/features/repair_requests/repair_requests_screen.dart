@@ -233,16 +233,21 @@ class RepairRequestCard extends StatelessWidget {
               width: 104,
               height: 132,
               child: imageUrl == null
-                  ? const ColoredBox(
-                      color: Color(0xFFE8EAF0),
-                      child: Icon(Icons.build_outlined, size: 40),
+                  ? ColoredBox(
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
+                      child: const Icon(Icons.build_outlined, size: 40),
                     )
                   : Image.network(
                       imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const ColoredBox(
-                        color: Color(0xFFE8EAF0),
-                        child: Icon(Icons.broken_image_outlined, size: 40),
+                      errorBuilder: (_, _, _) => ColoredBox(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerLow,
+                        child: const Icon(
+                          Icons.broken_image_outlined,
+                          size: 40,
+                        ),
                       ),
                     ),
             ),

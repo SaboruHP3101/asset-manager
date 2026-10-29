@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/purchase_requests/purchase_request_form.dart';
 import 'package:mobile/features/purchase_requests/purchase_request_models.dart';
 import 'package:mobile/features/purchase_requests/purchase_requests_repository.dart';
@@ -63,6 +64,7 @@ void main() {
   testWidgets('form cho phép thêm nhiều hạng mục', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseRequestFormScreen(repository: _FakeRepository()),
       ),
     );
@@ -88,6 +90,7 @@ void main() {
   testWidgets('danh mục cấp 2 được lọc theo danh mục cấp 1', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseRequestFormScreen(repository: _FakeRepository()),
       ),
     );
@@ -113,6 +116,7 @@ void main() {
   testWidgets('loại Khác yêu cầu người dùng mô tả', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseRequestFormScreen(repository: _FakeRepository()),
       ),
     );
@@ -140,6 +144,7 @@ void main() {
   testWidgets('chỉ hiện nút xóa nháp khi API cấp quyền', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseRequestFormScreen(
           initial: _draft(allowedActions: const []),
           repository: _FakeRepository(),
@@ -152,6 +157,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseRequestFormScreen(
           initial: _draft(
             allowedActions: const ['purchase.request.delete_draft'],

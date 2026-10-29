@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/theme/textarea_decoration.dart';
 import '../../core/widgets/code_scanner_screen.dart';
 import 'purchase_receipt_models.dart';
 import 'purchase_receipts_repository.dart';
@@ -290,12 +291,18 @@ class _InspectionDialogState extends State<_InspectionDialog> {
               controller: _reason,
               autofocus: true,
               maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Lý do bắt buộc'),
+              decoration: textareaDecoration(
+                context,
+                const InputDecoration(labelText: 'Lý do bắt buộc'),
+              ),
             ),
           TextField(
             controller: _note,
             maxLines: 3,
-            decoration: const InputDecoration(labelText: 'Ghi chú'),
+            decoration: textareaDecoration(
+              context,
+              const InputDecoration(labelText: 'Ghi chú'),
+            ),
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,

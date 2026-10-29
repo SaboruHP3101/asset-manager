@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/theme/textarea_decoration.dart';
 import '../../core/widgets/code_scanner_screen.dart';
 import 'purchase_receipt_models.dart';
 import 'purchase_receipts_repository.dart';
@@ -191,13 +192,16 @@ class _PurchaseReceiptFormScreenState extends State<PurchaseReceiptFormScreen> {
                 controller: _serials[itemId],
                 minLines: 2,
                 maxLines: 5,
-                decoration: InputDecoration(
-                  labelText: 'Mã sản phẩm (mỗi dòng một mã)',
-                  helperText: 'Đã có $serialCount/$quantity mã',
-                  suffixIcon: IconButton(
-                    onPressed: () => _scanSerials(item),
-                    tooltip: 'Quét mã ${item.itemName}',
-                    icon: const Icon(Icons.qr_code_scanner),
+                decoration: textareaDecoration(
+                  context,
+                  InputDecoration(
+                    labelText: 'Mã sản phẩm (mỗi dòng một mã)',
+                    helperText: 'Đã có $serialCount/$quantity mã',
+                    suffixIcon: IconButton(
+                      onPressed: () => _scanSerials(item),
+                      tooltip: 'Quét mã ${item.itemName}',
+                      icon: const Icon(Icons.qr_code_scanner),
+                    ),
                   ),
                 ),
                 onChanged: (_) => setState(() {}),

@@ -257,11 +257,6 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                                 },
                                 icon: const Icon(Icons.clear),
                               ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        filled: true,
                       ),
                       onChanged: (_) => setState(() {}),
                     ),

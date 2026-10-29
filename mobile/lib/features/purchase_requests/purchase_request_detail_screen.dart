@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/theme/textarea_decoration.dart';
 import '../purchase_orders/purchase_order_form.dart';
 import 'purchase_request_form.dart';
 import 'purchase_request_models.dart';
@@ -301,8 +302,9 @@ class _PurchaseRequestDetailScreenState
               if (!approved)
                 TextField(
                   controller: reason,
-                  decoration: const InputDecoration(
-                    labelText: 'Lý do bắt buộc',
+                  decoration: textareaDecoration(
+                    context,
+                    const InputDecoration(labelText: 'Lý do bắt buộc'),
                   ),
                   maxLines: 3,
                 ),

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/purchase_requests/purchase_request_detail_screen.dart';
 import 'package:mobile/features/purchase_requests/purchase_request_models.dart';
 import 'package:mobile/features/purchase_requests/purchase_requests_repository.dart';
@@ -55,6 +56,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseRequestDetailScreen(
           requestId: detail.id,
           repository: _FakeRepository(detail),
@@ -95,6 +97,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseRequestDetailScreen(
           requestId: detail.id,
           repository: _FakeRepository(detail),
@@ -144,6 +147,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          theme: buildAppTheme(),
           home: PurchaseRequestDetailScreen(
             requestId: detail.id,
             repository: _FakeRepository(detail),
@@ -193,6 +197,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseRequestDetailScreen(
           requestId: detail.id,
           repository: repository,
@@ -242,6 +247,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseRequestDetailScreen(
           requestId: detail.id,
           repository: _FakeRepository(detail),
@@ -291,6 +297,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseRequestDetailScreen(
           requestId: detail.id,
           repository: _FakeRepository(

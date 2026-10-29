@@ -7,6 +7,7 @@ import '../../../core/utils/department_labels.dart';
 import '../../../core/widgets/status_card.dart';
 import '../../asset_allocations/asset_allocation_queue_screen.dart';
 import '../../asset_depreciations/depreciation_screens.dart';
+import '../../chat/chat_screen.dart';
 import '../../asset_recalls/asset_recall_requests_screen.dart';
 import '../../asset_recalls/asset_upgrade_requests_screen.dart';
 import '../../purchase_orders/purchase_orders_screen.dart';
@@ -244,6 +245,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<_QuickAction> get _quickActions => [
+    _QuickAction(
+      title: 'Trợ lý AI',
+      icon: Icons.chat_bubble_outline,
+      onTap: () => _open(const ChatScreen()),
+    ),
     if (_actions.contains('depreciation.view'))
       _QuickAction(
         title: 'Khấu hao',
@@ -379,6 +385,18 @@ class _WelcomeHeader extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Icon(
+            Icons.waving_hand_outlined,
+            color: Theme.of(context).colorScheme.onSecondaryContainer,
+          ),
+        ),
+        const SizedBox(height: 16),
         Text(
           fullName.isEmpty ? 'Xin chào!' : 'Xin chào, $fullName',
           style: Theme.of(context).textTheme.headlineSmall
@@ -436,7 +454,6 @@ class _TaskCard extends StatelessWidget {
   Widget build(BuildContext context) => Card(
     margin: const EdgeInsets.only(bottom: 10),
     elevation: 0,
-    color: Theme.of(context).colorScheme.surfaceContainerLow,
     clipBehavior: Clip.antiAlias,
     child: ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -463,7 +480,6 @@ class _EmptyTasks extends StatelessWidget {
   Widget build(BuildContext context) => Card(
     margin: EdgeInsets.zero,
     elevation: 0,
-    color: Theme.of(context).colorScheme.surfaceContainerLow,
     child: const Padding(
       padding: EdgeInsets.all(16),
       child: Row(
@@ -499,11 +515,17 @@ class _QuickActionGrid extends StatelessWidget {
     shrinkWrap: true,
     physics: const NeverScrollableScrollPhysics(),
     itemCount: actions.length,
-    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
       crossAxisCount: 2,
       mainAxisSpacing: 10,
       crossAxisSpacing: 10,
-      childAspectRatio: 1.75,
+      mainAxisExtent:
+          61 +
+          MediaQuery.textScalerOf(
+                context,
+              ).scale(Theme.of(context).textTheme.titleSmall?.fontSize ?? 14) *
+              (Theme.of(context).textTheme.titleSmall?.height ?? 1.43) *
+              2,
     ),
     itemBuilder: (context, index) {
       final action = actions[index];
@@ -511,7 +533,6 @@ class _QuickActionGrid extends StatelessWidget {
       return Card(
         margin: EdgeInsets.zero,
         elevation: 0,
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: action.onTap,
@@ -525,7 +546,7 @@ class _QuickActionGrid extends StatelessWidget {
                 const SizedBox(height: 9),
                 Text(
                   action.title,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
@@ -599,7 +620,7 @@ class _SkeletonBlock extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
       ),
     ),
   );

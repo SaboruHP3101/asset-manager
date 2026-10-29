@@ -7,6 +7,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/theme/textarea_decoration.dart';
 
 class RepairRequestForm extends StatefulWidget {
   const RepairRequestForm({
@@ -394,9 +395,12 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
                       focusNode: _descriptionFocus,
                       minLines: 4,
                       maxLines: 6,
-                      decoration: const InputDecoration(
-                        hintText: 'Mô tả triệu chứng của tài sản',
-                        border: OutlineInputBorder(),
+                      decoration: textareaDecoration(
+                        context,
+                        const InputDecoration(
+                          hintText: 'Mô tả triệu chứng của tài sản',
+                          border: OutlineInputBorder(),
+                        ),
                       ),
                       validator: (value) => value?.trim().isEmpty == true
                           ? 'Vui lòng nhập triệu chứng gặp phải'

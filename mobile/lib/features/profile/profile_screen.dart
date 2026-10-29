@@ -107,7 +107,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const CircleAvatar(radius: 42, child: Icon(Icons.person, size: 48)),
+            Center(
+              child: CircleAvatar(
+                radius: 42,
+                backgroundColor: Theme.of(context)
+                    .colorScheme
+                    .secondaryContainer,
+                foregroundColor: Theme.of(context)
+                    .colorScheme
+                    .onSecondaryContainer,
+                child: const Icon(Icons.person_outline, size: 44),
+              ),
+            ),
             const SizedBox(height: 12),
             AppText(
               employee['fullName'] ?? '',
@@ -116,6 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 20),
             Card(
+              margin: EdgeInsets.zero,
               child: Column(
                 children: [
                   _infoRow(

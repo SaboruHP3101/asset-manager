@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/auth/auth_session.dart';
 import 'package:mobile/features/asset_depreciations/depreciation_models.dart';
 import 'package:mobile/features/asset_depreciations/depreciation_screens.dart';
@@ -128,6 +129,7 @@ Future<void> _detail(
 ) async {
   await tester.pumpWidget(
     MaterialApp(
+      theme: buildAppTheme(),
       home: DepreciationDetailScreen(
         periodId: 'period-id',
         profile: _profile(actions),
@@ -161,6 +163,7 @@ void main() {
     final repository = _Repository(_data())..failLoad = true;
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: DepreciationPeriodsScreen(
           profile: _profile({'depreciation.prepare'}),
           repository: repository,
@@ -186,6 +189,7 @@ void main() {
     final repository = _Repository(_data());
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: DepreciationPeriodsScreen(
           profile: const AuthenticatedProfile(
             department: 'IT',
@@ -207,6 +211,7 @@ void main() {
     final repository = _Repository(_data())..empty = true;
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: DepreciationPeriodsScreen(
           profile: _profile({}),
           repository: repository,
@@ -426,6 +431,7 @@ void main() {
       final repository = _Repository(_data());
       await tester.pumpWidget(
         MaterialApp(
+          theme: buildAppTheme(),
           builder: (context, child) => MediaQuery(
             data: MediaQuery.of(context)
                 .copyWith(textScaler: const TextScaler.linear(1.5)),

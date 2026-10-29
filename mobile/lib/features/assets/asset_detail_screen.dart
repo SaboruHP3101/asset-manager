@@ -13,6 +13,8 @@ import '../asset_recalls/asset_recall_form.dart';
 import '../asset_recalls/asset_upgrade_form.dart';
 import 'asset_status_chip.dart';
 
+enum _AssetAction { recall, upgrade, repair }
+
 class AssetDetailScreen extends StatefulWidget {
   const AssetDetailScreen({required this.assetId, super.key});
 
@@ -129,6 +131,95 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     await _loadAsset();
   }
 
+  Future<void> _showActions() async {
+    final asset = _asset!;
+    final activeRecall = asset['activeRecall'] == null
+        ? null
+        : Map<String, dynamic>.from(asset['activeRecall'] as Map);
+    final activeRecallType = activeRecall?['type'] as String?;
+    final action = await showModalBottomSheet<_AssetAction>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Yêu cầu tài sản',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Đóng thao tác',
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (asset['managementOwner'] == 'it') ...[
+                ListTile(
+                  enabled: _repairProgress == null || activeRecall != null,
+                  leading: Icon(
+                    activeRecallType == 'upgrade'
+                        ? Icons.upgrade
+                        : Icons.swap_horiz,
+                  ),
+                  title: Text(
+                    activeRecall == null
+                        ? 'Đổi / báo phế tài sản'
+                        : activeRecallType == 'upgrade'
+                        ? 'Xem phiếu nâng cấp tài sản'
+                        : 'Xem phiếu thu hồi tài sản',
+                  ),
+                  onTap: () => Navigator.pop(context, _AssetAction.recall),
+                ),
+                if (activeRecall == null)
+                  ListTile(
+                    enabled: _repairProgress == null,
+                    leading: const Icon(Icons.upgrade),
+                    title: const Text('Yêu cầu nâng cấp tài sản'),
+                    onTap: () => Navigator.pop(context, _AssetAction.upgrade),
+                  ),
+              ],
+              ListTile(
+                enabled: activeRecall == null || _repairProgress != null,
+                leading: Icon(
+                  _repairProgress == null
+                      ? Icons.build_outlined
+                      : Icons.timeline_outlined,
+                ),
+                title: Text(
+                  _repairProgress == null
+                      ? 'Gửi yêu cầu sửa chữa'
+                      : 'Xem tiến trình sửa chữa',
+                ),
+                onTap: () => Navigator.pop(context, _AssetAction.repair),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _AssetAction.recall:
+        await _openRecallAction(upgrade: activeRecallType == 'upgrade');
+      case _AssetAction.upgrade:
+        await _openRecallAction(upgrade: true);
+      case _AssetAction.repair:
+        await _openRepairAction();
+    }
+  }
+
   String? _imageUrl() {
     final url = _asset?['imageUrl'] as String?;
     return url == null ? null : AppConfig.absoluteUrl(url);
@@ -179,18 +270,18 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
 
     final history = (asset['handoverHistory'] as List<dynamic>? ?? const [])
         .cast<Object>();
-    final activeRecall = asset['activeRecall'] == null
-        ? null
-        : Map<String, dynamic>.from(asset['activeRecall'] as Map);
-    final activeRecallType = activeRecall?['type'] as String?;
-
     return Scaffold(
       appBar: AppBar(title: const Text('Chi tiết tài sản')),
       body: RefreshIndicator(
         onRefresh: _loadAsset,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            8,
+            16,
+            104 + MediaQuery.paddingOf(context).bottom,
+          ),
           children: [
             _AssetHero(
               asset: asset,
@@ -209,7 +300,9 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                   child: const ListTile(
                     leading: Icon(Icons.build_circle_outlined),
                     title: Text('Đang có yêu cầu sửa chữa'),
-                    subtitle: Text('Theo dõi tiến trình bằng nút phía dưới.'),
+                    subtitle: Text(
+                      'Chọn “Xem tiến trình sửa chữa” trong nút Yêu cầu.',
+                    ),
                   ),
                 ),
               ],
@@ -292,89 +385,18 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: !_detailsLoaded
+      floatingActionButton: !_detailsLoaded
           ? null
-          : Material(
-              elevation: 8,
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (asset['managementOwner'] == 'it') ...[
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.tonalIcon(
-                            onPressed:
-                                _repairProgress != null &&
-                                    asset['activeRecall'] == null
-                                ? null
-                                : () => _openRecallAction(
-                                    upgrade: activeRecallType == 'upgrade',
-                                  ),
-                            icon: Icon(
-                              activeRecallType == 'upgrade'
-                                  ? Icons.upgrade
-                                  : Icons.swap_horiz,
-                            ),
-                            label: Text(
-                              asset['activeRecall'] == null
-                                  ? 'Đổi / báo phế tài sản'
-                                  : activeRecallType == 'upgrade'
-                                  ? 'Xem phiếu nâng cấp tài sản'
-                                  : 'Xem phiếu thu hồi tài sản',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        if (asset['activeRecall'] == null) ...[
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.tonalIcon(
-                              onPressed: _repairProgress == null
-                                  ? () => _openRecallAction(upgrade: true)
-                                  : null,
-                              icon: const Icon(Icons.upgrade),
-                              label: const Text('Yêu cầu nâng cấp tài sản'),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                      ],
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed:
-                              _checkingRepair ||
-                                  (asset['activeRecall'] != null &&
-                                      _repairProgress == null)
-                              ? null
-                              : _openRepairAction,
-                          icon: _checkingRepair
-                              ? const SizedBox.square(
-                                  dimension: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Icon(
-                                  _repairProgress == null
-                                      ? Icons.build_outlined
-                                      : Icons.timeline_outlined,
-                                ),
-                          label: Text(
-                            _repairProgress == null
-                                ? 'Gửi yêu cầu sửa chữa'
-                                : 'Xem tiến trình sửa chữa',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+          : FloatingActionButton.extended(
+              tooltip: 'Yêu cầu tài sản',
+              onPressed: _checkingRepair ? null : _showActions,
+              icon: _checkingRepair
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add),
+              label: const Text('Yêu cầu'),
             ),
     );
   }
@@ -418,7 +440,7 @@ class _AssetHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(12),
+    borderRadius: BorderRadius.circular(24),
     child: SizedBox(
       height: 280,
       child: Stack(
@@ -512,7 +534,12 @@ class _DetailSection extends StatelessWidget {
               children: [
                 Icon(icon, size: 20),
                 const SizedBox(width: 8),
-                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
               ],
             ),
           ),

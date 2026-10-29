@@ -8,5 +8,6 @@ import { AuthModule } from '../auth/auth.module.js';
   imports: [DrizzleModule, AuthModule],
   controllers: [RepairRequestsController],
   providers: [RepairRequestsService],
+  exports: [RepairRequestsService],
 })
 export class RepairRequestsModule {}

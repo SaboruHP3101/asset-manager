@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/theme/textarea_decoration.dart';
 import 'asset_recall_models.dart';
 import 'asset_recalls_repository.dart';
 
@@ -196,16 +197,19 @@ class _AssetRecallFormState extends State<AssetRecallForm> {
             minLines: 4,
             maxLines: 7,
             maxLength: 2000,
-            decoration: InputDecoration(
-              labelText: switch (_type) {
-                'disposal' => 'Lý do báo phế tài sản',
-                'upgrade' => 'Mục tiêu nâng cấp tài sản',
-                _ => 'Lý do đổi tài sản',
-              },
-              hintText: 'Mô tả nhu cầu và tình trạng tài sản hiện tại',
-              helperText: 'Có thể để trống khi lưu nháp.',
-              border: const OutlineInputBorder(),
-              alignLabelWithHint: true,
+            decoration: textareaDecoration(
+              context,
+              InputDecoration(
+                labelText: switch (_type) {
+                  'disposal' => 'Lý do báo phế tài sản',
+                  'upgrade' => 'Mục tiêu nâng cấp tài sản',
+                  _ => 'Lý do đổi tài sản',
+                },
+                hintText: 'Mô tả nhu cầu và tình trạng tài sản hiện tại',
+                helperText: 'Có thể để trống khi lưu nháp.',
+                border: const OutlineInputBorder(),
+                alignLabelWithHint: true,
+              ),
             ),
             validator: (value) =>
                 value?.trim().isEmpty ?? true ? 'Vui lòng nhập lý do.' : null,

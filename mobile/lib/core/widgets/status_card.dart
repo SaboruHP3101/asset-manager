@@ -25,9 +25,6 @@ class StatusCard extends StatelessWidget {
 
     return Card(
       margin: EdgeInsets.zero,
-      elevation: 0,
-      color: colorScheme.surfaceContainerLow,
-      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: loading ? null : onTap,
         child: Padding(
@@ -36,8 +33,8 @@ class StatusCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                height: 40,
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 40),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -57,24 +54,37 @@ class StatusCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Container(
-                margin: const EdgeInsets.only(top: 4),
-                height: 36,
-                alignment: Alignment.centerLeft,
-                child: loading
-                    ? const SizedBox.square(
-                        dimension: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      )
-                    : Row(
-                        children: [
-                          AppText(count, type: AppTextType.h5, fontSize: 28),
-                          if (onTap != null) ...[
-                            const Spacer(),
-                            const Icon(Icons.arrow_forward, size: 18),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 36),
+                  child: loading
+                      ? const Align(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: 1,
+                          heightFactor: 1,
+                          child: SizedBox.square(
+                            dimension: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                          ),
+                        )
+                      : Row(
+                          children: [
+                            Expanded(
+                              child: AppText(
+                                count,
+                                type: AppTextType.h5,
+                                fontSize: 28,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (onTap != null) ...[
+                              const Icon(Icons.arrow_forward, size: 18),
+                            ],
                           ],
-                        ],
-                      ),
+                        ),
+                ),
               ),
             ],
           ),

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/purchase_receipts/purchase_inspection_queue_screen.dart';
 import 'package:mobile/features/purchase_receipts/purchase_receipt_models.dart';
 import 'package:mobile/features/purchase_receipts/purchase_receipts_repository.dart';
@@ -29,6 +30,7 @@ void main() {
   testWidgets('quét mã mở đúng đơn vị hàng chờ kiểm tra', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseInspectionQueueScreen(
           repository: _FakeRepository(),
           scanner: (
@@ -56,6 +58,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: PurchaseInspectionQueueScreen(
           repository: _FakeRepository(),
           scanner: (

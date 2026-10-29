@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/asset_recalls/asset_recall_detail_screen.dart';
 import 'package:mobile/features/asset_recalls/asset_recalls_repository.dart';
 
@@ -89,6 +90,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: AssetRecallDetailScreen(
           requestId: 'recall-id',
           repository: _FakeRepository(),
@@ -117,6 +119,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: AssetRecallDetailScreen(
           requestId: 'recall-id',
           repository: repository,
@@ -151,6 +154,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: AssetRecallDetailScreen(
           requestId: 'recall-id',
           repository: _StaticRepository(request),

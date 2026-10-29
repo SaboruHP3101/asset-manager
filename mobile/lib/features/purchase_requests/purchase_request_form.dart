@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/textarea_decoration.dart';
 import 'purchase_request_models.dart';
 import 'purchase_requests_repository.dart';
 
@@ -468,28 +469,35 @@ class _ProgressCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          Theme.of(context).colorScheme.primaryContainer,
-          Theme.of(context).colorScheme.secondaryContainer,
-        ],
-      ),
+      color: Theme.of(context).colorScheme.primaryContainer,
       borderRadius: BorderRadius.circular(20),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Hoàn thiện đề nghị của bạn',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
+          ),
         ),
         const SizedBox(height: 5),
-        Text('$complete/$total hạng mục đã đủ thông tin'),
+        Text(
+          '$complete/$total hạng mục đã đủ thông tin',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
+          ),
+        ),
         const SizedBox(height: 12),
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: LinearProgressIndicator(
             value: total == 0 ? 0 : complete / total,
+            color: Theme.of(context).colorScheme.primary,
+            backgroundColor: Theme.of(context).colorScheme.onPrimaryContainer
+                .withValues(alpha: 0.12),
             minHeight: 7,
           ),
         ),
@@ -540,10 +548,13 @@ class _InformationCard extends StatelessWidget {
           TextFormField(
             controller: purpose,
             maxLines: 2,
-            decoration: const InputDecoration(
-              labelText: 'Mục đích sử dụng *',
-              hintText: 'Ví dụ: Trang bị cho nhân viên mới',
-              prefixIcon: Icon(Icons.flag_outlined),
+            decoration: textareaDecoration(
+              context,
+              const InputDecoration(
+                labelText: 'Mục đích sử dụng *',
+                hintText: 'Ví dụ: Trang bị cho nhân viên mới',
+                prefixIcon: Icon(Icons.flag_outlined),
+              ),
             ),
             onChanged: (_) => onChanged(),
             validator: _required,
@@ -552,9 +563,12 @@ class _InformationCard extends StatelessWidget {
           TextFormField(
             controller: note,
             maxLines: 2,
-            decoration: const InputDecoration(
-              labelText: 'Ghi chú',
-              prefixIcon: Icon(Icons.notes_outlined),
+            decoration: textareaDecoration(
+              context,
+              const InputDecoration(
+                labelText: 'Ghi chú',
+                prefixIcon: Icon(Icons.notes_outlined),
+              ),
             ),
             onChanged: (_) => onChanged(),
           ),
@@ -605,7 +619,6 @@ class _ItemCard extends StatelessWidget {
         : '$rootName › $categoryName · SL ${item.quantity.text}';
 
     return Card(
-      elevation: expanded ? 2 : 0,
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
@@ -722,10 +735,13 @@ class _ItemCard extends StatelessWidget {
                         TextFormField(
                           controller: item.specifications,
                           maxLines: 2,
-                          decoration: const InputDecoration(
-                            labelText: 'Mô tả / thông số *',
-                            hintText:
-                                'Cấu hình, kích thước, yêu cầu kỹ thuật...',
+                          decoration: textareaDecoration(
+                            context,
+                            const InputDecoration(
+                              labelText: 'Mô tả / thông số *',
+                              hintText:
+                                  'Cấu hình, kích thước, yêu cầu kỹ thuật...',
+                            ),
                           ),
                           onChanged: (_) => onChanged(),
                           validator: _required,

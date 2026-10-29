@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/theme/textarea_decoration.dart';
 import '../../core/utils/department_labels.dart';
 import 'asset_recall_form.dart';
 import 'asset_recall_models.dart';
@@ -82,9 +83,12 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
             minLines: 3,
             maxLines: 5,
             onChanged: (value) => setDialogState(() => reason = value.trim()),
-            decoration: const InputDecoration(
-              labelText: 'Lý do',
-              border: OutlineInputBorder(),
+            decoration: textareaDecoration(
+              context,
+              const InputDecoration(
+                labelText: 'Lý do',
+                border: OutlineInputBorder(),
+              ),
             ),
           ),
           actions: [
@@ -225,8 +229,9 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
                   minLines: 2,
                   maxLines: 4,
                   onChanged: (value) => result = value.trim(),
-                  decoration: const InputDecoration(
-                    labelText: 'Kết quả / ghi chú',
+                  decoration: textareaDecoration(
+                    context,
+                    const InputDecoration(labelText: 'Kết quả / ghi chú'),
                   ),
                 ),
                 TextField(
@@ -276,9 +281,12 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
             minLines: 3,
             maxLines: 6,
             onChanged: (value) => setDialogState(() => result = value.trim()),
-            decoration: const InputDecoration(
-              labelText: 'Kết quả nâng cấp *',
-              border: OutlineInputBorder(),
+            decoration: textareaDecoration(
+              context,
+              const InputDecoration(
+                labelText: 'Kết quả nâng cấp *',
+                border: OutlineInputBorder(),
+              ),
             ),
           ),
           actions: [

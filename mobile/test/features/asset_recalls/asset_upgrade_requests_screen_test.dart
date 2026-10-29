@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/asset_recalls/asset_recall_requests_screen.dart';
 import 'package:mobile/features/asset_recalls/asset_recalls_repository.dart';
 import 'package:mobile/features/asset_recalls/asset_upgrade_requests_screen.dart';
@@ -36,6 +37,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: AssetRecallRequestsScreen(repository: _FakeRepository()),
       ),
     );
@@ -48,6 +50,7 @@ void main() {
   testWidgets('màn nâng cấp chỉ hiển thị phiếu nâng cấp', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        theme: buildAppTheme(),
         home: AssetUpgradeRequestsScreen(repository: _FakeRepository()),
       ),
     );

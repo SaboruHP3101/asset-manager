@@ -56,11 +56,8 @@ class _RequirementCardTile extends StatelessWidget {
     return SizedBox(
       height: height,
       child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: InkWell(
           onTap: card.onTap,
-          borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(

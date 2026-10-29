@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_session.dart';
+import '../../core/theme/textarea_decoration.dart';
 import 'depreciation_models.dart';
 import 'depreciations_repository.dart';
 
@@ -76,7 +77,7 @@ class _DepreciationPeriodsScreenState extends State<DepreciationPeriodsScreen> {
                       return const Padding(
                         padding: EdgeInsets.symmetric(vertical: 64),
                         child: Text(
-                          'Chưa có kỳ khấu hao. Kỳ nháp được tạo tự động sau khi '
+                          'Chưa có kỳ khấu hao. Kỳ nháp sẽ được tạo tự động sau khi '
                           'kết thúc tháng và đã thiết lập tháng bắt đầu quản lý.',
                           textAlign: TextAlign.center,
                         ),
@@ -271,8 +272,9 @@ class _DepreciationDetailScreenState extends State<DepreciationDetailScreen> {
                 minLines: 2,
                 maxLines: 4,
                 maxLength: 1000,
-                decoration: const InputDecoration(
-                  labelText: 'Lý do trả về (bắt buộc)',
+                decoration: textareaDecoration(
+                  context,
+                  const InputDecoration(labelText: 'Lý do trả về (bắt buộc)'),
                 ),
                 onChanged: (value) => setSheetState(() => reason = value),
               ),

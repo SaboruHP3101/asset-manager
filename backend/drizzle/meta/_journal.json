@@ -57,6 +57,13 @@
       "when": 1792502091273,
       "tag": "0007_monthly-depreciation",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793109021985,
+      "tag": "0008_remove-non-unique-indexes",
+      "breakpoints": true
     }
   ]
 }
