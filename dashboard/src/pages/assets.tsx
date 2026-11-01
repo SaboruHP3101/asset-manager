@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Pencil } from "lucide-react";
 import AssetEditDialog from "@/components/asset-edit-dialog";
 import AssetStatusChip from "@/components/asset-status-chip";
+import ExportExcelButton from "@/components/export-excel-button";
 import type { Asset } from "@/types";
 import { useAuth } from "@/components/auth-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -16,7 +17,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { assetDepartmentLabels, getAssets } from "@/lib/assets";
+import {
+  assetDepartmentLabels,
+  assetStatusLabels,
+  getAssets,
+} from "@/lib/assets";
+
+const columns = [
+  "Mã tài sản",
+  "Tên tài sản",
+  "Danh mục",
+  "Người sử dụng",
+  "Phòng ban",
+  "Vị trí",
+  "Trạng thái",
+];
 
 export default function AssetsPage() {
   const { token } = useAuth();
@@ -31,11 +46,30 @@ export default function AssetsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Tài sản</h1>
-        <p className="mt-2 text-muted-foreground">
-          Chi tiết tài sản, tình trạng và nơi quản lý.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Tài sản</h1>
+          <p className="mt-2 text-muted-foreground">
+            Chi tiết tài sản, tình trạng và nơi quản lý.
+          </p>
+        </div>
+        <ExportExcelButton
+          fileName="danh-sach-tai-san"
+          sheetName="Tài sản"
+          headers={columns}
+          rows={(assets.data ?? []).map((asset) => [
+            asset.assetCode,
+            asset.name || "—",
+            asset.category || "—",
+            asset.assignedTo || "—",
+            asset.department
+              ? (assetDepartmentLabels[asset.department] ?? asset.department)
+              : "—",
+            asset.location || "—",
+            assetStatusLabels[asset.status.toLowerCase()] ?? "Chưa xác định",
+          ])}
+          disabled={!assets.isSuccess || assets.isFetching}
+        />
       </div>
       {assets.isError ? (
         <Alert variant="destructive">
@@ -58,16 +92,7 @@ export default function AssetsPage() {
             <TableCaption className="sr-only">Danh sách tài sản</TableCaption>
             <TableHeader>
               <TableRow>
-                {[
-                  "Mã tài sản",
-                  "Tên tài sản",
-                  "Danh mục",
-                  "Người sử dụng",
-                  "Phòng ban",
-                  "Vị trí",
-                  "Trạng thái",
-                  "Hành động",
-                ].map((label) => (
+                {[...columns, "Hành động"].map((label) => (
                   <TableHead key={label} className="font-semibold" scope="col">
                     {label}
                   </TableHead>

@@ -5,6 +5,7 @@ import { getAssetCategories } from "@/lib/asset-categories";
 import type { AssetCategory } from "@/lib/asset-categories";
 import AssetCategoryDialog from "@/components/asset-category-dialog";
 import AssetCategoryDeleteDialog from "@/components/asset-category-delete-dialog";
+import ExportExcelButton from "@/components/export-excel-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+const columns = ["Mã danh mục", "Tên danh mục", "Mô tả"];
 
 export default function AssetCategoriesPage() {
   const [editing, setEditing] = useState<AssetCategory | null | undefined>();
@@ -61,10 +64,23 @@ export default function AssetCategoriesPage() {
             Quản lý danh mục tài sản cấp gốc.
           </p>
         </div>
-        <Button onClick={() => setEditing(null)}>
-          <Plus />
-          Thêm danh mục
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ExportExcelButton
+            fileName="danh-muc-tai-san"
+            sheetName="Danh mục tài sản"
+            headers={columns}
+            rows={roots.map((category) => [
+              category.code,
+              category.name,
+              category.description || "—",
+            ])}
+            disabled={!categories.isSuccess || categories.isFetching}
+          />
+          <Button onClick={() => setEditing(null)}>
+            <Plus />
+            Thêm danh mục
+          </Button>
+        </div>
       </div>
       {categories.isError ? (
         <Alert variant="destructive">
@@ -89,17 +105,11 @@ export default function AssetCategoriesPage() {
             </TableCaption>
             <TableHeader>
               <TableRow>
-                {["Mã danh mục", "Tên danh mục", "Mô tả", "Hành động"].map(
-                  (label) => (
-                    <TableHead
-                      key={label}
-                      scope="col"
-                      className="font-semibold"
-                    >
-                      {label}
-                    </TableHead>
-                  )
-                )}
+                {[...columns, "Hành động"].map((label) => (
+                  <TableHead key={label} scope="col" className="font-semibold">
+                    {label}
+                  </TableHead>
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>

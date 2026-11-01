@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth-provider";
 import AssetStatusChip from "@/components/asset-status-chip";
+import ExportExcelButton from "@/components/export-excel-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +14,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getItWarehouseAssets } from "@/lib/warehouses";
+import { assetStatusLabels } from "@/lib/assets";
+
+const columns = ["Mã tài sản", "Tên tài sản", "Danh mục", "Trạng thái"];
 
 export default function WarehousePage() {
   const { token } = useAuth();
@@ -26,11 +30,25 @@ export default function WarehousePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Kho IT</h1>
-        <p className="mt-2 text-muted-foreground">
-          Tài sản đang được lưu giữ tại kho IT.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Kho IT</h1>
+          <p className="mt-2 text-muted-foreground">
+            Tài sản đang được lưu giữ tại kho IT.
+          </p>
+        </div>
+        <ExportExcelButton
+          fileName="tai-san-kho-it"
+          sheetName="Kho IT"
+          headers={columns}
+          rows={(assets.data ?? []).map((asset) => [
+            asset.assetCode,
+            asset.name || "—",
+            asset.category || "—",
+            assetStatusLabels[asset.status.toLowerCase()] ?? "Chưa xác định",
+          ])}
+          disabled={!assets.isSuccess || assets.isFetching}
+        />
       </div>
       {assets.isError ? (
         <Alert variant="destructive">
@@ -55,17 +73,11 @@ export default function WarehousePage() {
             </TableCaption>
             <TableHeader>
               <TableRow>
-                {["Mã tài sản", "Tên tài sản", "Danh mục", "Trạng thái"].map(
-                  (label) => (
-                    <TableHead
-                      key={label}
-                      className="font-semibold"
-                      scope="col"
-                    >
-                      {label}
-                    </TableHead>
-                  )
-                )}
+                {columns.map((label) => (
+                  <TableHead key={label} className="font-semibold" scope="col">
+                    {label}
+                  </TableHead>
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
