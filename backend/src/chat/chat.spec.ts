@@ -406,11 +406,13 @@ function model(parts: Record<string, unknown>[]) {
 function textAnswer(text: string) {
   return model([{ text }]);
 }
-function readCall(args: unknown, id = 'call-1') {
+function readCall(input: Record<string, unknown>, id = 'call-1') {
+  const { domain, ...args } = input;
+
   return model([
     {
       thoughtSignature: 'provider-signature',
-      functionCall: { name: 'read_records', args, id },
+      functionCall: { name: 'read_' + String(domain), args, id },
     },
   ]);
 }
@@ -517,7 +519,7 @@ describe('Gemini tool boundary', () => {
     expect(body.contents).toEqual([]);
   });
 
-  it('declares only a read tool and preserves function IDs and thought signatures', async () => {
+  it('declares business read tools and preserves function IDs and thought signatures', async () => {
     const content = readCall({ domain: 'assets', operation: 'list' });
     const fetchMock = vi.fn().mockResolvedValue(providerResult(content));
 
@@ -539,7 +541,18 @@ describe('Gemini tool boundary', () => {
       body.tools[0].functionDeclarations.map(
         (tool: { name: string }) => tool.name,
       ),
-    ).toEqual(['read_records']);
+    ).toEqual([
+      'read_my_assets',
+      'read_assets',
+      'read_handovers',
+      'read_inventory',
+      'read_repairs',
+      'read_purchase_requests',
+      'read_purchase_orders',
+      'read_warehouse',
+      'read_depreciation',
+      'read_permissions',
+    ]);
     expect(body.generationConfig.responseJsonSchema).toBeUndefined();
     expect(body.toolConfig.functionCallingConfig.mode).toBe('AUTO');
     expect(request.headers['x-goog-api-key']).toBe('secret-key');
@@ -775,21 +788,58 @@ describe('contextual read-only assistant', () => {
     expect(queries.read).not.toHaveBeenCalled();
   });
 
+  it('binds personal asset queries to the current actor and personal scope', async () => {
+    const { service, queries } = assistantHarness([
+      model([
+        {
+          functionCall: { name: 'read_my_assets', args: { operation: 'list' } },
+        },
+      ]),
+      textAnswer('Tài sản của bạn.'),
+    ]);
+
+    await service.ask({ message: 'Tài sản của tôi' }, actor);
+    expect(queries.read).toHaveBeenCalledWith(
+      expect.objectContaining({ domain: 'assets', scope: 'mine' }),
+      actor,
+    );
+  });
+
+  it.each([{ domain: 'warehouse' }, { scope: 'allowed' }])(
+    'rejects overrides of the personal asset tool binding: %j',
+    async (override) => {
+      const { service, queries } = assistantHarness([
+        model([
+          {
+            functionCall: {
+              name: 'read_my_assets',
+              args: { operation: 'list', ...override },
+            },
+          },
+        ]),
+        textAnswer('Tham số tra cứu không hợp lệ.'),
+      ]);
+
+      await service.ask({ message: 'Tài sản của tôi' }, actor);
+      expect(queries.read).not.toHaveBeenCalled();
+    },
+  );
+
   it('supports parallel calls with corresponding IDs and keeps CSV out of model payloads', async () => {
     const { service, queries, gemini } = assistantHarness(
       [
         model([
           {
             functionCall: {
-              name: 'read_records',
-              args: { domain: 'assets', operation: 'export' },
+              name: 'read_assets',
+              args: { operation: 'export' },
               id: 'one',
             },
           },
           {
             functionCall: {
-              name: 'read_records',
-              args: { domain: 'repairs', operation: 'count' },
+              name: 'read_repairs',
+              args: { operation: 'count' },
               id: 'two',
             },
           },
@@ -942,7 +992,7 @@ describe('contextual read-only assistant', () => {
     const batch = assistantHarness([
       model(
         Array.from({ length: 7 }, () => ({
-          functionCall: { name: 'read_records', args: query() },
+          functionCall: { name: 'read_assets', args: { operation: 'list' } },
         })),
       ),
     ]);

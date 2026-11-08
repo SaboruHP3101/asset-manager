@@ -22,6 +22,8 @@ import {
 } from './gemini.service.js';
 import { ChatQueryService } from './chat-query.service.js';
 import { buildChatReply } from './chat-response.js';
+import { findReadTool } from './tools/index.js';
+import { toolArguments } from './tools/read-tool.js';
 
 const sources = {
   assets: 'Tài sản (lọc ngày mua)',
@@ -70,10 +72,9 @@ function toolResult(reply: ChatReply) {
   };
 }
 
-async function validateQuery(args: unknown): Promise<ChatQueryDto> {
-  if (!isObject(args))
-    throw new BadRequestException('Tham số tool phải là object.');
-
+async function validateQuery(
+  args: Record<string, unknown>,
+): Promise<ChatQueryDto> {
   const query = plainToInstance(ChatQueryDto, args);
 
   if (
@@ -90,7 +91,7 @@ async function validateQuery(args: unknown): Promise<ChatQueryDto> {
 
   if (errors.length) {
     throw new BadRequestException(
-      'Tool chỉ nhận domain, phép đọc và bộ lọc đã khai báo.',
+      'Tool chỉ nhận phép đọc và bộ lọc đã khai báo.',
     );
   }
 
@@ -327,12 +328,9 @@ export class ChatService {
           let result: unknown;
 
           try {
-            if (call.name !== 'read_records')
-              throw new BadRequestException(
-                'Tool này không được hỗ trợ; chỉ có read_records.',
-              );
-
-            const query = await validateQuery(call.args);
+            const query = await validateQuery(
+              toolArguments(findReadTool(call.name), call.args),
+            );
 
             if (
               query.operation === 'export' &&
