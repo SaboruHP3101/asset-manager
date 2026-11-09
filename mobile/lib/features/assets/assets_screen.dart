@@ -1,11 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/network/api_client.dart';
 import '../../core/storage/token_storage.dart';
 import '../../core/utils/department_labels.dart';
+import '../../core/widgets/code_scanner_screen.dart';
 import '../login/login_screen.dart';
 import 'asset_detail_screen.dart';
 import 'asset_status_chip.dart';
@@ -162,7 +162,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
 
   Future<void> _scanQr() async {
     final qrCode = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const _AssetQrScannerScreen()),
+      MaterialPageRoute(builder: (_) => const AssetQrScannerScreen()),
     );
     if (qrCode == null || !mounted) return;
 
@@ -720,31 +720,6 @@ class _AssetMessageState extends StatelessWidget {
           ],
         ],
       ),
-    ),
-  );
-}
-
-class _AssetQrScannerScreen extends StatefulWidget {
-  const _AssetQrScannerScreen();
-
-  @override
-  State<_AssetQrScannerScreen> createState() => _AssetQrScannerScreenState();
-}
-
-class _AssetQrScannerScreenState extends State<_AssetQrScannerScreen> {
-  bool _found = false;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Quét mã QR tài sản')),
-    body: MobileScanner(
-      onDetect: (capture) {
-        if (_found || capture.barcodes.isEmpty) return;
-        final value = capture.barcodes.first.rawValue;
-        if (value == null) return;
-        _found = true;
-        Navigator.pop(context, value);
-      },
     ),
   );
 }

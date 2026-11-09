@@ -3,11 +3,11 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme/textarea_decoration.dart';
+import '../../core/widgets/code_scanner_screen.dart';
 
 class RepairRequestForm extends StatefulWidget {
   const RepairRequestForm({
@@ -164,9 +164,9 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
   // Quét QR và chọn tài sản tương ứng trong dropdown
   Future<void> _scanQrCode() async {
     _removeFocus();
-    final qrCode = await Navigator.of(
-      context,
-    ).push<String>(MaterialPageRoute(builder: (_) => const _QrScannerScreen()));
+    final qrCode = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const AssetQrScannerScreen()),
+    );
     if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) => _removeFocus());
     if (qrCode == null) return;
@@ -576,34 +576,6 @@ class _MediaPreviewScreenState extends State<_MediaPreviewScreen> {
             : InteractiveViewer(
                 child: Image.file(File(widget.file.path), fit: BoxFit.contain),
               ),
-      ),
-    );
-  }
-}
-
-class _QrScannerScreen extends StatefulWidget {
-  const _QrScannerScreen();
-
-  @override
-  State<_QrScannerScreen> createState() => _QrScannerScreenState();
-}
-
-class _QrScannerScreenState extends State<_QrScannerScreen> {
-  bool _found = false;
-
-  @override
-  Widget build(BuildContext context) {
-    // Camera quét một mã QR rồi tự quay lại form
-    return Scaffold(
-      appBar: AppBar(title: const Text('Quét mã QR tài sản')),
-      body: MobileScanner(
-        onDetect: (capture) {
-          if (_found || capture.barcodes.isEmpty) return;
-          final value = capture.barcodes.first.rawValue;
-          if (value == null) return;
-          _found = true;
-          Navigator.pop(context, value);
-        },
       ),
     );
   }

@@ -200,3 +200,29 @@ class _CodeScannerScreenState extends State<CodeScannerScreen> {
     ),
   );
 }
+
+/// Scans an asset QR code and returns its raw value to the calling screen.
+class AssetQrScannerScreen extends StatefulWidget {
+  const AssetQrScannerScreen({super.key});
+
+  @override
+  State<AssetQrScannerScreen> createState() => _AssetQrScannerScreenState();
+}
+
+class _AssetQrScannerScreenState extends State<AssetQrScannerScreen> {
+  bool _found = false;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Quét mã QR tài sản')),
+    body: MobileScanner(
+      onDetect: (capture) {
+        if (_found || capture.barcodes.isEmpty) return;
+        final value = capture.barcodes.first.rawValue;
+        if (value == null) return;
+        _found = true;
+        Navigator.pop(context, value);
+      },
+    ),
+  );
+}
