@@ -26,7 +26,31 @@ class _FakeRepository extends PurchaseReceiptsRepository {
   ];
 }
 
+class _RetryRepository extends _FakeRepository {
+  int attempts = 0;
+
+  @override
+  Future<List<PurchaseInspectionUnit>> findInspectionQueue() async {
+    if (++attempts == 1) throw StateError('Queue unavailable');
+    return super.findInspectionQueue();
+  }
+}
+
 void main() {
+  testWidgets('thử lại tải hàng chờ sau lỗi', (tester) async {
+    final repository = _RetryRepository();
+    await tester.pumpWidget(
+      MaterialApp(home: PurchaseInspectionQueueScreen(repository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Thử lại'));
+    await tester.pumpAndSettle();
+
+    expect(repository.attempts, 2);
+    expect(find.text('Laptop Dell'), findsOneWidget);
+  });
+
   testWidgets('quét mã mở đúng đơn vị hàng chờ kiểm tra', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

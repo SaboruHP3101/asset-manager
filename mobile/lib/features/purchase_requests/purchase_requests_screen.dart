@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_session.dart';
+import '../../core/widgets/retry_message.dart';
 import 'purchase_request_detail_screen.dart';
 import 'purchase_request_form.dart';
 import 'purchase_request_models.dart';
@@ -117,7 +118,7 @@ class _PurchaseRequestsScreenState extends State<PurchaseRequestsScreen> {
           centerTitle: true,
         ),
         body: _error != null
-            ? _ListError(message: _error!, onRetry: _load)
+            ? RetryMessage(message: _error!, onRetry: _load)
             : _mine == null
             ? const Center(child: CircularProgressIndicator())
             : TabBarView(
@@ -206,25 +207,4 @@ class PurchaseRequestList extends StatelessWidget {
             ),
     );
   }
-}
-
-class _ListError extends StatelessWidget {
-  const _ListError({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 12),
-          FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
-        ],
-      ),
-    ),
-  );
 }

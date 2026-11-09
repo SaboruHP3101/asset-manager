@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/theme/textarea_decoration.dart';
 import '../../core/widgets/code_scanner_screen.dart';
+import '../../core/widgets/retry_message.dart';
 import 'purchase_receipt_models.dart';
 import 'purchase_receipts_repository.dart';
 
@@ -68,7 +69,7 @@ class _PurchaseInspectionQueueScreenState
       ],
     ),
     body: _error != null
-        ? _Message(message: _error!, onRetry: _load)
+        ? RetryMessage(message: _error!, onRetry: _load, buttonSpacing: 0)
         : _units == null
         ? const Center(child: CircularProgressIndicator())
         : RefreshIndicator(
@@ -348,24 +349,4 @@ class _InspectionInput {
   final String? reason;
   final String? note;
   final XFile? evidence;
-}
-
-class _Message extends StatelessWidget {
-  const _Message({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(message, textAlign: TextAlign.center),
-          FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
-        ],
-      ),
-    ),
-  );
 }

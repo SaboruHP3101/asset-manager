@@ -5,6 +5,7 @@ import '../../core/network/api_client.dart';
 import '../../core/theme/textarea_decoration.dart';
 import '../../core/widgets/vertical_timeline.dart';
 import 'repair_request_form.dart';
+import 'repair_status_labels.dart';
 
 class RepairProgressScreen extends StatefulWidget {
   const RepairProgressScreen({this.assetId, this.requestId, super.key})
@@ -51,26 +52,11 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
     }
   }
 
-  String _statusText(String status) {
-    const labels = {
-      'draft': 'Bản nháp',
-      'pending_department_head': 'Chờ Trưởng bộ phận',
-      'pending_it_head': 'Chờ Trưởng IT',
-      'revision_required': 'Cần chỉnh sửa',
-      'pending_handover_confirmations': 'Chờ xác nhận bàn giao',
-      'reported': 'Đã tiếp nhận',
-      'assessed': 'Đã đánh giá',
-      'approval_pending': 'Đang chờ duyệt',
-      'in_progress': 'Đang sửa chữa',
-      'ready_for_return': 'Chờ nhận lại tài sản',
-      'completed': 'Chờ nghiệm thu',
-      'confirmed': 'Đã nghiệm thu',
-      'rejected': 'Yêu cầu làm lại',
-      'closed': 'Đã kết thúc',
-      'cancelled': 'Đã hủy',
-    };
-    return labels[status] ?? status.replaceAll('_', ' ');
-  }
+  String _statusText(String status) => switch (status) {
+    'pending_handover_confirmations' => 'Chờ xác nhận bàn giao',
+    'approval_pending' => 'Đang chờ duyệt',
+    _ => repairStatusLabels[status] ?? status.replaceAll('_', ' '),
+  };
 
   String _actionText(String action) {
     const labels = {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/textarea_decoration.dart';
 import '../../core/utils/department_labels.dart';
+import '../../core/widgets/retry_message.dart';
 import 'asset_allocation_models.dart';
 import 'asset_allocations_repository.dart';
 
@@ -45,7 +46,7 @@ class _AssetAllocationQueueScreenState
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Cấp phát tài sản'), centerTitle: true),
     body: _error != null
-        ? _MessageState(message: _error!, onRetry: _load)
+        ? RetryMessage(message: _error!, onRetry: _load)
         : _groups == null
         ? const Center(child: CircularProgressIndicator())
         : RefreshIndicator(
@@ -557,7 +558,7 @@ class _AllocationFormScreenState extends State<_AllocationFormScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text('Cấp phát ${widget.tasks.length} tài sản')),
     body: _error != null
-        ? _MessageState(message: _error!, onRetry: _loadDepartments)
+        ? RetryMessage(message: _error!, onRetry: _loadDepartments)
         : _departments == null
         ? const Center(child: CircularProgressIndicator())
         : Form(
@@ -766,25 +767,4 @@ Future<String?> _rejectionReason(BuildContext context) async {
   controller.dispose();
 
   return reason;
-}
-
-class _MessageState extends StatelessWidget {
-  const _MessageState({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 12),
-          FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
-        ],
-      ),
-    ),
-  );
 }

@@ -7,6 +7,7 @@ import '../../core/storage/token_storage.dart';
 import '../login/login_screen.dart';
 import 'repair_progress_screen.dart';
 import 'repair_request_form.dart';
+import 'repair_status_labels.dart';
 
 class RepairRequestsScreen extends StatefulWidget {
   const RepairRequestsScreen({super.key});
@@ -192,26 +193,8 @@ class RepairRequestCard extends StatelessWidget {
   final Map<String, dynamic> request;
   final VoidCallback onTap;
 
-  String _statusText(String status) {
-    const labels = {
-      'draft': 'Bản nháp',
-      'pending_department_head': 'Chờ Trưởng bộ phận',
-      'pending_it_head': 'Chờ Trưởng IT',
-      'revision_required': 'Cần chỉnh sửa',
-      'pending_handover_confirmations': 'Chờ bàn giao',
-      'reported': 'Đã tiếp nhận',
-      'assessed': 'Đã đánh giá',
-      'approval_pending': 'Chờ phê duyệt',
-      'in_progress': 'Đang sửa chữa',
-      'ready_for_return': 'Chờ nhận lại tài sản',
-      'completed': 'Chờ nghiệm thu',
-      'confirmed': 'Đã nghiệm thu',
-      'rejected': 'Yêu cầu làm lại',
-      'closed': 'Đã kết thúc',
-      'cancelled': 'Đã hủy',
-    };
-    return labels[status] ?? status.replaceAll('_', ' ');
-  }
+  String _statusText(String status) =>
+      repairStatusLabels[status] ?? status.replaceAll('_', ' ');
 
   String? _imageUrl() {
     final value = request['imageUrl'] as String?;
