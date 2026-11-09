@@ -268,8 +268,6 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
       );
     }
 
-    final history = (asset['handoverHistory'] as List<dynamic>? ?? const [])
-        .cast<Object>();
     return Scaffold(
       appBar: AppBar(title: const Text('Chi tiết tài sản')),
       body: RefreshIndicator(
@@ -575,73 +573,6 @@ class _InfoRow extends StatelessWidget {
   );
 }
 
-class _HandoverTimelineItem extends StatelessWidget {
-  const _HandoverTimelineItem({required this.entry, required this.isLast});
-
-  final Map<String, dynamic> entry;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) => IntrinsicHeight(
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          width: 48,
-          child: Column(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.handshake_outlined, size: 16),
-              ),
-              if (!isLast)
-                Expanded(
-                  child: Container(
-                    width: 2,
-                    color: Theme.of(context).colorScheme.outlineVariant,
-                  ),
-                ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(0, 3, 14, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _handoverTypeLabel(entry['handoverType'] as String?),
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  entry['recipientName'] as String? ??
-                      'Chưa cập nhật người nhận',
-                ),
-                Text(
-                  '${departmentLabel(entry['departmentName'] as String?) ?? 'Chưa có phòng ban'}'
-                  ' • ${_formatDate(entry['handoverDate'])}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                if ((entry['note'] as String?)?.isNotEmpty ?? false) ...[
-                  const SizedBox(height: 4),
-                  Text(entry['note'] as String),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 class _AssetDetailSkeleton extends StatelessWidget {
   const _AssetDetailSkeleton();
 
@@ -768,11 +699,3 @@ String _formatCurrency(Object? value) {
 
   return '$formatted ₫';
 }
-
-String _handoverTypeLabel(String? type) => switch (type) {
-  'allocation' || 'initial' => 'Cấp phát tài sản',
-  'reallocation' || 'transfer' => 'Bàn giao lại tài sản',
-  'return' => 'Thu hồi tài sản',
-  null || '' => 'Bàn giao tài sản',
-  _ => type.replaceAll('_', ' '),
-};
