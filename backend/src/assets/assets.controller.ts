@@ -13,23 +13,14 @@ import {
   UseGuards,
   ValidationPipe,
 } from '@nestjs/common';
-import {
-  ApiConflictResponse,
-  ApiCreatedResponse,
-  ApiNotFoundResponse,
-  ApiOkResponse,
-  ApiTags,
-} from '@nestjs/swagger';
 import { AssetsService } from './assets.service.js';
 import { CreateAssetDto } from './dto/create-asset.dto.js';
 import { UpdateAssetDto } from './dto/update-asset.dto.js';
-import { Asset } from './entities/asset.entity.js';
 import { AuthService } from '../auth/auth.service.js';
 import { CurrentEmployee } from '../auth/current-employee.decorator.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 
-@ApiTags('assets')
 @Controller('assets')
 export class AssetsController {
   constructor(
@@ -38,17 +29,12 @@ export class AssetsController {
   ) {}
 
   @Post()
-  @ApiCreatedResponse({ type: Asset })
-  @ApiConflictResponse({
-    description: 'Dữ liệu đã tồn tại hoặc có tham chiếu không hợp lệ',
-  })
   create(@Body() dto: CreateAssetDto) {
     return this.assetsService.create(dto);
   }
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  @ApiOkResponse({ type: Asset, isArray: true })
   findAll(@CurrentEmployee() actor: AuthenticatedEmployee) {
     if (actor.departmentName !== 'IT') {
       throw new ForbiddenException('Chỉ phòng IT được xem danh sách tài sản.');
@@ -90,19 +76,12 @@ export class AssetsController {
   }
 
   @Get(':id')
-  @ApiOkResponse({ type: Asset })
-  @ApiNotFoundResponse({ description: 'Không tìm thấy tài sản' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.assetsService.findOne(id);
   }
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
-  @ApiOkResponse({ type: Asset })
-  @ApiConflictResponse({
-    description: 'Dữ liệu đã tồn tại hoặc có tham chiếu không hợp lệ',
-  })
-  @ApiNotFoundResponse({ description: 'Không tìm thấy tài sản' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
@@ -117,16 +96,6 @@ export class AssetsController {
   }
 
   @Delete(':id')
-  @ApiOkResponse({
-    schema: {
-      example: { deleted: true },
-      properties: { deleted: { type: 'boolean' } },
-    },
-  })
-  @ApiConflictResponse({
-    description: 'Không thể xóa vì dữ liệu đang được tham chiếu',
-  })
-  @ApiNotFoundResponse({ description: 'Không tìm thấy tài sản' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.assetsService.remove(id);
   }

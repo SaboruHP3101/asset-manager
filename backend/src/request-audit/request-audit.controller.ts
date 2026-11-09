@@ -6,7 +6,6 @@ import {
   ParseUUIDPipe,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
 import { RequestAuditService } from './request-audit.service.js';
 import type { RequestType } from './request-audit.service.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
@@ -20,7 +19,6 @@ const requestTypes = {
   repair: 'repair',
 } as const;
 
-@ApiTags('request-audit')
 @Controller('request-audit')
 @UseGuards(JwtAuthGuard)
 /** Resource đọc timeline xử lý theo loại yêu cầu và mã yêu cầu. */

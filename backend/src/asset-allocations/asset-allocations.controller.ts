@@ -8,7 +8,6 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
 import { CurrentEmployee } from '../auth/current-employee.decorator.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
@@ -25,7 +24,6 @@ import {
   CreateAssetAllocationDto,
 } from './dto/asset-allocation.dto.js';
 
-@ApiTags('asset-allocations')
 @Controller('asset-allocations')
 @UseGuards(JwtAuthGuard, WorkflowActionGuard)
 export class AssetAllocationsController {

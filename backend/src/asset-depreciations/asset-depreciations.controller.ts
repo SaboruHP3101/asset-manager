@@ -9,7 +9,6 @@ import {
   UseGuards,
   ValidationPipe,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
 import { CurrentEmployee } from '../auth/current-employee.decorator.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import {
@@ -25,7 +24,6 @@ import {
   DepreciationSettingsDto,
 } from './dto/depreciation-workflow.dto.js';
 
-@ApiTags('asset-depreciations')
 @Controller('asset-depreciations')
 @UseGuards(JwtAuthGuard, WorkflowActionGuard)
 export class AssetDepreciationsController {

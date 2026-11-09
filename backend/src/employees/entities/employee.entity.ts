@@ -1,5 +1,3 @@
-import { ApiHideProperty } from '@nestjs/swagger';
-
 export class Employee {
   id: string;
   employeeCode: string;
@@ -15,7 +13,6 @@ export class Employee {
   createdBy?: string | null;
   updatedBy?: string | null;
 
-  @ApiHideProperty()
   password?: string | null;
 
   constructor(partial: Partial<Employee>) {

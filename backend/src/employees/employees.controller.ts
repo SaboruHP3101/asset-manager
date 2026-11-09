@@ -14,12 +14,10 @@ import {
 import { EmployeesService } from './employees.service.js';
 import { CreateEmployeeDto } from './dto/create-employee.dto.js';
 import { UpdateEmployeeDto } from './dto/update-employee.dto.js';
-import { ApiTags } from '@nestjs/swagger';
 import { CurrentEmployee } from '../auth/current-employee.decorator.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 
-@ApiTags('employees')
 @Controller('employees')
 export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}

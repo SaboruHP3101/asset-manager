@@ -7,7 +7,6 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
 import {
   CreateTransferRequestDto,
   TransferApprovalDto,
@@ -22,7 +21,6 @@ import { CurrentEmployee } from '../auth/current-employee.decorator.js';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 import { WORKFLOW_ACTIONS } from '../auth/workflow-actions.config.js';
 
-@ApiTags('transfer-requests')
 @Controller('transfer-requests')
 @UseGuards(JwtAuthGuard, WorkflowActionGuard)
 /** Điều phối API điều chuyển và áp dụng quyền riêng cho từng bước của quy trình. */

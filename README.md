@@ -22,7 +22,6 @@ Cung cấp REST API cho quản lý tài sản và các quy trình mua sắm, đi
 - PostgreSQL 16 chạy bằng Docker
 - Drizzle ORM
 - JWT
-- Swagger / OpenAPI
 - Vitest
 - Docker Compose
 
@@ -72,8 +71,6 @@ npm run start:dev
 ```
 
 API mặc định: `http://localhost:8080`
-
-Swagger: `http://localhost:8080/api-docs`
 
 ### Quản lý hạ tầng
 

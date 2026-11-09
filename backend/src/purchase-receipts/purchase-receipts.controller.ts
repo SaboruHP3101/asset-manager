@@ -9,7 +9,6 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { CurrentEmployee } from '../auth/current-employee.decorator.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
@@ -33,7 +32,6 @@ type ReceiptFiles = Partial<
   Record<'deliveryNote' | 'invoice' | 'warranty', Express.Multer.File[]>
 >;
 
-@ApiTags('purchase-receipts')
 @Controller('purchase-receipts')
 @UseGuards(JwtAuthGuard, WorkflowActionGuard)
 export class PurchaseReceiptsController {
@@ -41,7 +39,6 @@ export class PurchaseReceiptsController {
 
   @Post('purchase-orders/:orderId')
   @RequireWorkflowAction(WORKFLOW_ACTIONS.purchaseReceiptRecord)
-  @ApiConsumes('multipart/form-data')
   @UseInterceptors(purchaseReceiptUpload)
   record(
     @Param('orderId', ParseUUIDPipe) orderId: string,
@@ -74,7 +71,6 @@ export class PurchaseReceiptsController {
   }
 
   @Post('units/:unitId/inspection')
-  @ApiConsumes('multipart/form-data')
   @UseInterceptors(purchaseInspectionUpload)
   inspectUnit(
     @Param('unitId', ParseUUIDPipe) unitId: string,

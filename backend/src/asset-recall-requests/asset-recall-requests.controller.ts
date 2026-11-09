@@ -8,7 +8,6 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
 import { CurrentEmployee } from '../auth/current-employee.decorator.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
@@ -28,7 +27,6 @@ import {
   UpdateAssetRecallRequestDto,
 } from './dto/asset-recall-request.dto.js';
 
-@ApiTags('asset-recall-requests')
 @Controller('asset-recall-requests')
 @UseGuards(JwtAuthGuard, WorkflowActionGuard)
 export class AssetRecallRequestsController {

@@ -1,4 +1,4 @@
-import { PartialType, PickType } from '@nestjs/swagger';
+import { PartialType, PickType } from '@nestjs/mapped-types';
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { CreateAssetDto } from './create-asset.dto.js';
 

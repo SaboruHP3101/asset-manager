@@ -11,10 +11,6 @@ import {
   UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiConsumes,
-} from '@nestjs/swagger';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'node:path';
@@ -71,7 +67,6 @@ const repairUpload = AnyFilesInterceptor({
   },
 });
 
-@ApiTags('repair-requests')
 @Controller('repair-requests')
 @UseGuards(JwtAuthGuard, WorkflowActionGuard)
 /** Quản lý vòng đời sửa chữa, bao gồm tải minh chứng và nghiệm thu của người báo. */
@@ -84,7 +79,6 @@ export class RepairRequestsController {
   // Tạo yêu cầu sửa chữa cho tài sản của nhân viên hiện tại
   @Post('mine')
   @RequireWorkflowAction(WORKFLOW_ACTIONS.repairReport)
-  @ApiConsumes('multipart/form-data')
   @UseInterceptors(repairUpload)
   async createMine(
     @CurrentEmployee() actor: AuthenticatedEmployee,
