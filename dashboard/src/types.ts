@@ -15,8 +15,6 @@ export type EmployeeFormValue = Pick<
   "employeeCode" | "fullName" | "email" | "departmentId" | "isDepartmentHead"
 > & { phoneNumber: string };
 
-export type Department = { id: string; name: string };
-
 export type Asset = {
   id: string;
   assetCode: string;

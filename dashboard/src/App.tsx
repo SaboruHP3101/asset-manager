@@ -20,7 +20,7 @@ const resourceElements: Record<string, ReactNode> = {
   "/repair-costs": <RepairCostsPage />,
 };
 
-export function App() {
+function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
