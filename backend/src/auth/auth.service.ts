@@ -182,12 +182,22 @@ export class AuthService {
 
     if (!token) throw new UnauthorizedException('Access token is required.');
 
-    try {
-      const payload = await this.jwtService.verifyAsync<{ sub: string }>(token);
+    let payload: { sub?: unknown; purpose?: string };
 
-      return payload.sub;
+    try {
+      payload = await this.jwtService.verifyAsync(token);
     } catch {
       throw new UnauthorizedException('Access token is invalid or expired.');
     }
+
+    if (
+      typeof payload.sub !== 'string' ||
+      !payload.sub ||
+      payload.purpose === 'activation'
+    ) {
+      throw new UnauthorizedException('Access token is invalid.');
+    }
+
+    return payload.sub;
   }
 }
