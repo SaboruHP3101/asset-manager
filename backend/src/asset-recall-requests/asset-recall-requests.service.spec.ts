@@ -79,7 +79,10 @@ describe('AssetRecallRequestsService', () => {
       audit as unknown as RequestAuditService,
     );
 
-    vi.spyOn(service, 'findOne').mockResolvedValue({ id: 'recall-id' });
+    vi.spyOn(service, 'findOne');
+    vi.mocked(service.findOne, { partial: true }).mockResolvedValue({
+      id: 'recall-id',
+    });
 
     await service.create(
       {
@@ -118,7 +121,10 @@ describe('AssetRecallRequestsService', () => {
       log: vi.fn(async () => undefined),
     } as unknown as RequestAuditService);
 
-    vi.spyOn(service, 'findOne').mockResolvedValue({ id: 'recall-id' });
+    vi.spyOn(service, 'findOne');
+    vi.mocked(service.findOne, { partial: true }).mockResolvedValue({
+      id: 'recall-id',
+    });
     await service.create(
       {
         type: 'disposal',
@@ -199,7 +205,10 @@ describe('AssetRecallRequestsService', () => {
       audit as unknown as RequestAuditService,
     );
 
-    vi.spyOn(service, 'findOne').mockResolvedValue({ id: 'recall-id' });
+    vi.spyOn(service, 'findOne');
+    vi.mocked(service.findOne, { partial: true }).mockResolvedValue({
+      id: 'recall-id',
+    });
     await service.completeDisposal(
       'recall-id',
       {
