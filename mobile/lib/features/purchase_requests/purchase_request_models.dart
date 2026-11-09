@@ -100,6 +100,14 @@ class PurchaseRequestItemDraft {
   };
 }
 
+/// Checks whether an item has a quote selected for procurement.
+bool purchaseItemHasSelectedQuote(Map<String, dynamic> item) {
+  final quotes = item['quotes'];
+
+  return quotes is List &&
+      quotes.any((quote) => quote is Map && quote['isSelected'] == true);
+}
+
 class PurchaseRequestDetail {
   const PurchaseRequestDetail({
     required this.id,
