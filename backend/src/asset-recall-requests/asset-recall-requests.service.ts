@@ -16,6 +16,7 @@ import {
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
 import { RequestAuditService } from '../request-audit/request-audit.service.js';
+import { requireActiveItWarehouse } from '../warehouses/warehouses.service.js';
 import {
   CompleteDisposalDto,
   CompleteUpgradeDto,
@@ -273,7 +274,7 @@ export class AssetRecallRequestsService {
 
   async findExchangeCandidates(actor: AuthenticatedEmployee) {
     this.assertItHead(actor);
-    const warehouse = await this.requireItWarehouse(this.db);
+    const warehouse = await requireActiveItWarehouse(this.db);
 
     return this.db
       .select({
@@ -536,7 +537,7 @@ export class AssetRecallRequestsService {
       }
 
       await this.lockAsset(tx, request.assetId);
-      const warehouse = await this.requireItWarehouse(tx);
+      const warehouse = await requireActiveItWarehouse(tx);
       const asset = await this.loadAsset(tx, request.assetId);
 
       if (
@@ -588,7 +589,7 @@ export class AssetRecallRequestsService {
       }
 
       await this.lockAsset(tx, request.assetId);
-      const warehouse = await this.requireItWarehouse(tx);
+      const warehouse = await requireActiveItWarehouse(tx);
       const asset = await this.loadAsset(tx, request.assetId);
 
       if (
@@ -687,7 +688,7 @@ export class AssetRecallRequestsService {
       }
 
       await this.lockAsset(tx, request.assetId);
-      const warehouse = await this.requireItWarehouse(tx);
+      const warehouse = await requireActiveItWarehouse(tx);
       const asset = await this.loadAsset(tx, request.assetId);
 
       if (
@@ -760,7 +761,7 @@ export class AssetRecallRequestsService {
     now: Date,
   ) {
     await this.lockAsset(tx, request.assetId);
-    const warehouse = await this.requireItWarehouse(tx);
+    const warehouse = await requireActiveItWarehouse(tx);
     const asset = await this.requireOwnedItAsset(
       tx,
       request.assetId,
@@ -817,7 +818,7 @@ export class AssetRecallRequestsService {
     now: Date,
   ) {
     await this.lockAsset(tx, request.assetId);
-    const warehouse = await this.requireItWarehouse(tx);
+    const warehouse = await requireActiveItWarehouse(tx);
     const asset = await this.requireOwnedItAsset(
       tx,
       request.assetId,
@@ -874,7 +875,7 @@ export class AssetRecallRequestsService {
 
     await this.lockAsset(tx, request.assetId);
     await this.lockAsset(tx, request.replacementAssetId);
-    const warehouse = await this.requireItWarehouse(tx);
+    const warehouse = await requireActiveItWarehouse(tx);
     const original = await this.requireOwnedItAsset(
       tx,
       request.assetId,
@@ -1106,7 +1107,7 @@ export class AssetRecallRequestsService {
       );
     }
 
-    const warehouse = await this.requireItWarehouse(db);
+    const warehouse = await requireActiveItWarehouse(db);
     const candidate = await this.loadAsset(db, replacementAssetId);
 
     if (
@@ -1158,25 +1159,6 @@ export class AssetRecallRequestsService {
           eq(schema.assets.status, 'reserved_for_exchange'),
         ),
       );
-  }
-
-  /**
-   * Lấy kho IT với mã IT_WAREHOUSE từ bảng warehouses
-   */
-  private async requireItWarehouse(db: Database) {
-    const [warehouse] = await db
-      .select()
-      .from(schema.warehouses)
-      .where(
-        and(
-          eq(schema.warehouses.code, 'IT_WAREHOUSE'),
-          eq(schema.warehouses.isActive, true),
-        ),
-      );
-
-    if (!warehouse) throw new NotFoundException('Không tìm thấy kho IT.');
-
-    return warehouse;
   }
 
   /**

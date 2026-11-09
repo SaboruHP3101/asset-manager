@@ -5,6 +5,24 @@ import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
 
+export async function requireActiveItWarehouse(
+  db: NodePgDatabase<typeof schema>,
+) {
+  const [warehouse] = await db
+    .select()
+    .from(schema.warehouses)
+    .where(
+      and(
+        eq(schema.warehouses.code, 'IT_WAREHOUSE'),
+        eq(schema.warehouses.isActive, true),
+      ),
+    );
+
+  if (!warehouse) throw new NotFoundException('Không tìm thấy kho IT.');
+
+  return warehouse;
+}
+
 @Injectable()
 export class WarehousesService {
   constructor(
@@ -14,19 +32,8 @@ export class WarehousesService {
 
   async findItWarehouse(actor: AuthenticatedEmployee) {
     this.assertItDepartment(actor);
-    const [warehouse] = await this.db
-      .select()
-      .from(schema.warehouses)
-      .where(
-        and(
-          eq(schema.warehouses.code, 'IT_WAREHOUSE'),
-          eq(schema.warehouses.isActive, true),
-        ),
-      );
 
-    if (!warehouse) throw new NotFoundException('Không tìm thấy kho IT.');
-
-    return warehouse;
+    return requireActiveItWarehouse(this.db);
   }
 
   async findItAssets(actor: AuthenticatedEmployee) {

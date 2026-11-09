@@ -26,6 +26,7 @@ import {
   UpdateMyRepairRequestDto,
 } from './dto/create-my-repair-request.dto.js';
 import { RequestAuditService } from '../request-audit/request-audit.service.js';
+import { requireActiveItWarehouse } from '../warehouses/warehouses.service.js';
 import {
   AssignRepairDto,
   CompleteRepairDto,
@@ -795,7 +796,7 @@ export class RepairRequestsService {
 
       // Khóa tài sản để không thao tác trả trên dữ liệu vị trí hoặc người giữ đã đổi.
       await this.lockAsset(db, current.assetId);
-      const warehouse = await this.requireItWarehouse(db);
+      const warehouse = await requireActiveItWarehouse(db);
       const asset = await this.loadAsset(db, current.assetId);
 
       // Chỉ xử lý nghiệm thu nếu tài sản vẫn do kho IT giữ và đang trong luồng sửa.
@@ -886,7 +887,7 @@ export class RepairRequestsService {
       request.reporterId,
     );
     // Kho đang hoạt động cung cấp bộ phận quản lý và vị trí đích.
-    const warehouse = await this.requireItWarehouse(db);
+    const warehouse = await requireActiveItWarehouse(db);
 
     // Sau khi cả hai bên xác nhận, kho IT thay người báo giữ tài sản trong thời gian sửa.
     await db
@@ -998,24 +999,6 @@ export class RepairRequestsService {
     }
 
     return asset;
-  }
-
-  /** Dùng mã kho cố định để lấy đúng kho sửa chữa, kể cả khi tên hiển thị thay đổi. */
-  private async requireItWarehouse(db: Database) {
-    const [warehouse] = await db
-      .select()
-      .from(schema.warehouses)
-      .where(
-        and(
-          eq(schema.warehouses.code, 'IT_WAREHOUSE'),
-          eq(schema.warehouses.isActive, true),
-        ),
-      );
-
-    // Không thể nhận hoặc trả tài sản nếu thiếu kho IT đang hoạt động.
-    if (!warehouse) throw new NotFoundException('Không tìm thấy kho IT.');
-
-    return warehouse;
   }
 
   /** Tính các nút client có thể hiện từ người xem và trạng thái phiếu. */
