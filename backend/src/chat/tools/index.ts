@@ -8,7 +8,7 @@ import { warehouseTool } from './warehouse.tool.js';
 import { depreciationTool } from './depreciation.tool.js';
 import { permissionsTool } from './permissions.tool.js';
 
-export const readTools = [
+const readTools = [
   myAssetsTool,
   assetsTool,
   handoversTool,

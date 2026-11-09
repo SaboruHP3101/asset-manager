@@ -83,7 +83,7 @@ const moneyFields = new Set([
   'totalInclVat',
 ]);
 
-export function formatMoney(value: string): string {
+function formatMoney(value: string): string {
   const [integer, fraction = ''] = value.split('.');
   const decimals = fraction.replace(/0+$/, '');
 

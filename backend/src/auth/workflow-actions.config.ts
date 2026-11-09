@@ -62,7 +62,7 @@ export type WorkflowAction =
  * Các thao tác tự phục vụ mà mọi nhân viên đang hoạt động đều cần có. Tách nhóm
  * này giúp vai trò chuyên môn vẫn có thể tạo yêu cầu cá nhân mà không lặp cấu hình.
  */
-export const EMPLOYEE_ACTIONS: readonly WorkflowAction[] = [
+const EMPLOYEE_ACTIONS: readonly WorkflowAction[] = [
   WORKFLOW_ACTIONS.transferCreate,
   WORKFLOW_ACTIONS.transferConfirm,
   WORKFLOW_ACTIONS.repairReport,
@@ -86,7 +86,7 @@ export const EMPLOYEE_ACTIONS: readonly WorkflowAction[] = [
  * Bảng này chỉ chứa quyền bổ sung theo chuyên môn. EMPLOYEE_ACTIONS được cộng
  * cho mọi nhân viên, kể cả role mới chưa được khai báo trong bảng này.
  */
-export const ROLE_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
+const ROLE_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
   {
     EMPLOYEE: [],
     ACCOUNTING: [],
@@ -99,7 +99,7 @@ export const ROLE_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
     ],
   };
 
-export const DEPARTMENT_HEAD_ACTIONS: readonly WorkflowAction[] = [
+const DEPARTMENT_HEAD_ACTIONS: readonly WorkflowAction[] = [
   WORKFLOW_ACTIONS.transferApproveDepartment,
   WORKFLOW_ACTIONS.repairApproveDepartment,
   WORKFLOW_ACTIONS.purchaseRequestApproveDepartment,

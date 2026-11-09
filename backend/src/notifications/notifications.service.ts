@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
 
-export const PURCHASE_NOTIFICATION_EVENTS = [
+const PURCHASE_NOTIFICATION_EVENTS = [
   'purchase_request_submitted',
   'purchase_request_returned_for_revision',
   'purchase_request_ready_for_procurement',
@@ -24,9 +24,9 @@ export const PURCHASE_NOTIFICATION_EVENTS = [
   'asset_activated',
 ] as const;
 
-export type PurchaseNotificationEvent =
+type PurchaseNotificationEvent =
   (typeof PURCHASE_NOTIFICATION_EVENTS)[number];
-export type NotificationEntityType =
+type NotificationEntityType =
   'request' | 'order' | 'receipt' | 'asset' | 'allocation';
 
 export interface CreateNotificationEntry {

@@ -27,7 +27,7 @@ import * as s from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
 import { ChatQueryDto, type ChatRecord } from './chat.dto.js';
 
-export const CHAT_RECORD_LIMIT = 2000;
+const CHAT_RECORD_LIMIT = 2000;
 
 const actionModules: Record<string, string> = {
   'purchase.request': 'Đề nghị mua',

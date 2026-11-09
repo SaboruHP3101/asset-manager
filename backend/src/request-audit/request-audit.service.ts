@@ -6,7 +6,7 @@ import { DRIZZLE } from '../drizzle/drizzle.module.js';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 
 export type RequestType = 'purchase' | 'transfer' | 'repair' | 'recall';
-export type ApprovalResult = 'approved' | 'rejected' | 'pending';
+type ApprovalResult = 'approved' | 'rejected' | 'pending';
 
 /** Dữ liệu chuẩn hóa cho một hành động phát sinh trong bất kỳ workflow nào. */
 export interface AuditEntry {
