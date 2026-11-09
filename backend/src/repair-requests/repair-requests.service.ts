@@ -50,77 +50,83 @@ export class RepairRequestsService {
     private readonly audit: RequestAuditService,
   ) {}
 
-  // Tạo yêu cầu pending và lưu thông tin ảnh, video đi kèm
   async createMine(
     actor: AuthenticatedEmployee,
     dto: CreateMyRepairRequestDto,
     files: Express.Multer.File[],
   ) {
-    const [asset] = await this.db
-      .select({
-        id: schema.assets.id,
-        currentLocation: schema.assets.currentLocation,
-        managementOwner: schema.assetCategories.managementOwner,
-      })
-      .from(schema.assets)
-      .innerJoin(
-        schema.assetCategories,
-        eq(schema.assets.assetCategoryId, schema.assetCategories.id),
-      )
-      .where(
-        and(
-          eq(schema.assets.id, dto.assetId),
-          eq(schema.assets.currentUserId, actor.id),
-        ),
-      );
-
-    if (!asset || asset.managementOwner !== 'it') {
-      throw new NotFoundException(
-        'Chỉ có thể sửa chữa thiết bị điện tử đang được giao cho bạn.',
-      );
-    }
-
-    // Mỗi tài sản chỉ có một luồng sửa chữa đang hoạt động để timeline và trạng
-    // thái tài sản không bị phân nhánh thành nhiều yêu cầu song song.
-    const [activeRequest] = await this.db
-      .select({ id: schema.repairRequests.id })
-      .from(schema.repairRequests)
-      .where(
-        and(
-          eq(schema.repairRequests.assetId, dto.assetId),
-          notInArray(schema.repairRequests.status, ['closed', 'cancelled']),
-        ),
-      );
-
-    if (activeRequest) {
-      throw new ConflictException(
-        'Tài sản đang có một yêu cầu sửa chữa chưa hoàn tất.',
-      );
-    }
-
-
-    const [activeRecall] = await this.db
-      .select({ id: schema.assetRecallRequests.id })
-      .from(schema.assetRecallRequests)
-      .where(
-        and(
-          eq(schema.assetRecallRequests.assetId, dto.assetId),
-          sql`${schema.assetRecallRequests.status} <> 'completed'`,
-        ),
-      );
-
-    if (activeRecall) {
-      throw new ConflictException('Tài sản đang có phiếu thu hồi chưa hoàn tất.');
-    }
-
     return this.db.transaction(async (tx) => {
+      // Luồng thu hồi cũng khóa dòng tài sản trước khi kiểm tra phiếu đang mở.
+      await this.lockAsset(tx, dto.assetId);
+      // Lấy vị trí gốc để trả tài sản về sau và đọc đơn vị quản lý từ danh mục.
+      const [asset] = await tx
+        .select({
+          id: schema.assets.id,
+          currentLocation: schema.assets.currentLocation,
+          managementOwner: schema.assetCategories.managementOwner,
+        })
+        .from(schema.assets)
+        .innerJoin(
+          schema.assetCategories,
+          eq(schema.assets.assetCategoryId, schema.assetCategories.id),
+        )
+        .where(
+          and(
+            eq(schema.assets.id, dto.assetId),
+            eq(schema.assets.currentUserId, actor.id),
+          ),
+        );
+
+      // Phiếu chỉ dành cho tài sản IT đang giao cho chính người gửi phiếu.
+      if (!asset || asset.managementOwner !== 'it') {
+        throw new NotFoundException(
+          'Chỉ có thể sửa chữa thiết bị điện tử đang được giao cho bạn.',
+        );
+      }
+
+      // Mỗi tài sản chỉ có một luồng sửa chữa đang hoạt động.
+      const [activeRequest] = await tx
+        .select({ id: schema.repairRequests.id })
+        .from(schema.repairRequests)
+        .where(
+          and(
+            eq(schema.repairRequests.assetId, dto.assetId),
+            notInArray(schema.repairRequests.status, ['closed', 'cancelled']),
+          ),
+        );
+
+      // Báo xung đột để nhân viên tiếp tục trên phiếu đang mở.
+      if (activeRequest) {
+        throw new ConflictException(
+          'Tài sản đang có một yêu cầu sửa chữa chưa hoàn tất.',
+        );
+      }
+
+      // Phiếu thu hồi chưa xong có thể thay đổi người giữ hoặc vị trí tài sản.
+      const [activeRecall] = await tx
+        .select({ id: schema.assetRecallRequests.id })
+        .from(schema.assetRecallRequests)
+        .where(
+          and(
+            eq(schema.assetRecallRequests.assetId, dto.assetId),
+            sql`${schema.assetRecallRequests.status} <> 'completed'`,
+          ),
+        );
+
+      // Chờ thu hồi kết thúc để hai quy trình không cùng xử lý một tài sản.
+      if (activeRecall) {
+        throw new ConflictException(
+          'Tài sản đang có phiếu thu hồi chưa hoàn tất.',
+        );
+      }
+
       const [request] = await tx
         .insert(schema.repairRequests)
         .values({
           assetId: dto.assetId,
           reporterId: actor.id,
           departmentId: actor.departmentId,
-          originalLocation: asset.currentLocation,
+          originalLocation: asset.currentLocation, // Vị trí cần khôi phục khi nghiệm thu.
           reportDate: new Date().toISOString().slice(0, 10),
           issueDescription: dto.issueDescription,
           status: 'draft',
@@ -141,7 +147,7 @@ export class RepairRequestsService {
         );
       }
 
-      await this.audit.log(tx as unknown as NodePgDatabase<typeof schema>, {
+      await this.audit.log(tx, {
         requestType: 'repair',
         requestId: request.id,
         actionType: 'repair.draft_created',
@@ -157,21 +163,22 @@ export class RepairRequestsService {
     });
   }
 
+  /** Chỉ người tạo được sửa mô tả khi phiếu còn nháp hoặc đã bị trả về. */
   async updateMine(
     id: string,
     dto: UpdateMyRepairRequestDto,
     actor: AuthenticatedEmployee,
   ) {
-    await this.db.transaction(async (transaction) => {
-      const tx = transaction as unknown as Database;
-
-      await this.lockRequest(tx, id);
-      const request = await this.requireStatus(tx, id, [
+    // Mô tả và sự kiện chỉnh sửa phải được lưu hoặc hoàn tác cùng nhau.
+    await this.db.transaction(async (tx) => {
+      // Khóa trước khi đọc để lần sửa này không chen vào lúc một người khác gửi phiếu.
+      const request = await this.loadLockedRequest(tx, id, [
         'draft',
         'revision_required',
       ]);
 
       this.assertOwner(request, actor);
+
       await tx
         .update(schema.repairRequests)
         .set({
@@ -180,18 +187,25 @@ export class RepairRequestsService {
           updatedBy: actor.id,
         })
         .where(eq(schema.repairRequests.id, id));
-      await this.logAction(tx, request, actor, 'repair.draft_updated', 'pending');
+
+      await this.logAction(
+        tx,
+        request,
+        actor,
+        'repair.draft_updated',
+        'pending',
+      );
     });
 
+    // Đọc lại sau khi lưu để trả mô tả, timeline và thao tác đang có hiệu lực.
     return this.findOneForActor(id, actor);
   }
 
+  /** Gửi bản nháp hoặc bản sửa lại cho trưởng bộ phận duyệt. */
   async submit(id: string, actor: AuthenticatedEmployee) {
-    await this.db.transaction(async (transaction) => {
-      const tx = transaction as unknown as Database;
-
-      await this.lockRequest(tx, id);
-      const request = await this.requireStatus(tx, id, [
+    await this.db.transaction(async (tx) => {
+      // Khóa trước khi đọc trạng thái để hai lần cùng lúc gửi không tạo hai lượt duyệt.
+      const request = await this.loadLockedRequest(tx, id, [
         'draft',
         'revision_required',
       ]);
@@ -202,14 +216,18 @@ export class RepairRequestsService {
         throw new BadRequestException('Vui lòng mô tả tình trạng tài sản.');
       }
 
+      // Tài sản có thể đã đổi người giữ sau lúc tạo nháp, nên kiểm tra lại sau khi khóa.
       await this.lockAsset(tx, request.assetId);
       await this.requireOwnedItAsset(tx, request.assetId, actor.id);
+
       const now = new Date();
+      // Chỉ lần gửi lại mới mở phiên bản duyệt mới để đối chiếu với bản đã bị trả.
       const revision =
         request.status === 'revision_required'
           ? request.currentRevision + 1
           : request.currentRevision;
 
+      // Gửi về bước đầu và xóa quyết định cũ để phiên bản này được duyệt lại đầy đủ.
       await tx
         .update(schema.repairRequests)
         .set({
@@ -235,6 +253,7 @@ export class RepairRequestsService {
           updatedBy: actor.id,
         })
         .where(eq(schema.repairRequests.id, id));
+
       await this.logAction(
         tx,
         request,
@@ -247,12 +266,15 @@ export class RepairRequestsService {
       );
     });
 
+    // Client cần trạng thái chờ duyệt và danh sách thao tác mới sau khi gửi.
     return this.findOneForActor(id, actor);
   }
 
+  /** Tìm những phiếu cần làm cho tài khoản hiện tại. */
   async findQueue(actor: AuthenticatedEmployee) {
     const conditions = [];
 
+    // Trưởng bộ phận chỉ duyệt ở bước đầu và trong bộ phận mình.
     if (actor.isDepartmentHead) {
       conditions.push(
         and(
@@ -262,6 +284,7 @@ export class RepairRequestsService {
       );
     }
 
+    // Trưởng IT xử lý cả duyệt, bàn giao phía IT và phân công hoặc hoàn tất sửa chữa.
     if (this.isItHead(actor)) {
       conditions.push(eq(schema.repairRequests.status, 'pending_it_head'));
       conditions.push(
@@ -272,6 +295,7 @@ export class RepairRequestsService {
       );
       conditions.push(eq(schema.repairRequests.status, 'in_progress'));
     } else if (actor.departmentName === 'IT') {
+      // Kỹ thuật viên chỉ nhận việc đang sửa đã giao cho mình.
       conditions.push(
         and(
           eq(schema.repairRequests.status, 'in_progress'),
@@ -296,9 +320,11 @@ export class RepairRequestsService {
     return this.findSummaries(or(...conditions)!);
   }
 
+  /** Cung cấp danh sách để trưởng IT chọn người nhận việc. */
   async findItAssignees(actor: AuthenticatedEmployee) {
     this.assertItHead(actor);
 
+    // Chỉ hiện nhân viên IT còn hoạt động, xếp theo tên để dễ tìm trong danh sách.
     return this.db
       .select({
         id: schema.employees.id,
@@ -319,13 +345,16 @@ export class RepairRequestsService {
       .orderBy(asc(schema.employees.fullName));
   }
 
+  /** Trả chi tiết và các thao tác phù hợp với tài khoản đang xem phiếu. */
   async findOneForActor(id: string, actor: AuthenticatedEmployee) {
     const request = await this.requireStatus(this.db, id);
 
+    // Kiểm tra quyền trước khi đọc thông tin tài sản và nhật ký đi kèm.
     if (!this.canView(request, actor)) {
       throw new ForbiddenException('Bạn không được xem phiếu sửa chữa này.');
     }
 
+    // Hai truy vấn độc lập nên có thể chạy song song.
     const [asset, trail] = await Promise.all([
       this.loadAsset(this.db, request.assetId),
       this.audit.findTrail('repair', id),
@@ -339,24 +368,30 @@ export class RepairRequestsService {
     };
   }
 
+  /** Cho trưởng bộ phận chuyển phiếu đến IT hoặc trả người báo chỉnh sửa. */
   async decideDepartment(
     id: string,
     dto: RepairDecisionDto,
     actor: AuthenticatedEmployee,
   ) {
-    await this.db.transaction(async (transaction) => {
-      const tx = transaction as unknown as Database;
-
-      await this.lockRequest(tx, id);
-      const request = await this.requireStatus(tx, id, [
+    await this.db.transaction(async (tx) => {
+      // Khóa rồi kiểm tra đúng bước để hai quyết định đến cùng lúc không ghi đè nhau.
+      const request = await this.loadLockedRequest(tx, id, [
         'pending_department_head',
       ]);
 
-      if (!actor.isDepartmentHead || actor.departmentId !== request.departmentId) {
-        throw new ForbiddenException('Bạn không được duyệt phiếu của bộ phận khác.');
+      // Kiểm tra cả chức vụ lẫn bộ phận ghi trên phiếu.
+      if (
+        !actor.isDepartmentHead ||
+        actor.departmentId !== request.departmentId
+      ) {
+        throw new ForbiddenException(
+          'Bạn không được duyệt phiếu của bộ phận khác.',
+        );
       }
 
       const now = new Date();
+      // IT chỉ nhận phiếu đã qua bước duyệt của bộ phận gửi.
       const status = dto.approved ? 'pending_it_head' : 'revision_required';
 
       await tx
@@ -375,7 +410,7 @@ export class RepairRequestsService {
         tx,
         request,
         actor,
-        'repair.department_decision',
+        'repair.department_decision', // Tách khỏi quyết định của IT trong timeline.
         dto.approved ? 'approved' : 'rejected',
         status,
         dto.note,
@@ -385,18 +420,17 @@ export class RepairRequestsService {
     return this.findOneForActor(id, actor);
   }
 
+  /** Cho trưởng IT mở bước bàn giao hoặc yêu cầu người báo sửa phiếu. */
   async decideIt(
     id: string,
     dto: RepairDecisionDto,
     actor: AuthenticatedEmployee,
   ) {
     this.assertItHead(actor);
-    await this.db.transaction(async (transaction) => {
-      const tx = transaction as unknown as Database;
-
-      await this.lockRequest(tx, id);
-      const request = await this.requireStatus(tx, id, ['pending_it_head']);
+    await this.db.transaction(async (tx) => {
+      const request = await this.loadLockedRequest(tx, id, ['pending_it_head']);
       const now = new Date();
+      // Duyệt phiếu chỉ mở bước bàn giao. Tài sản vẫn chưa chuyển vào kho.
       const status = dto.approved
         ? 'pending_handover_confirmations'
         : 'revision_required';
@@ -417,7 +451,7 @@ export class RepairRequestsService {
         tx,
         request,
         actor,
-        'repair.it_decision',
+        'repair.it_decision', // Timeline cho biết IT đã quyết định ở bước nào.
         dto.approved ? 'approved' : 'rejected',
         status,
         dto.note,
@@ -427,69 +461,38 @@ export class RepairRequestsService {
     return this.findOneForActor(id, actor);
   }
 
+  /** Ghi xác nhận của từng bên và chỉ nhận tài sản khi cả hai bên đồng ý. */
   async decideHandover(
     id: string,
     dto: RepairHandoverDecisionDto,
     actor: AuthenticatedEmployee,
   ) {
-    await this.db.transaction(async (transaction) => {
-      const tx = transaction as unknown as Database;
-
-      await this.lockRequest(tx, id);
-      const request = await this.requireStatus(tx, id, [
+    await this.db.transaction(async (tx) => {
+      const request = await this.loadLockedRequest(tx, id, [
         'pending_handover_confirmations',
       ]);
+
       const side = this.handoverSide(request, actor);
       const now = new Date();
-
-      if (!dto.confirmed) {
-        await tx
-          .update(schema.repairRequests)
-          .set({
-            status: 'revision_required',
-            ...(side === 'employee'
-              ? {
-                  employeeHandoverDecision: 'rejected' as const,
-                  employeeHandoverDecidedAt: now,
-                  employeeHandoverNote: dto.note?.trim() || null,
-                }
-              : {
-                  itHandoverDecision: 'rejected' as const,
-                  itHandoverDecidedBy: actor.id,
-                  itHandoverDecidedAt: now,
-                  itHandoverNote: dto.note?.trim() || null,
-                }),
-            updatedAt: now,
-            updatedBy: actor.id,
-          })
-          .where(eq(schema.repairRequests.id, id));
-        await this.logAction(
-          tx,
-          request,
-          actor,
-          `repair.${side}_handover_rejected`,
-          'rejected',
-          'revision_required',
-          dto.note,
-        );
-
-        return;
-      }
-
+      const decision = dto.confirmed ? 'confirmed' : 'rejected';
+      const note = dto.note?.trim() || null;
+      // Một bên từ chối là đủ để trả phiếu về bước chỉnh sửa.
+      const status = dto.confirmed ? request.status : 'revision_required';
       const [updated] = await tx
         .update(schema.repairRequests)
         .set({
+          status,
           ...(side === 'employee'
             ? {
-                employeeHandoverDecision: 'confirmed' as const,
+                employeeHandoverDecision: decision,
                 employeeHandoverDecidedAt: now,
-                employeeHandoverNote: dto.note?.trim() || null,
+                employeeHandoverNote: note,
               }
             : {
-                itHandoverDecision: 'confirmed' as const,
+                itHandoverDecision: decision,
                 itHandoverDecidedBy: actor.id,
                 itHandoverDecidedAt: now,
-                itHandoverNote: dto.note?.trim() || null,
+                itHandoverNote: note,
               }),
           updatedAt: now,
           updatedBy: actor.id,
@@ -501,11 +504,15 @@ export class RepairRequestsService {
         tx,
         request,
         actor,
-        `repair.${side}_handover_confirmed`,
-        'approved',
+        `repair.${side}_handover_${decision}`,
+        dto.confirmed ? 'approved' : 'rejected',
+        status,
+        dto.confirmed ? undefined : dto.note,
       );
 
+      // Bên xác nhận sau cùng kích hoạt chuyển kho trong cùng giao dịch.
       if (
+        dto.confirmed &&
         updated.employeeHandoverDecision === 'confirmed' &&
         updated.itHandoverDecision === 'confirmed'
       ) {
@@ -517,13 +524,10 @@ export class RepairRequestsService {
   }
 
   /**
-   * Trả yêu cầu gần nhất của một tài sản cùng audit trail để mobile quyết định
-   * hiển thị nút tạo mới hay màn hình tiến trình. Chỉ chủ tài sản được phép xem.
+   * Lấy phiếu gần nhất do người gọi báo cho tài sản này để mở màn hình tiến trình.
+   * Nếu chưa có phiếu, chỉ trả null khi người gọi đang giữ tài sản IT này.
    */
-  async findMyLatestByAsset(
-    actor: AuthenticatedEmployee,
-    assetId: string,
-  ) {
+  async findMyLatestByAsset(actor: AuthenticatedEmployee, assetId: string) {
     const [request] = await this.db
       .select()
       .from(schema.repairRequests)
@@ -533,22 +537,26 @@ export class RepairRequestsService {
           eq(schema.repairRequests.reporterId, actor.id),
         ),
       )
+      // Màn hình tài sản chỉ cần phiếu mới nhất của người báo.
       .orderBy(desc(schema.repairRequests.createdAt))
       .limit(1);
 
     if (!request) {
+      // Phân biệt chưa có phiếu với trường hợp tài sản không thuộc phạm vi của người gọi.
       await this.requireOwnedItAsset(this.db, assetId, actor.id);
 
       return null;
     }
 
+    // Dùng cùng dữ liệu chi tiết và quyền thao tác như khi mở phiếu từ danh sách.
     const detail = await this.findOneForActor(request.id, actor);
 
     return { request: detail, timeline: detail.timeline };
   }
 
-  /** Lấy toàn bộ yêu cầu của nhân viên kèm thông tin tài sản để dựng list card. */
+  /** Lấy danh sách phiếu của người báo cùng thông tin hiển thị trên thẻ tài sản. */
   async findMine(employeeId: string) {
+    // Chỉ chọn các cột thẻ cần và xếp phiếu mới lên đầu.
     const requests = await this.db
       .select({
         id: schema.repairRequests.id,
@@ -572,8 +580,10 @@ export class RepairRequestsService {
       .where(eq(schema.repairRequests.reporterId, employeeId))
       .orderBy(desc(schema.repairRequests.createdAt));
 
+    // Bỏ qua truy vấn ảnh khi không có mã tài sản nào để tìm.
     if (requests.length === 0) return [];
 
+    // Lấy ảnh của các tài sản trong một truy vấn để tránh đọc lại theo từng phiếu.
     const attachments = await this.db
       .select({
         entityId: schema.attachments.entityId,
@@ -590,22 +600,26 @@ export class RepairRequestsService {
         ),
       )
       .orderBy(asc(schema.attachments.createdAt));
+    // Tra ảnh theo ID tài sản vì nhiều phiếu có thể thuộc cùng một tài sản.
     const images = new Map<string, string>();
 
     for (const attachment of attachments) {
+      // Kết quả xếp cũ trước, nên giữ ảnh đầu tiên của mỗi tài sản.
       if (!images.has(attachment.entityId)) {
         images.set(attachment.entityId, attachment.url);
       }
     }
 
+    // Giữ phiếu không có ảnh để client vẫn hiển thị được thẻ và ảnh mặc định.
     return requests.map((request) => ({
       ...request,
       imageUrl: images.get(request.assetId) ?? null,
     }));
   }
 
-  /** Trả timeline đúng request được chọn và kiểm tra request thuộc nhân viên. */
+  /** Trả tiến trình của phiếu cụ thể do chính nhân viên báo hỏng. */
   async findMyProgress(employeeId: string, requestId: string) {
+    // Ràng buộc cả ID phiếu lẫn người báo để biết ID không đủ đọc tiến trình.
     const [request] = await this.db
       .select()
       .from(schema.repairRequests)
@@ -617,6 +631,7 @@ export class RepairRequestsService {
       );
 
     if (!request) {
+      // Trả cùng lỗi cho ID không tồn tại và ID phiếu của người khác.
       throw new NotFoundException('Không tìm thấy yêu cầu sửa chữa.');
     }
 
@@ -626,11 +641,11 @@ export class RepairRequestsService {
     };
   }
 
-  /** Đọc và khóa luồng bằng trạng thái mong đợi trước mỗi hành động nghiệp vụ. */
+  /** Đọc phiếu và kiểm tra bước hiện tại. Các thao tác ghi phải khóa phiếu trước khi gọi. */
   private async requireStatus(
-    db: NodePgDatabase<typeof schema>,
+    db: Database,
     id: string,
-    expected?: (typeof schema.repairStatusEnum.enumValues)[number][],
+    expected?: RepairRecord['status'][],
   ) {
     const [request] = await db
       .select()
@@ -643,6 +658,7 @@ export class RepairRequestsService {
       );
     }
 
+    // Đọc chi tiết có thể bỏ qua danh sách trạng thái. Thao tác ghi chỉ chạy ở bước hợp lệ.
     if (expected && !expected.includes(request.status)) {
       throw new BadRequestException(
         `Không thể thực hiện ở trạng thái ${request.status}.`,
@@ -652,16 +668,15 @@ export class RepairRequestsService {
     return request;
   }
 
-  /** Phân công kỹ thuật viên khi yêu cầu đã sẵn sàng xử lý. */
+  /** Phân công kỹ thuật viên sau khi tài sản đã được nhận để sửa. */
   async assign(id: string, dto: AssignRepairDto, actor: AuthenticatedEmployee) {
     this.assertItHead(actor);
 
-    return this.db.transaction(async (tx) => {
-      const db = tx as unknown as NodePgDatabase<typeof schema>;
+    return this.db.transaction(async (db) => {
+      // Chưa bàn giao xong hoặc đã chờ nghiệm thu thì không phân công tại bước này.
+      await this.loadLockedRequest(db, id, ['in_progress']);
 
-      await this.lockRequest(db, id);
-      await this.requireStatus(db, id, ['in_progress']);
-
+      // Đọc phòng ban và tình trạng tài khoản từ DB, không dựa vào dữ liệu client gửi.
       const [assignee] = await db
         .select({
           id: schema.employees.id,
@@ -675,10 +690,14 @@ export class RepairRequestsService {
         )
         .where(eq(schema.employees.id, dto.assignedTo));
 
+      // Kiểm tra lại vì danh sách chọn trên màn hình có thể đã cũ.
       if (!assignee || !assignee.isActive || assignee.departmentName !== 'IT') {
-        throw new BadRequestException('Chỉ có thể phân công nhân viên IT đang hoạt động.');
+        throw new BadRequestException(
+          'Chỉ có thể phân công nhân viên IT đang hoạt động.',
+        );
       }
 
+      // Người được giao trên phiếu là căn cứ cấp quyền hoàn tất cho kỹ thuật viên.
       const [request] = await db
         .update(schema.repairRequests)
         .set({
@@ -696,7 +715,7 @@ export class RepairRequestsService {
         approvedBy: actor.id,
         approverRole: actor.roleName,
         status: 'approved',
-        metadata: { assignedTo: dto.assignedTo },
+        metadata: { assignedTo: dto.assignedTo }, // Phân biệt người giao việc với người nhận việc.
       });
 
       return new RepairRequest(request);
@@ -709,23 +728,20 @@ export class RepairRequestsService {
     dto: CompleteRepairDto,
     actor: AuthenticatedEmployee,
   ) {
-    return this.db.transaction(async (tx) => {
-      const db = tx as unknown as NodePgDatabase<typeof schema>;
+    return this.db.transaction(async (db) => {
+      const current = await this.loadLockedRequest(db, id, ['in_progress']);
 
-      await this.lockRequest(db, id);
-      const current = await this.requireStatus(db, id, ['in_progress']);
-
+      // Trưởng IT có thể hoàn tất. Nhân viên IT phải là người đang được phân công.
       if (
-        (!current.assignedTo && !this.isItHead(actor)) ||
-        (current.assignedTo !== null &&
-          current.assignedTo !== actor.id &&
-          !this.isItHead(actor))
+        !this.isItHead(actor) &&
+        (actor.departmentName !== 'IT' || current.assignedTo !== actor.id)
       ) {
         throw new ForbiddenException(
           'Chỉ kỹ thuật viên được phân công hoặc Trưởng IT được hoàn tất.',
         );
       }
 
+      // Lưu kết quả và số tiền của lần này. Phiếu vẫn phải qua nghiệm thu trước khi đóng.
       const [request] = await db
         .update(schema.repairRequests)
         .set({
@@ -744,9 +760,10 @@ export class RepairRequestsService {
         actionType: 'completed',
         approvedBy: actor.id,
         approverRole: actor.roleName,
-        status: 'approved',
+        status: 'approved', // Ghi nhận bước IT hoàn tất. Nghiệm thu là một sự kiện riêng.
         previousStatus: current.status,
         newStatus: 'ready_for_return',
+        // Giữ số tiền của từng lần để xem lại và điền sẵn nếu tài sản bị trả để sửa tiếp.
         metadata: { actualCost: dto.actualCost },
       });
 
@@ -755,20 +772,18 @@ export class RepairRequestsService {
   }
 
   /**
-   * Chấp nhận sẽ đóng yêu cầu. Nếu người dùng từ chối kết quả, yêu cầu quay lại
-   * in_progress để IT làm lại; đây là ngoại lệ có chủ đích của luồng sửa chữa.
+   * Nghiệm thu thành công thì trả tài sản và đóng phiếu.
+   * Từ chối thì giữ tài sản ở kho IT để tiếp tục sửa trên cùng phiếu.
    */
   async confirmResult(
     id: string,
     dto: ConfirmRepairDto,
     actor: AuthenticatedEmployee,
   ) {
-    return this.db.transaction(async (tx) => {
-      const db = tx as unknown as NodePgDatabase<typeof schema>;
+    return this.db.transaction(async (db) => {
+      const current = await this.loadLockedRequest(db, id, ['ready_for_return']);
 
-      await this.lockRequest(db, id);
-      const current = await this.requireStatus(db, id, ['ready_for_return']);
-
+      // Người báo hỏng là người nhận lại tài sản và quyết định có chấp nhận kết quả.
       if (current.reporterId !== actor.id) {
         throw new BadRequestException(
           'Chỉ người báo hỏng mới được nghiệm thu kết quả',
@@ -778,10 +793,12 @@ export class RepairRequestsService {
       const now = new Date();
       const status = dto.accepted ? 'closed' : 'in_progress';
 
+      // Khóa tài sản để không thao tác trả trên dữ liệu vị trí hoặc người giữ đã đổi.
       await this.lockAsset(db, current.assetId);
       const warehouse = await this.requireItWarehouse(db);
       const asset = await this.loadAsset(db, current.assetId);
 
+      // Chỉ xử lý nghiệm thu nếu tài sản vẫn do kho IT giữ và đang trong luồng sửa.
       if (
         asset.currentWarehouseId !== warehouse.id ||
         asset.currentUserId !== null ||
@@ -790,6 +807,7 @@ export class RepairRequestsService {
         throw new ConflictException('Tài sản không còn ở kho IT.');
       }
 
+      // Chỉ khi được nghiệm thu mới chuyển tài sản về người báo và vị trí trước lúc bàn giao.
       if (dto.accepted) {
         await db
           .update(schema.assets)
@@ -803,6 +821,7 @@ export class RepairRequestsService {
             updatedBy: actor.id,
           })
           .where(eq(schema.assets.id, asset.id));
+        // Lưu lần trả tài sản để lịch sử vị trí khớp với người giữ hiện tại.
         await db.insert(schema.assetHandoverHistory).values({
           assetId: asset.id,
           handoverType: 'repair_returned',
@@ -818,6 +837,7 @@ export class RepairRequestsService {
         });
       }
 
+      // Phiếu bị trả xóa kết quả chờ nghiệm thu. Số tiền lần sửa vẫn còn trong nhật ký.
       const [request] = await db
         .update(schema.repairRequests)
         .set({
@@ -825,7 +845,7 @@ export class RepairRequestsService {
           confirmedBy: actor.id,
           confirmedAt: now,
           confirmationStatus: dto.accepted ? 'approved' : 'rejected',
-          closedAt: dto.accepted ? now : null,
+          closedAt: dto.accepted ? now : null, // Báo cáo tháng dùng ngày đóng phiếu này.
           completedAt: dto.accepted ? current.completedAt : null,
           resultNotes: dto.accepted ? current.resultNotes : null,
           repairCost: dto.accepted ? current.repairCost : null,
@@ -834,6 +854,7 @@ export class RepairRequestsService {
         .where(eq(schema.repairRequests.id, id))
         .returning();
 
+      // Giữ quyết định và lý do để đọc lại kết quả của từng vòng sửa.
       await this.audit.log(db, {
         requestType: 'repair',
         requestId: id,
@@ -850,21 +871,24 @@ export class RepairRequestsService {
     });
   }
 
+  /** Chuyển tài sản vào kho IT trước khi mở bước phân công và sửa chữa. */
   private async receiveForRepair(
     db: Database,
     request: RepairRecord,
     actor: AuthenticatedEmployee,
     now: Date,
   ) {
+    // Người giữ có thể đã đổi trong lúc chờ bàn giao, nên kiểm tra lại sau khi khóa tài sản.
     await this.lockAsset(db, request.assetId);
     const asset = await this.requireOwnedItAsset(
       db,
       request.assetId,
       request.reporterId,
     );
+    // Kho đang hoạt động cung cấp bộ phận quản lý và vị trí đích.
     const warehouse = await this.requireItWarehouse(db);
 
-    // Custody chỉ thay đổi sau khi cả hai bên xác nhận bàn giao thực tế.
+    // Sau khi cả hai bên xác nhận, kho IT thay người báo giữ tài sản trong thời gian sửa.
     await db
       .update(schema.assets)
       .set({
@@ -877,6 +901,7 @@ export class RepairRequestsService {
         updatedBy: actor.id,
       })
       .where(eq(schema.assets.id, asset.id));
+    // Lưu điểm đi và điểm đến để đối chiếu lần nhập kho với lần trả tài sản.
     await db.insert(schema.assetHandoverHistory).values({
       assetId: asset.id,
       handoverType: 'repair_to_it_warehouse',
@@ -890,10 +915,12 @@ export class RepairRequestsService {
       createdBy: actor.id,
       updatedBy: actor.id,
     });
+    // Chỉ đưa phiếu vào hàng chờ sửa khi đã ghi nhận tài sản vào kho.
     await db
       .update(schema.repairRequests)
       .set({ status: 'in_progress', updatedAt: now, updatedBy: actor.id })
       .where(eq(schema.repairRequests.id, request.id));
+    // Timeline dùng sự kiện nhận tài sản để phân biệt nhập kho với xác nhận của từng bên.
     await this.logAction(
       db,
       request,
@@ -904,27 +931,32 @@ export class RepairRequestsService {
     );
   }
 
+  /** Dùng chung dữ liệu thẻ phiếu, còn hàm gọi cung cấp điều kiện theo quyền. */
   private async findSummaries(condition: SQL<unknown>) {
-    return this.db
-      .select({
-        id: schema.repairRequests.id,
-        assetId: schema.repairRequests.assetId,
-        assetCode: schema.assets.assetCode,
-        assetName: schema.assets.name,
-        status: schema.repairRequests.status,
-        issueDescription: schema.repairRequests.issueDescription,
-        reportDate: schema.repairRequests.reportDate,
-        createdAt: schema.repairRequests.createdAt,
-      })
-      .from(schema.repairRequests)
-      .innerJoin(
-        schema.assets,
-        eq(schema.repairRequests.assetId, schema.assets.id),
-      )
-      .where(condition)
-      .orderBy(desc(schema.repairRequests.createdAt));
+    return (
+      this.db
+        .select({
+          id: schema.repairRequests.id,
+          assetId: schema.repairRequests.assetId,
+          assetCode: schema.assets.assetCode,
+          assetName: schema.assets.name,
+          status: schema.repairRequests.status,
+          issueDescription: schema.repairRequests.issueDescription,
+          reportDate: schema.repairRequests.reportDate,
+          createdAt: schema.repairRequests.createdAt,
+        })
+        .from(schema.repairRequests)
+        .innerJoin(
+          schema.assets,
+          eq(schema.repairRequests.assetId, schema.assets.id),
+        )
+        // Lọc ngay trong DB để hàng chờ chỉ trả phiếu khớp vai trò và bước xử lý.
+        .where(condition)
+        .orderBy(desc(schema.repairRequests.createdAt))
+    );
   }
 
+  /** Đọc cả thông tin hiển thị và dữ liệu kiểm tra quyền giữ tài sản. */
   private async loadAsset(db: Database, id: string) {
     const [asset] = await db
       .select({
@@ -945,11 +977,13 @@ export class RepairRequestsService {
       )
       .where(eq(schema.assets.id, id));
 
+    // Dừng các bước sửa hoặc bàn giao nếu không còn tìm thấy tài sản liên quan.
     if (!asset) throw new NotFoundException('Không tìm thấy tài sản.');
 
     return asset;
   }
 
+  /** Kiểm tra người giữ hiện tại và phạm vi IT trước khi gửi phiếu hoặc nhập kho. */
   private async requireOwnedItAsset(
     db: Database,
     assetId: string,
@@ -966,6 +1000,7 @@ export class RepairRequestsService {
     return asset;
   }
 
+  /** Dùng mã kho cố định để lấy đúng kho sửa chữa, kể cả khi tên hiển thị thay đổi. */
   private async requireItWarehouse(db: Database) {
     const [warehouse] = await db
       .select()
@@ -977,24 +1012,31 @@ export class RepairRequestsService {
         ),
       );
 
+    // Không thể nhận hoặc trả tài sản nếu thiếu kho IT đang hoạt động.
     if (!warehouse) throw new NotFoundException('Không tìm thấy kho IT.');
 
     return warehouse;
   }
 
+  /** Tính các nút client có thể hiện từ người xem và trạng thái phiếu. */
   private allowedActions(
     request: RepairRecord,
     actor: AuthenticatedEmployee,
   ): WorkflowAction[] {
     const actions: WorkflowAction[] = [];
 
+    // Người báo chỉ sửa hoặc gửi ở bước soạn phiếu.
     if (
       request.reporterId === actor.id &&
       ['draft', 'revision_required'].includes(request.status)
     ) {
-      actions.push(WORKFLOW_ACTIONS.repairUpdate, WORKFLOW_ACTIONS.repairSubmit);
+      actions.push(
+        WORKFLOW_ACTIONS.repairUpdate,
+        WORKFLOW_ACTIONS.repairSubmit,
+      );
     }
 
+    // Quyền duyệt bước đầu đi theo bộ phận ghi trên phiếu.
     if (
       request.status === 'pending_department_head' &&
       actor.isDepartmentHead &&
@@ -1003,10 +1045,12 @@ export class RepairRequestsService {
       actions.push(WORKFLOW_ACTIONS.repairApproveDepartment);
     }
 
+    // Nút duyệt IT chỉ xuất hiện khi phiếu đã qua bộ phận gửi.
     if (request.status === 'pending_it_head' && this.isItHead(actor)) {
       actions.push(WORKFLOW_ACTIONS.repairApproveIt);
     }
 
+    // Mỗi bên chỉ thấy nút khi phần xác nhận của mình còn chờ.
     if (
       request.status === 'pending_handover_confirmations' &&
       ((request.reporterId === actor.id &&
@@ -1016,22 +1060,32 @@ export class RepairRequestsService {
       actions.push(WORKFLOW_ACTIONS.repairConfirmHandover);
     }
 
+    // Khi đang sửa, trưởng IT có thể giao việc hoặc hoàn tất. Kỹ thuật viên chỉ hoàn tất phiếu của mình.
     if (request.status === 'in_progress' && this.isItHead(actor)) {
-      actions.push(WORKFLOW_ACTIONS.repairAssign, WORKFLOW_ACTIONS.repairComplete);
+      actions.push(
+        WORKFLOW_ACTIONS.repairAssign,
+        WORKFLOW_ACTIONS.repairComplete,
+      );
     } else if (
       request.status === 'in_progress' &&
+      actor.departmentName === 'IT' &&
       request.assignedTo === actor.id
     ) {
       actions.push(WORKFLOW_ACTIONS.repairComplete);
     }
 
-    if (request.status === 'ready_for_return' && request.reporterId === actor.id) {
+    // Chỉ người báo thấy nút nghiệm thu sau khi IT đã báo hoàn tất.
+    if (
+      request.status === 'ready_for_return' &&
+      request.reporterId === actor.id
+    ) {
       actions.push(WORKFLOW_ACTIONS.repairConfirmResult);
     }
 
     return actions;
   }
 
+  /** Cho người báo, trưởng bộ phận ghi trên phiếu và phòng IT xem chi tiết. */
   private canView(request: RepairRecord, actor: AuthenticatedEmployee) {
     return (
       request.reporterId === actor.id ||
@@ -1040,22 +1094,28 @@ export class RepairRequestsService {
     );
   }
 
+  /** Quyền xem hoặc duyệt không bao gồm quyền sửa và gửi phiếu thay người báo. */
   private assertOwner(request: RepairRecord, actor: AuthenticatedEmployee) {
     if (request.reporterId !== actor.id) {
       throw new ForbiddenException('Chỉ người tạo mới được sửa phiếu.');
     }
   }
 
+  /** Dùng cùng điều kiện trưởng IT ở các thao tác cần quyền của trưởng phòng. */
   private assertItHead(actor: AuthenticatedEmployee) {
     if (!this.isItHead(actor)) {
-      throw new ForbiddenException('Chỉ Trưởng IT được thực hiện thao tác này.');
+      throw new ForbiddenException(
+        'Chỉ Trưởng IT được thực hiện thao tác này.',
+      );
     }
   }
 
+  /** Kiểm tra cả phòng ban lẫn chức vụ để phân biệt trưởng IT với trưởng bộ phận khác. */
   private isItHead(actor: AuthenticatedEmployee) {
     return actor.isDepartmentHead && actor.departmentName === 'IT';
   }
 
+  /** Chọn bên mà tài khoản hiện tại được xác nhận và vẫn còn chờ phản hồi. */
   private handoverSide(
     request: RepairRecord,
     actor: AuthenticatedEmployee,
@@ -1071,29 +1131,40 @@ export class RepairRequestsService {
       return 'it';
     }
 
+    // Không cho xác nhận lại hoặc ghi vào phần bàn giao của người khác.
     throw new ForbiddenException('Bạn không có xác nhận bàn giao đang chờ.');
   }
 
+  /** Giữ khóa đến hết giao dịch để lần bàn giao khác không thể đổi người giữ cùng lúc. */
   private lockAsset(db: Database, id: string) {
     return db.execute(sql`select id from assets where id = ${id} for update`);
   }
 
-  private lockRequest(db: Database, id: string) {
-    return db.execute(
+  /** Khóa phiếu trước khi đọc trạng thái để các lần cập nhật cùng phiếu chạy lần lượt. */
+  private async loadLockedRequest(
+    db: Database,
+    id: string,
+    expected: RepairRecord['status'][],
+  ) {
+    await db.execute(
       sql`select id from repair_requests where id = ${id} for update`,
     );
+
+    return this.requireStatus(db, id, expected);
   }
 
+  /** Ghi chuyển bước kèm người thực hiện và phiên bản để dựng lại timeline. */
   private logAction(
     db: Database,
     request: RepairRecord,
     actor: AuthenticatedEmployee,
     actionType: string,
     status: 'approved' | 'rejected' | 'pending',
-    newStatus = request.status,
+    newStatus = request.status, // Có hành động chỉ thêm sự kiện mà không chuyển bước.
     reason?: string,
-    revision = request.currentRevision,
+    revision = request.currentRevision, // Lần gửi lại truyền phiên bản mới vào đây.
   ) {
+    // Dùng giao dịch của hàm gọi để nhật ký chỉ tồn tại nếu cập nhật phiếu thành công.
     return this.audit.log(db, {
       requestType: 'repair',
       requestId: request.id,
@@ -1110,5 +1181,4 @@ export class RepairRequestsService {
       notes: reason,
     });
   }
-
 }

@@ -15,6 +15,18 @@ const seedAccounts = [
 ] as const;
 
 describe('seed account purchase actions', () => {
+  it('cấp quyền hoàn tất sửa chữa theo phòng IT, không theo role', () => {
+    expect(getAllowedWorkflowActions('EMPLOYEE', false, 'IT')).toContain(
+      WORKFLOW_ACTIONS.repairComplete,
+    );
+    expect(getAllowedWorkflowActions('IT', true, 'IT')).toContain(
+      WORKFLOW_ACTIONS.repairComplete,
+    );
+    expect(getAllowedWorkflowActions('IT', false, 'WAREHOUSE')).not.toContain(
+      WORKFLOW_ACTIONS.repairComplete,
+    );
+  });
+
   it('separates Accounting preparation from head approval by department', () => {
     const staff = getAllowedWorkflowActions('EMPLOYEE', false, 'ACCOUNTING');
     const head = getAllowedWorkflowActions('ACCOUNTING', true, 'ACCOUNTING');

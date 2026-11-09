@@ -5,6 +5,7 @@ import {
   Package,
   Tags,
   Warehouse,
+  ReceiptText,
   LogOut,
   Moon,
   Sun,
@@ -54,6 +55,12 @@ export const resourcePages = [
     title: "Kho IT",
     description: "Tài sản đang được lưu giữ tại kho IT.",
     icon: Warehouse,
+  },
+  {
+    path: "/repair-costs",
+    title: "Chi phí sửa chữa",
+    description: "Chi phí theo tháng và lịch sử sửa chữa tài sản.",
+    icon: ReceiptText,
   },
 ];
 

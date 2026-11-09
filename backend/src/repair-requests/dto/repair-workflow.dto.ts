@@ -1,10 +1,10 @@
 import {
   IsBoolean,
   IsNotEmpty,
-  IsNumberString,
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   ValidateIf,
 } from 'class-validator';
@@ -46,9 +46,18 @@ export class CompleteRepairDto {
   @MaxLength(2000)
   resultNotes: string;
 
-  @IsNumberString()
+  @Matches(/^\d{1,15}$/, {
+    message: 'Chi phí sửa chữa phải là số nguyên VND không âm, tối đa 15 chữ số.',
+  })
   @IsOptional()
   actualCost?: string;
+}
+
+export class RepairCostMonthDto {
+  @Matches(/^[1-9]\d{3}-(0[1-9]|1[0-2])$/, {
+    message: 'Tháng báo cáo phải có định dạng YYYY-MM.',
+  })
+  month: string;
 }
 
 /** Phản hồi nghiệm thu của chính nhân viên đã báo hỏng tài sản. */

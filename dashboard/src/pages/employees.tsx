@@ -25,6 +25,16 @@ import {
 } from "@/components/ui/table";
 import type { Employee } from "@/types";
 
+const tableHeaders = [
+  "Mã nhân viên",
+  "Họ tên",
+  "Email",
+  "Số điện thoại",
+  "Trưởng phòng",
+  "Trạng thái",
+  "Hành động",
+];
+
 export default function EmployeesPage() {
   const { token } = useAuth();
   const [editing, setEditing] = useState<Employee | null | undefined>();
@@ -72,27 +82,11 @@ export default function EmployeesPage() {
             <TableCaption className="sr-only">Danh sách nhân viên</TableCaption>
             <TableHeader>
               <TableRow>
-                <TableHead className="font-semibold" scope="col">
-                  Mã nhân viên
-                </TableHead>
-                <TableHead className="font-semibold" scope="col">
-                  Họ tên
-                </TableHead>
-                <TableHead className="font-semibold" scope="col">
-                  Email
-                </TableHead>
-                <TableHead className="font-semibold" scope="col">
-                  Số điện thoại
-                </TableHead>
-                <TableHead className="font-semibold" scope="col">
-                  Trưởng phòng
-                </TableHead>
-                <TableHead className="font-semibold" scope="col">
-                  Trạng thái
-                </TableHead>
-                <TableHead className="font-semibold" scope="col">
-                  Hành động
-                </TableHead>
+                {tableHeaders.map((label) => (
+                  <TableHead key={label} className="font-semibold" scope="col">
+                    {label}
+                  </TableHead>
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>

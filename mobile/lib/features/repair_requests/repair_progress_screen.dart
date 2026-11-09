@@ -184,6 +184,85 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
     );
   }
 
+  Future<Map<String, String>?> _completionDialog() {
+    final events = (_data?['timeline'] as List<dynamic>? ?? const [])
+        .cast<Map<String, dynamic>>();
+    var cost = '';
+    for (final event in events.reversed) {
+      if (event['actionType'] != 'completed') continue;
+      final metadata = event['metadata'] as Map<String, dynamic>?;
+      cost = metadata?['actualCost']?.toString() ?? '';
+      break;
+    }
+
+    final formKey = GlobalKey<FormState>();
+    var notes = '';
+    final validCost = RegExp(r'^\d{1,15}$');
+
+    return showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hoàn tất sửa chữa'),
+        scrollable: true,
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                minLines: 3,
+                maxLines: 6,
+                maxLength: 2000,
+                onChanged: (value) => notes = value.trim(),
+                validator: (_) => notes.isEmpty
+                    ? 'Nhập kết quả sửa chữa.'
+                    : null,
+                decoration: textareaDecoration(
+                  context,
+                  const InputDecoration(
+                    labelText: 'Kết quả sửa chữa',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                initialValue: cost,
+                keyboardType: TextInputType.number,
+                onChanged: (value) => cost = value.trim(),
+                validator: (_) => validCost.hasMatch(cost)
+                    ? null
+                    : 'Nhập số nguyên từ 0, tối đa 15 chữ số.',
+                decoration: const InputDecoration(
+                  labelText: 'Tổng chi phí sửa chữa (VND)',
+                  helperText: 'Nhập 0 nếu không phát sinh chi phí.',
+                  helperMaxLines: 2,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(context, {
+                  'resultNotes': notes,
+                  'actualCost': cost,
+                });
+              }
+            },
+            child: const Text('Xác nhận'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _decision(String endpoint, bool approved) async {
     String? note;
     if (!approved) {
@@ -352,15 +431,12 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
             width: double.infinity,
             child: FilledButton(
               onPressed: () async {
-                final result = await _textDialog(
-                  'Hoàn tất sửa chữa',
-                  'Kết quả sửa chữa',
-                );
-                if (result != null) {
+                final result = await _completionDialog();
+                if (mounted && result != null) {
                   await _run(
                     () => _dio.post<void>(
                       '/repair-requests/$id/complete',
-                      data: {'resultNotes': result},
+                      data: result,
                     ),
                   );
                 }

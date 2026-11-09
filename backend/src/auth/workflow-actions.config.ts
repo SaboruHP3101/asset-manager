@@ -96,7 +96,6 @@ export const ROLE_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
       WORKFLOW_ACTIONS.transferVerify,
       WORKFLOW_ACTIONS.repairAssess,
       WORKFLOW_ACTIONS.repairAssign,
-      WORKFLOW_ACTIONS.repairComplete,
     ],
   };
 
@@ -120,6 +119,7 @@ const DEPARTMENT_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
       WORKFLOW_ACTIONS.purchaseAllocationReallocateProcurement,
     ],
     IT: [
+      WORKFLOW_ACTIONS.repairComplete,
       WORKFLOW_ACTIONS.purchaseReceiptInspectIt,
       WORKFLOW_ACTIONS.purchaseAllocationReallocateIt,
       WORKFLOW_ACTIONS.warehouseItView,

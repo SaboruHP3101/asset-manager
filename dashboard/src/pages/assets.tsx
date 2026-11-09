@@ -32,6 +32,7 @@ const columns = [
   "Vị trí",
   "Trạng thái",
 ];
+const tableHeaders = [...columns, "Hành động"];
 
 export default function AssetsPage() {
   const { token } = useAuth();
@@ -92,7 +93,7 @@ export default function AssetsPage() {
             <TableCaption className="sr-only">Danh sách tài sản</TableCaption>
             <TableHeader>
               <TableRow>
-                {[...columns, "Hành động"].map((label) => (
+                {tableHeaders.map((label) => (
                   <TableHead key={label} className="font-semibold" scope="col">
                     {label}
                   </TableHead>

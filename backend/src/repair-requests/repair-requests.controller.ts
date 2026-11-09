@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UploadedFiles,
   UseInterceptors,
   UseGuards,
@@ -20,6 +21,7 @@ import { extname } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { RepairRequestsService } from './repair-requests.service.js';
+import { RepairCostsService } from './repair-costs.service.js';
 import {
   CreateMyRepairRequestDto,
   UpdateMyRepairRequestDto,
@@ -28,6 +30,7 @@ import {
   AssignRepairDto,
   CompleteRepairDto,
   ConfirmRepairDto,
+  RepairCostMonthDto,
   RepairDecisionDto,
   RepairHandoverDecisionDto,
 } from './dto/repair-workflow.dto.js';
@@ -73,7 +76,10 @@ const repairUpload = AnyFilesInterceptor({
 @UseGuards(JwtAuthGuard, WorkflowActionGuard)
 /** Quản lý vòng đời sửa chữa, bao gồm tải minh chứng và nghiệm thu của người báo. */
 export class RepairRequestsController {
-  constructor(private readonly repairRequestsService: RepairRequestsService) {}
+  constructor(
+    private readonly repairRequestsService: RepairRequestsService,
+    private readonly repairCostsService: RepairCostsService,
+  ) {}
 
   // Tạo yêu cầu sửa chữa cho tài sản của nhân viên hiện tại
   @Post('mine')
@@ -97,6 +103,22 @@ export class RepairRequestsController {
   @Get('queue')
   findQueue(@CurrentEmployee() actor: AuthenticatedEmployee) {
     return this.repairRequestsService.findQueue(actor);
+  }
+
+  @Get('costs')
+  listCosts(
+    @Query() query: RepairCostMonthDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairCostsService.listCosts(query.month, actor);
+  }
+
+  @Get('costs/:assetId/history')
+  listCostHistory(
+    @Param('assetId', ParseUUIDPipe) assetId: string,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairCostsService.listCostHistory(assetId, actor);
   }
 
   @Get('it-assignees')

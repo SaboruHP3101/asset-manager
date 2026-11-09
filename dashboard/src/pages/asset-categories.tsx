@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 
 const columns = ["Mã danh mục", "Tên danh mục", "Mô tả"];
+const tableHeaders = [...columns, "Hành động"];
 
 export default function AssetCategoriesPage() {
   const [editing, setEditing] = useState<AssetCategory | null | undefined>();
@@ -105,7 +106,7 @@ export default function AssetCategoriesPage() {
             </TableCaption>
             <TableHeader>
               <TableRow>
-                {[...columns, "Hành động"].map((label) => (
+                {tableHeaders.map((label) => (
                   <TableHead key={label} scope="col" className="font-semibold">
                     {label}
                   </TableHead>
