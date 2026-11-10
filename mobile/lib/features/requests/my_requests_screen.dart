@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/utils/display_date.dart';
 import '../../core/widgets/status_chip.dart';
 import '../asset_recalls/asset_recall_detail_screen.dart';
 import '../purchase_requests/purchase_request_detail_screen.dart';
@@ -412,7 +413,7 @@ class _RequestCard extends StatelessWidget {
                         label: _statusLabel(item, employeeView: employeeView),
                       ),
                       Text(
-                        _formatDate(item.updatedAt),
+                        formatDisplayDate(item.updatedAt),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -665,10 +666,6 @@ MyRequestItem _purchaseItem(Map<String, dynamic> json) => MyRequestItem(
 
 DateTime _parseDate(Object? value) =>
     DateTime.tryParse(value?.toString() ?? '') ?? DateTime(1970);
-
-String _formatDate(DateTime value) =>
-    '${value.day.toString().padLeft(2, '0')}/'
-    '${value.month.toString().padLeft(2, '0')}/${value.year}';
 
 String _statusLabel(MyRequestItem item, {required bool employeeView}) {
   if (employeeView &&

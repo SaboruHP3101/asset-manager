@@ -6,6 +6,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import '../../core/config/app_config.dart';
 import '../../core/network/api_client.dart';
 import '../../core/utils/department_labels.dart';
+import '../../core/utils/display_date.dart';
 import '../repair_requests/repair_progress_screen.dart';
 import '../repair_requests/repair_request_form.dart';
 import '../asset_recalls/asset_recall_detail_screen.dart';
@@ -688,8 +689,7 @@ String _formatDate(Object? value) {
   final parsed = DateTime.tryParse(raw);
   if (parsed == null) return raw;
 
-  return '${parsed.day.toString().padLeft(2, '0')}/'
-      '${parsed.month.toString().padLeft(2, '0')}/${parsed.year}';
+  return formatDisplayDate(parsed);
 }
 
 String _formatCurrency(Object? value) {

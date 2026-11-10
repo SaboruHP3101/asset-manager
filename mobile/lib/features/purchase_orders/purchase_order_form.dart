@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/utils/display_date.dart';
 import '../../core/widgets/button_spinner.dart';
 
 import 'purchase_order_models.dart';
@@ -417,7 +418,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     String? errorText,
   }) => Semantics(
     button: true,
-    label: '$label, ${_formatDisplayDate(value)}',
+    label: '$label, ${formatDisplayDate(value)}',
     child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(4),
@@ -427,7 +428,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
           errorText: errorText,
           suffixIcon: const Icon(Icons.calendar_today_outlined),
         ),
-        child: Text(_formatDisplayDate(value)),
+        child: Text(formatDisplayDate(value)),
       ),
     ),
   );
@@ -511,11 +512,6 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
       '${date.year.toString().padLeft(4, '0')}-'
       '${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';
-
-  String _formatDisplayDate(DateTime date) =>
-      '${date.day.toString().padLeft(2, '0')}/'
-      '${date.month.toString().padLeft(2, '0')}/'
-      '${date.year}';
 }
 
 class _SectionTitle extends StatelessWidget {

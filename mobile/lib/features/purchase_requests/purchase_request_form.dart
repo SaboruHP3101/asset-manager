@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/textarea_decoration.dart';
+import '../../core/utils/display_date.dart';
 import '../../core/widgets/button_spinner.dart';
 import 'purchase_request_models.dart';
 import 'purchase_requests_repository.dart';
@@ -537,7 +538,7 @@ class _InformationCard extends StatelessWidget {
                 labelText: 'Ngày cần tài sản',
                 suffixIcon: Icon(Icons.calendar_month_outlined),
               ),
-              child: Text(_displayDate(date)),
+              child: Text(formatDisplayDate(date)),
             ),
           ),
           const SizedBox(height: 14),
@@ -1175,6 +1176,3 @@ String? _required(String? value) => value == null || value.trim().isEmpty
 
 String _isoDate(DateTime date) =>
     '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-
-String _displayDate(DateTime date) =>
-    '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
