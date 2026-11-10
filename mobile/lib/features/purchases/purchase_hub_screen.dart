@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_session.dart';
+import '../../core/widgets/retry_message.dart';
 import '../asset_allocations/asset_allocation_queue_screen.dart';
 import '../asset_allocations/asset_allocations_repository.dart';
 import '../purchase_orders/purchase_order_models.dart';
@@ -182,7 +183,7 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Mua sắm tài sản'), centerTitle: true),
     body: _error != null
-        ? _HubMessage(message: _error!, onRetry: _load)
+        ? RetryMessage(message: _error!, onRetry: _load)
         : _counts == null
         ? const Center(child: CircularProgressIndicator())
         : RefreshIndicator(
@@ -252,8 +253,14 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
                     !_canInspect &&
                     !_canManageAllocations &&
                     _counts!.allocationQueue == 0)
-                  const _HubMessage(
-                    message: 'Bạn không có công việc mua sắm cần xử lý.',
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Bạn không có công việc mua sắm cần xử lý.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -308,30 +315,6 @@ class _HubCard extends StatelessWidget {
         ],
       ),
       onTap: onTap,
-    ),
-  );
-}
-
-class _HubMessage extends StatelessWidget {
-  const _HubMessage({required this.message, this.onRetry});
-
-  final String message;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(message, textAlign: TextAlign.center),
-          if (onRetry != null) ...[
-            const SizedBox(height: 12),
-            FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
-          ],
-        ],
-      ),
     ),
   );
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/utils/display_date.dart';
 import '../../core/widgets/button_spinner.dart';
+import '../../core/widgets/retry_message.dart';
 
 import 'purchase_order_models.dart';
 import 'purchase_orders_repository.dart';
@@ -181,12 +182,18 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
         ),
       ),
       body: _error != null
-          ? _FormMessage(message: _error!, onRetry: _load)
+          ? RetryMessage(message: _error!, onRetry: _load, buttonSpacing: 0)
           : _eligible == null
           ? const Center(child: CircularProgressIndicator())
           : _requests.isEmpty
-          ? const _FormMessage(
-              message: 'Không có hạng mục nào còn số lượng để đặt mua.',
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Không có hạng mục nào còn số lượng để đặt mua.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
             )
           : Form(
               key: _formKey,
@@ -649,28 +656,6 @@ class _PurchaseOrderActionBar extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    ),
-  );
-}
-
-class _FormMessage extends StatelessWidget {
-  const _FormMessage({required this.message, this.onRetry});
-
-  final String message;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(message, textAlign: TextAlign.center),
-          if (onRetry != null)
-            FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
-        ],
       ),
     ),
   );
