@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/config/app_config.dart';
 import '../../core/network/api_client.dart';
 import '../../core/storage/token_storage.dart';
+import '../../core/widgets/status_chip.dart';
 import '../login/login_screen.dart';
 import 'repair_progress_screen.dart';
 import 'repair_request_form.dart';
@@ -205,6 +206,8 @@ class RepairRequestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final imageUrl = _imageUrl();
+    final status = request['status'] as String? ?? '';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
@@ -247,7 +250,17 @@ class RepairRequestCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text('Mã tài sản: ${request['assetCode'] ?? ''}'),
                     const SizedBox(height: 8),
-                    Chip(label: Text(_statusText(request['status'] ?? ''))),
+                    StatusChip(
+                      icon: switch (status) {
+                        'in_progress' => Icons.build_outlined,
+                        'confirmed' || 'closed' => Icons.check_circle_outline,
+                        'rejected' || 'revision_required' || 'cancelled' =>
+                          Icons.error_outline,
+                        _ => Icons.info_outline,
+                      },
+                      label: _statusText(status),
+                      compact: true,
+                    ),
                   ],
                 ),
               ),

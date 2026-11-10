@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/textarea_decoration.dart';
+import '../../core/widgets/status_chip.dart';
 import '../purchase_orders/purchase_order_form.dart';
 import 'purchase_quote_dialog.dart';
 import 'purchase_request_action_bar.dart';
@@ -361,13 +362,16 @@ class _QuoteStateChip extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final selected = state == _QuoteState.selected;
 
-    return Chip(
-      visualDensity: VisualDensity.compact,
-      label: Text(state.label),
-      backgroundColor: selected
-          ? colorScheme.primaryContainer
-          : colorScheme.surfaceContainerHighest,
-      side: BorderSide.none,
+    return StatusChip(
+      icon: switch (state) {
+        _QuoteState.missing => Icons.request_quote_outlined,
+        _QuoteState.unselected => Icons.pending_actions_outlined,
+        _QuoteState.selected => Icons.check_circle_outline,
+      },
+      label: state.label,
+      compact: true,
+      backgroundColor: selected ? colorScheme.primaryContainer : null,
+      foregroundColor: selected ? colorScheme.onPrimaryContainer : null,
     );
   }
 }

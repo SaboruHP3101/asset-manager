@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/textarea_decoration.dart';
 import '../../core/utils/department_labels.dart';
 import '../../core/widgets/retry_message.dart';
+import '../../core/widgets/status_chip.dart';
 import 'asset_allocation_models.dart';
 import 'asset_allocations_repository.dart';
 
@@ -712,13 +713,15 @@ class _QueueChip extends StatelessWidget {
   final String type;
 
   @override
-  Widget build(BuildContext context) => Chip(
-    label: Text(switch (type) {
-      'initial' => 'Chờ cấp phát',
-      'reallocation' => 'Phân bổ lại',
-      _ => 'Chờ xác nhận',
-    }),
-  );
+  Widget build(BuildContext context) {
+    final (icon, label) = switch (type) {
+      'initial' => (Icons.inventory_2_outlined, 'Chờ cấp phát'),
+      'reallocation' => (Icons.swap_horiz, 'Phân bổ lại'),
+      _ => (Icons.schedule_outlined, 'Chờ xác nhận'),
+    };
+
+    return StatusChip(icon: icon, label: label, compact: true);
+  }
 }
 
 class _ButtonLoader extends StatelessWidget {

@@ -316,6 +316,14 @@ void main() {
       of: find.text('Laptop doanh nghiệp').last,
       matching: find.byType(ListTile),
     );
+    expect(find.text('Chưa có báo giá'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: itemTile,
+        matching: find.byIcon(Icons.request_quote_outlined),
+      ),
+      findsOneWidget,
+    );
     await tester.ensureVisible(itemTile);
     await tester.tap(itemTile);
     await tester.pumpAndSettle();

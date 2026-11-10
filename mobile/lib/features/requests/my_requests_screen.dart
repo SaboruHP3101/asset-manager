@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/widgets/status_chip.dart';
 import '../asset_recalls/asset_recall_detail_screen.dart';
 import '../purchase_requests/purchase_request_detail_screen.dart';
 import '../repair_requests/repair_progress_screen.dart';
@@ -442,14 +443,24 @@ class _RequestStatusChip extends StatelessWidget {
         label == 'Đã duyệt' ||
         label == 'Đã xác nhận' ||
         label == 'Đã bàn giao';
-    return Chip(
-      visualDensity: VisualDensity.compact,
+    return StatusChip(
+      icon: isProblem
+          ? Icons.error_outline
+          : isDone
+          ? Icons.check_circle_outline
+          : Icons.info_outline,
+      label: label,
+      compact: true,
       backgroundColor: isProblem
           ? colors.errorContainer
           : isDone
           ? colors.primaryContainer
           : colors.secondaryContainer,
-      label: Text(label),
+      foregroundColor: isProblem
+          ? colors.onErrorContainer
+          : isDone
+          ? colors.onPrimaryContainer
+          : colors.onSecondaryContainer,
     );
   }
 }

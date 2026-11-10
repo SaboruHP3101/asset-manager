@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/status_chip.dart';
+
 String assetStatusLabel(String status) => switch (status.toLowerCase()) {
   'in_use' || 'using' || 'active' => 'Đang sử dụng',
   'repairing' || 'fixing' => 'Đang sửa chữa',
@@ -37,39 +39,12 @@ class AssetStatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final presentation = _presentation(context, status);
 
-    return Semantics(
-      label: 'Trạng thái: ${assetStatusLabel(status)}',
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 8 : 10,
-          vertical: compact ? 5 : 6,
-        ),
-        decoration: BoxDecoration(
-          color: presentation.color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              presentation.icon,
-              size: compact ? 14 : 16,
-              color: presentation.color,
-            ),
-            const SizedBox(width: 5),
-            Flexible(
-              child: Text(
-                assetStatusLabel(status),
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: presentation.color,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return StatusChip(
+      icon: presentation.icon,
+      label: assetStatusLabel(status),
+      foregroundColor: presentation.color,
+      backgroundColor: presentation.color.withValues(alpha: 0.12),
+      compact: compact,
     );
   }
 }
