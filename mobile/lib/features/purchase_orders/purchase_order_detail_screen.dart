@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/textarea_decoration.dart';
+import '../../core/widgets/retry_message.dart';
 import 'purchase_order_form.dart';
 import 'purchase_order_models.dart';
 import 'purchase_orders_repository.dart';
@@ -90,7 +91,12 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
         children: [
           Positioned.fill(
             child: _error != null
-                ? _DetailMessage(message: _error!, onRetry: _load)
+                ? RetryMessage(
+                    message: _error!,
+                    onRetry: _load,
+                    buttonSpacing: 0,
+                    padding: EdgeInsets.zero,
+                  )
                 : detail == null
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
@@ -658,23 +664,6 @@ class _Totals extends StatelessWidget {
           ),
         ],
       ),
-    ),
-  );
-}
-
-class _DetailMessage extends StatelessWidget {
-  const _DetailMessage({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(message, textAlign: TextAlign.center),
-        FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
-      ],
     ),
   );
 }

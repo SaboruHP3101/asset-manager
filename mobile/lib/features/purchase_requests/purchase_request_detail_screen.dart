@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/textarea_decoration.dart';
+import '../../core/widgets/retry_message.dart';
 import '../../core/widgets/status_chip.dart';
 import '../purchase_orders/purchase_order_form.dart';
 import 'purchase_quote_dialog.dart';
@@ -73,7 +74,12 @@ class _PurchaseRequestDetailScreenState
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-          ? _DetailError(message: _error!, onRetry: _load)
+          ? RetryMessage(
+              message: _error!,
+              onRetry: _load,
+              buttonSpacing: 0,
+              padding: EdgeInsets.zero,
+            )
           : RefreshIndicator(
               onRefresh: _load,
               child: PurchaseRequestDetailContent(detail: detail!),
@@ -380,21 +386,4 @@ class _Decision {
   const _Decision(this.approved, this.reason);
   final bool approved;
   final String reason;
-}
-
-class _DetailError extends StatelessWidget {
-  const _DetailError({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(message, textAlign: TextAlign.center),
-        FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
-      ],
-    ),
-  );
 }

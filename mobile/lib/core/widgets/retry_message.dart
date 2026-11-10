@@ -7,16 +7,18 @@ class RetryMessage extends StatelessWidget {
     required this.message,
     required this.onRetry,
     this.buttonSpacing = 12,
+    this.padding = const EdgeInsets.all(24),
   });
 
   final String message;
   final VoidCallback onRetry;
   final double buttonSpacing;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) => Center(
     child: Padding(
-      padding: const EdgeInsets.all(24),
+      padding: padding,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

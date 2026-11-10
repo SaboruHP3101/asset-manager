@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_session.dart';
+import '../../core/widgets/retry_message.dart';
 import 'purchase_order_detail_screen.dart';
 import 'purchase_order_form.dart';
 import 'purchase_order_models.dart';
@@ -146,7 +147,11 @@ class _PurchaseOrdersScreenState extends State<PurchaseOrdersScreen> {
           bottom: TabBar(isScrollable: true, tabs: tabs),
         ),
         body: _error != null
-            ? _ScreenMessage(message: _error!, onRetry: _load)
+            ? RetryMessage(
+                message: _error!,
+                onRetry: _load,
+                buttonSpacing: 0,
+              )
             : loading
             ? const Center(child: CircularProgressIndicator())
             : TabBarView(children: views),
@@ -323,26 +328,5 @@ class _OrderList extends StatelessWidget {
               );
             },
           ),
-  );
-}
-
-class _ScreenMessage extends StatelessWidget {
-  const _ScreenMessage({required this.message, this.onRetry});
-  final String message;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(message, textAlign: TextAlign.center),
-          if (onRetry != null)
-            FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
-        ],
-      ),
-    ),
   );
 }
