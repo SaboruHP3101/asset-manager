@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/button_spinner.dart';
+
 import 'purchase_request_models.dart';
 
 /// Displays the request's available actions and procurement quote progress.
@@ -112,12 +114,7 @@ class PurchaseRequestActionBar extends StatelessWidget {
                           child: OutlinedButton.icon(
                             onPressed: disabled ? null : onChooseQuote,
                             icon: addingQuote
-                                ? const SizedBox.square(
-                                    dimension: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
+                                ? const ButtonSpinner()
                                 : const Icon(Icons.request_quote_outlined),
                             label: Text(
                               addingQuote

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/textarea_decoration.dart';
 import '../../core/utils/department_labels.dart';
+import '../../core/widgets/button_spinner.dart';
 import '../../core/widgets/retry_message.dart';
 import '../../core/widgets/status_chip.dart';
 import 'asset_allocation_models.dart';
@@ -258,7 +259,7 @@ class _AllocationGroupScreenState extends State<_AllocationGroupScreen> {
                             child: FilledButton(
                               onPressed: _busy ? null : () => _decide(true),
                               child: _busy
-                                  ? const _ButtonLoader()
+                                  ? const ButtonSpinner()
                                   : Text('Xác nhận (${selected.length})'),
                             ),
                           ),
@@ -267,7 +268,7 @@ class _AllocationGroupScreenState extends State<_AllocationGroupScreen> {
                     : FilledButton.icon(
                         onPressed: _busy ? null : _allocate,
                         icon: _busy
-                            ? const _ButtonLoader()
+                            ? const ButtonSpinner()
                             : const Icon(Icons.inventory_2_outlined),
                         label: Text(
                           selected.first.queueType == 'initial'
@@ -626,12 +627,7 @@ class _AllocationFormScreenState extends State<_AllocationFormScreen> {
                       suffixIcon: _departmentId != null && _recipients == null
                           ? const Padding(
                               padding: EdgeInsets.all(14),
-                              child: SizedBox.square(
-                                dimension: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
+                              child: ButtonSpinner(),
                             )
                           : null,
                     ),
@@ -722,16 +718,6 @@ class _QueueChip extends StatelessWidget {
 
     return StatusChip(icon: icon, label: label, compact: true);
   }
-}
-
-class _ButtonLoader extends StatelessWidget {
-  const _ButtonLoader();
-
-  @override
-  Widget build(BuildContext context) => const SizedBox.square(
-    dimension: 18,
-    child: CircularProgressIndicator(strokeWidth: 2),
-  );
 }
 
 Future<String?> _rejectionReason(BuildContext context) async {

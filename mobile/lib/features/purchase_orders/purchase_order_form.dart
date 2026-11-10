@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/button_spinner.dart';
+
 import 'purchase_order_models.dart';
 import 'purchase_orders_repository.dart';
 
@@ -644,10 +646,7 @@ class _PurchaseOrderActionBar extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: enabled ? onSave : null,
                 icon: saving
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? const ButtonSpinner()
                     : const Icon(Icons.save_outlined),
                 label: Text(saving ? 'Đang lưu...' : 'Lưu nháp'),
               ),

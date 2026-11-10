@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/textarea_decoration.dart';
+import '../../core/widgets/button_spinner.dart';
 import 'purchase_request_models.dart';
 import 'purchase_requests_repository.dart';
 
@@ -374,12 +375,7 @@ class _PurchaseRequestFormState extends State<PurchaseRequestFormScreen> {
                             ),
                           ),
                           icon: _deleting
-                              ? const SizedBox.square(
-                                  dimension: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
+                              ? const ButtonSpinner()
                               : const Icon(Icons.delete_outline),
                           label: Text(
                             _deleting ? 'Đang xóa bản nháp...' : 'Xóa bản nháp',
@@ -1052,10 +1048,7 @@ class _ActionBar extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: saving || deleting ? null : onSubmit,
                 icon: saving
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? const ButtonSpinner()
                     : const Icon(Icons.fact_check_outlined),
                 label: Text(saving ? 'Đang lưu...' : 'Kiểm tra & gửi'),
               ),

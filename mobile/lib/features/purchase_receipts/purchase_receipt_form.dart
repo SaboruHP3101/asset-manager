@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/theme/textarea_decoration.dart';
+import '../../core/widgets/button_spinner.dart';
 import '../../core/widgets/code_scanner_screen.dart';
 import 'purchase_receipt_models.dart';
 import 'purchase_receipts_repository.dart';
@@ -138,10 +139,7 @@ class _PurchaseReceiptFormScreenState extends State<PurchaseReceiptFormScreen> {
                 FilledButton.icon(
                   onPressed: _saving ? null : _submit,
                   icon: _saving
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                      ? const ButtonSpinner()
                       : const Icon(Icons.local_shipping_outlined),
                   label: const Text('Ghi nhận đợt giao'),
                 ),
