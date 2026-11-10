@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme/textarea_decoration.dart';
+import '../../core/widgets/required_reason_dialog.dart';
 import '../../core/widgets/vertical_timeline.dart';
 import 'repair_request_form.dart';
 import 'repair_status_labels.dart';
@@ -132,44 +133,6 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
     }
   }
 
-  Future<String?> _textDialog(String title, String label) async {
-    var value = '';
-
-    return showDialog<String>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(title),
-          content: TextField(
-            autofocus: true,
-            minLines: 3,
-            maxLines: 6,
-            onChanged: (text) => setDialogState(() => value = text.trim()),
-            decoration: textareaDecoration(
-              context,
-              InputDecoration(
-                labelText: label,
-                border: const OutlineInputBorder(),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Hủy'),
-            ),
-            FilledButton(
-              onPressed: value.isEmpty
-                  ? null
-                  : () => Navigator.pop(context, value),
-              child: const Text('Xác nhận'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Future<Map<String, String>?> _completionDialog() {
     final events = (_data?['timeline'] as List<dynamic>? ?? const [])
         .cast<Map<String, dynamic>>();
@@ -252,7 +215,11 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
   Future<void> _decision(String endpoint, bool approved) async {
     String? note;
     if (!approved) {
-      note = await _textDialog('Trả phiếu về chỉnh sửa', 'Lý do');
+      note = await showRequiredReasonDialog(
+        context,
+        title: 'Trả phiếu về chỉnh sửa',
+        maxLines: 6,
+      );
       if (note == null) return;
     }
     await _run(
@@ -376,7 +343,11 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
           ),
         ),
         onReject: () async {
-          final note = await _textDialog('Từ chối bàn giao', 'Lý do');
+          final note = await showRequiredReasonDialog(
+            context,
+            title: 'Từ chối bàn giao',
+            maxLines: 6,
+          );
           if (note != null) {
             await _run(
               () => _dio.post<void>(
@@ -444,7 +415,11 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
           ),
         ),
         onReject: () async {
-          final note = await _textDialog('Yêu cầu IT sửa lại', 'Lý do');
+          final note = await showRequiredReasonDialog(
+            context,
+            title: 'Yêu cầu IT sửa lại',
+            maxLines: 6,
+          );
           if (note != null) {
             await _run(
               () => _dio.post<void>(

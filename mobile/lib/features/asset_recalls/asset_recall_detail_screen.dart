@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/textarea_decoration.dart';
 import '../../core/utils/department_labels.dart';
+import '../../core/widgets/required_reason_dialog.dart';
 import 'asset_recall_form.dart';
 import 'asset_recall_models.dart';
 import 'asset_recalls_repository.dart';
@@ -68,44 +69,6 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
     } finally {
       if (mounted) setState(() => _acting = false);
     }
-  }
-
-  Future<String?> _reasonDialog(String title) async {
-    var reason = '';
-
-    return showDialog<String>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(title),
-          content: TextField(
-            autofocus: true,
-            minLines: 3,
-            maxLines: 5,
-            onChanged: (value) => setDialogState(() => reason = value.trim()),
-            decoration: textareaDecoration(
-              context,
-              const InputDecoration(
-                labelText: 'Lý do',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Hủy'),
-            ),
-            FilledButton(
-              onPressed: reason.isEmpty
-                  ? null
-                  : () => Navigator.pop(context, reason),
-              child: const Text('Xác nhận'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<String?> _selectReplacement() async {
@@ -358,7 +321,10 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
                 _repository.decideDepartment(widget.requestId, approved: true),
           ),
           onReject: () async {
-            final reason = await _reasonDialog('Trả phiếu về chỉnh sửa');
+            final reason = await showRequiredReasonDialog(
+              context,
+              title: 'Trả phiếu về chỉnh sửa',
+            );
             if (reason != null) {
               await _run(
                 () => _repository.decideDepartment(
@@ -406,7 +372,10 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
             }
           },
           onReject: () async {
-            final reason = await _reasonDialog('Trả phiếu về chỉnh sửa');
+            final reason = await showRequiredReasonDialog(
+              context,
+              title: 'Trả phiếu về chỉnh sửa',
+            );
             if (reason != null) {
               await _run(
                 () => _repository.decideIt(
@@ -435,7 +404,10 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
             () => _repository.decideHandover(widget.requestId, confirmed: true),
           ),
           onReject: () async {
-            final reason = await _reasonDialog('Từ chối bàn giao');
+            final reason = await showRequiredReasonDialog(
+              context,
+              title: 'Từ chối bàn giao',
+            );
             if (reason != null) {
               await _run(
                 () => _repository.decideHandover(
@@ -504,7 +476,10 @@ class _AssetRecallDetailScreenState extends State<AssetRecallDetailScreen> {
             ),
           ),
           onReject: () async {
-            final reason = await _reasonDialog('Yêu cầu IT xử lý lại');
+            final reason = await showRequiredReasonDialog(
+              context,
+              title: 'Yêu cầu IT xử lý lại',
+            );
             if (reason != null) {
               await _run(
                 () => _repository.decideUpgradeReturn(
