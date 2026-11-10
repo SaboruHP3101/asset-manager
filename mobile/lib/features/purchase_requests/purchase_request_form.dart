@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/textarea_decoration.dart';
 import '../../core/utils/display_date.dart';
 import '../../core/widgets/button_spinner.dart';
+import 'purchase_category_field.dart';
 import 'purchase_request_models.dart';
 import 'purchase_requests_repository.dart';
 
@@ -677,7 +678,7 @@ class _ItemCard extends StatelessWidget {
                       children: [
                         const Divider(),
                         const SizedBox(height: 8),
-                        _CategoryField(
+                        PurchaseCategoryField(
                           label: 'Nhóm tài sản *',
                           hint: 'Chọn nhóm tài sản',
                           value: item.rootId,
@@ -687,7 +688,7 @@ class _ItemCard extends StatelessWidget {
                         const SizedBox(height: 14),
                         AnimatedSwitcher(
                           duration: const Duration(milliseconds: 220),
-                          child: _CategoryField(
+                          child: PurchaseCategoryField(
                             key: ValueKey(item.rootId),
                             label: 'Loại tài sản *',
                             hint: item.rootId == null
@@ -767,114 +768,6 @@ class _ItemCard extends StatelessWidget {
     );
   }
 }
-
-class _CategoryField extends StatelessWidget {
-  const _CategoryField({
-    required this.label,
-    required this.hint,
-    required this.value,
-    required this.options,
-    required this.onChanged,
-    this.enabled = true,
-    super.key,
-  });
-  final String label;
-  final String hint;
-  final String? value;
-  final List<PurchaseCategoryOption> options;
-  final ValueChanged<String?> onChanged;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = options.where((option) => option.id == value).firstOrNull;
-    return FormField<String>(
-      key: ValueKey('$label-$value'),
-      initialValue: value,
-      validator: (value) => value == null ? 'Vui lòng chọn danh mục.' : null,
-      builder: (field) => InkWell(
-        onTap: enabled
-            ? () async {
-                final result = await _pickCategory(
-                  context,
-                  title: label.replaceAll(' *', ''),
-                  options: options,
-                  selectedId: value,
-                );
-                if (result == null) return;
-                field.didChange(result);
-                onChanged(result);
-              }
-            : null,
-        borderRadius: BorderRadius.circular(14),
-        child: InputDecorator(
-          decoration: InputDecoration(
-            labelText: label,
-            errorText: field.errorText,
-            enabled: enabled,
-            prefixIcon: const Icon(Icons.account_tree_outlined),
-            suffixIcon: const Icon(Icons.keyboard_arrow_down),
-          ),
-          child: Text(
-            selected?.name ?? hint,
-            style: selected == null
-                ? TextStyle(color: Theme.of(context).hintColor)
-                : null,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-Future<String?> _pickCategory(
-  BuildContext context, {
-  required String title,
-  required List<PurchaseCategoryOption> options,
-  required String? selectedId,
-}) => showModalBottomSheet<String>(
-  context: context,
-  showDragHandle: true,
-  builder: (context) => SafeArea(
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          if (options.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 32),
-              child: Center(child: Text('Chưa có danh mục phù hợp.')),
-            )
-          else
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: options.length,
-                itemBuilder: (context, index) {
-                  final option = options[index];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      child: Text(option.name.characters.first.toUpperCase()),
-                    ),
-                    title: Text(option.name),
-                    selected: option.id == selectedId,
-                    trailing: option.id == selectedId
-                        ? const Icon(Icons.check_circle)
-                        : null,
-                    onTap: () => Navigator.pop(context, option.id),
-                  );
-                },
-              ),
-            ),
-        ],
-      ),
-    ),
-  ),
-);
 
 class _QuantityField extends StatelessWidget {
   const _QuantityField({required this.controller, required this.onChanged});
