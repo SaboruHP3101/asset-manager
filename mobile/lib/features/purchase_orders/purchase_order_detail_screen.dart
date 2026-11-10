@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/textarea_decoration.dart';
+import '../../core/utils/group_display_digits.dart';
 import '../../core/widgets/retry_message.dart';
 import 'purchase_order_form.dart';
 import 'purchase_order_models.dart';
@@ -675,7 +676,4 @@ class _OrderDecision {
 }
 
 /// Format chuỗi số VND
-String _money(Object? value) {
-  final digits = value.toString();
-  return digits.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
-}
+String _money(Object? value) => groupDisplayDigits(value.toString());

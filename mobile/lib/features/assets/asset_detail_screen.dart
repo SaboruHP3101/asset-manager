@@ -7,6 +7,7 @@ import '../../core/config/app_config.dart';
 import '../../core/network/api_client.dart';
 import '../../core/utils/department_labels.dart';
 import '../../core/utils/display_date.dart';
+import '../../core/utils/group_display_digits.dart';
 import '../repair_requests/repair_progress_screen.dart';
 import '../repair_requests/repair_request_form.dart';
 import '../asset_recalls/asset_recall_detail_screen.dart';
@@ -696,11 +697,7 @@ String _formatCurrency(Object? value) {
   if (value == null) return 'Chưa cập nhật';
   final number = num.tryParse(value.toString());
   if (number == null) return value.toString();
-  final digits = number.round().toString();
-  final formatted = digits.replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (_) => '.',
-  );
+  final formatted = groupDisplayDigits(number.round().toString());
 
   return '$formatted ₫';
 }

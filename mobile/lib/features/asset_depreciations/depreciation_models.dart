@@ -1,3 +1,5 @@
+import '../../core/utils/group_display_digits.dart';
+
 class DepreciationPeriod {
   DepreciationPeriod.fromJson(Map<String, dynamic> json)
     : id = json['id'] as String,
@@ -89,8 +91,7 @@ class DepreciationHistory {
   };
 }
 
-String depreciationMoney(String value) =>
-    '${value.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.')} ₫';
+String depreciationMoney(String value) => '${groupDisplayDigits(value)} ₫';
 
 String depreciationDate(String value) =>
     '${value.substring(8, 10)}/${value.substring(5, 7)}/${value.substring(0, 4)}';
