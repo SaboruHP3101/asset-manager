@@ -12,6 +12,7 @@ describe('AssetsController', () => {
   let controller: AssetsController;
   const findAll = vi.fn();
   const findMine = vi.fn();
+  const findHistory = vi.fn();
   const update = vi.fn();
   const getEmployeeId = vi.fn();
   const actor: AuthenticatedEmployee = {
@@ -27,7 +28,10 @@ describe('AssetsController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        { provide: AssetsService, useValue: { findAll, findMine, update } },
+        {
+          provide: AssetsService,
+          useValue: { findAll, findMine, findHistory, update },
+        },
         { provide: AuthService, useValue: { getEmployeeId } },
       ],
     }).compile();
@@ -108,6 +112,7 @@ describe('AssetsController', () => {
       ).resolves.toEqual({ id: 'asset-id', ...values });
     }
 
+    expect(update).toHaveBeenCalledWith('asset-id', values, actor.id);
     update.mockClear();
     expect(() =>
       controller.update('asset-id', values, {
@@ -116,6 +121,14 @@ describe('AssetsController', () => {
       }),
     ).toThrow(ForbiddenException);
     expect(update).not.toHaveBeenCalled();
+  });
+
+  it('returns edit and handover history for the selected asset', async () => {
+    const history = { changes: [], handovers: [] };
+
+    findHistory.mockResolvedValue(history);
+    await expect(controller.findHistory('asset-id')).resolves.toEqual(history);
+    expect(findHistory).toHaveBeenCalledWith('asset-id');
   });
 
   it('validates editable fields and rejects workflow or unknown fields', async () => {

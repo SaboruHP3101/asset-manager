@@ -294,6 +294,9 @@ void main() {
   });
 
   testWidgets('lý do trả về được nhập trong cùng bottom sheet', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     final refresh = Completer<PurchaseOrderDetail>();
     final repository = _ActionRepository(
       initial: _detail(const [
@@ -316,6 +319,14 @@ void main() {
 
     await tester.tap(find.text('Xử lý đơn mua'));
     await tester.pumpAndSettle();
+    final approveButton = tester.getRect(
+      find.widgetWithText(FilledButton, 'Duyệt và phát hành'),
+    );
+    final returnButton = tester.getRect(
+      find.widgetWithText(OutlinedButton, 'Trả về chỉnh sửa'),
+    );
+    expect(returnButton.top - approveButton.bottom, greaterThanOrEqualTo(12));
+
     await tester.tap(find.text('Trả về chỉnh sửa'));
     await tester.pumpAndSettle();
 

@@ -25,6 +25,18 @@ import { CreateAssetDto } from './dto/create-asset.dto.js';
 import { UpdateAssetDto } from './dto/update-asset.dto.js';
 import { Asset } from './entities/asset.entity.js';
 
+const editableFields = [
+  'assetCode',
+  'name',
+  'assetCategoryId',
+  'supplierId',
+  'initialValue',
+  'purchaseDate',
+  'inServiceDate',
+] as const satisfies readonly (keyof UpdateAssetDto)[];
+
+const insignificantDecimalZeros = /(?:\.0+|(\.\d*?[1-9])0+)$/;
+
 @Injectable()
 export class AssetsService {
   constructor(
@@ -288,7 +300,30 @@ export class AssetsService {
       )
       .orderBy(asc(schema.attachments.createdAt));
 
-    const handoverHistory = await this.db
+    const handoverHistory = await this.findHandoverHistory(assetId);
+    const [activeRecall] = await this.db
+      .select({
+        id: schema.assetRecallRequests.id,
+        status: schema.assetRecallRequests.status,
+      })
+      .from(schema.assetRecallRequests)
+      .where(
+        and(
+          eq(schema.assetRecallRequests.assetId, assetId),
+          notInArray(schema.assetRecallRequests.status, ['completed']),
+        ),
+      );
+
+    return {
+      ...record,
+      imageUrl: attachment?.url ?? null,
+      handoverHistory,
+      activeRecall: activeRecall ?? null,
+    };
+  }
+
+  private findHandoverHistory(assetId: string) {
+    return this.db
       .select({
         id: schema.assetHandoverHistory.id,
         handoverType: schema.assetHandoverHistory.handoverType,
@@ -315,25 +350,37 @@ export class AssetsService {
       )
       .where(eq(schema.assetHandoverHistory.assetId, assetId))
       .orderBy(desc(schema.assetHandoverHistory.handoverDate));
-    const [activeRecall] = await this.db
-      .select({
-        id: schema.assetRecallRequests.id,
-        status: schema.assetRecallRequests.status,
-      })
-      .from(schema.assetRecallRequests)
-      .where(
-        and(
-          eq(schema.assetRecallRequests.assetId, assetId),
-          notInArray(schema.assetRecallRequests.status, ['completed']),
-        ),
-      );
+  }
 
-    return {
-      ...record,
-      imageUrl: attachment?.url ?? null,
-      handoverHistory,
-      activeRecall: activeRecall ?? null,
-    };
+  /** Lists recorded metadata edits and handovers for one asset. */
+  async findHistory(assetId: string) {
+    const history = schema.changeHistory;
+    const [changes, handovers] = await Promise.all([
+      this.db
+        .select({
+          id: history.id,
+          oldData: history.oldData,
+          newData: history.newData,
+          createdAt: history.createdAt,
+          employeeName: schema.employees.fullName,
+        })
+        .from(history)
+        .innerJoin(
+          schema.employees,
+          eq(history.performedByEmployeeId, schema.employees.id),
+        )
+        .where(
+          and(
+            eq(history.entityType, 'asset'),
+            eq(history.entityId, assetId),
+            eq(history.action, 'update'),
+          ),
+        )
+        .orderBy(desc(history.createdAt), desc(history.id)),
+      this.findHandoverHistory(assetId),
+    ]);
+
+    return { changes, handovers };
   }
 
   async findOne(id: string) {
@@ -349,22 +396,62 @@ export class AssetsService {
     return new Asset(record);
   }
 
-  async update(id: string, updateAssetDto: UpdateAssetDto) {
+  /** Saves asset metadata and records the changed values under the acting employee. */
+  async update(id: string, updateAssetDto: UpdateAssetDto, employeeId: string) {
     try {
-      const [updatedRecord] = await this.db
-        .update(schema.assets)
-        .set({
-          ...updateAssetDto,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.assets.id, id))
-        .returning();
+      return await this.db.transaction(async (tx) => {
+        // Read the previous values under the same lock as the update.
+        const [previous] = await tx
+          .select()
+          .from(schema.assets)
+          .where(eq(schema.assets.id, id))
+          .for('update');
 
-      if (!updatedRecord) {
-        throw new NotFoundException(`Không tìm thấy tài sản có ID ${id}`);
-      }
+        if (!previous) {
+          throw new NotFoundException(`Không tìm thấy tài sản có ID ${id}`);
+        }
 
-      return new Asset(updatedRecord);
+        const [updated] = await tx
+          .update(schema.assets)
+          .set({ ...updateAssetDto, updatedAt: new Date() })
+          .where(eq(schema.assets.id, id))
+          .returning();
+        const oldData: Partial<
+          Record<(typeof editableFields)[number], string | null>
+        > = {};
+        const newData: typeof oldData = {};
+
+        for (const field of editableFields) {
+          const before = previous[field];
+          const after = updated[field];
+
+          if (before === after) continue;
+
+          if (
+            field === 'initialValue' &&
+            previous.initialValue.replace(insignificantDecimalZeros, '$1') ===
+              updated.initialValue.replace(insignificantDecimalZeros, '$1')
+          ) {
+            continue;
+          }
+
+          oldData[field] = before;
+          newData[field] = after;
+        }
+
+        if (Object.keys(newData).length > 0) {
+          await tx.insert(schema.changeHistory).values({
+            entityType: 'asset',
+            entityId: id,
+            action: 'update',
+            oldData,
+            newData,
+            performedByEmployeeId: employeeId,
+          });
+        }
+
+        return new Asset(updated);
+      });
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 

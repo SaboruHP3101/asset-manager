@@ -372,6 +372,7 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
                     icon: const Icon(Icons.check_circle_outline),
                     label: const Text('Duyệt và phát hành'),
                   ),
+                  const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: () => setSheetState(() => returning = true),
                     icon: const Icon(Icons.undo_outlined),

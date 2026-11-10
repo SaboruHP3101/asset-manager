@@ -62,8 +62,13 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
         '/repair-requests/mine/asset/${widget.assetId}',
       );
       if (!mounted) return;
+      final progress = response.data as Map<String, dynamic>?;
+      final request = progress?['request'];
+      final status = request is Map ? request['status'] : null;
       setState(() {
-        _repairProgress = response.data as Map<String, dynamic>?;
+        _repairProgress = status == 'closed' || status == 'cancelled'
+            ? null
+            : progress;
         _checkingRepair = false;
       });
     } on DioException {

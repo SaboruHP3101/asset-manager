@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { History } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -80,7 +81,7 @@ function LoadError({
   );
 }
 
-function RepairHistory({ assetId }: { assetId: string }) {
+export function RepairHistory({ assetId }: { assetId: string }) {
   const history = useQuery({
     queryKey: ["repair-cost-history", assetId],
     queryFn: ({ signal }) => getRepairHistory(assetId, signal),
@@ -133,12 +134,10 @@ function HistoryDialog({ asset }: { asset: RepairCostAsset }) {
   return (
     <Dialog>
       <DialogTrigger
-        render={
-          <Button variant="outline" className="min-h-11 cursor-pointer" />
-        }
-        aria-label={`Xem lịch sử sửa chữa ${asset.code}`}
+        render={<Button variant="ghost" size="icon" className="size-11" />}
+        title="Xem lịch sử sửa chữa"
       >
-        Xem lịch sử
+        <History aria-hidden="true" />
       </DialogTrigger>
       <DialogContent
         showCloseButton={false}

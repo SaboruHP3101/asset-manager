@@ -162,7 +162,7 @@ void main() {
     tester,
   ) async {
     adapter.repair = {
-      'request': {'id': 'repair-id'},
+      'request': {'id': 'repair-id', 'status': 'ready_for_return'},
     };
     await _showAsset(tester);
     await tester.pumpAndSettle();
@@ -183,6 +183,33 @@ void main() {
       isTrue,
     );
   });
+
+  for (final status in ['closed', 'cancelled']) {
+    testWidgets('$status repair history does not block new asset actions', (
+      tester,
+    ) async {
+      adapter.repair = {
+        'request': {'id': 'repair-id', 'status': status},
+      };
+      await _showAsset(tester);
+      await tester.pumpAndSettle();
+      expect(find.text('Đang có yêu cầu sửa chữa'), findsNothing);
+
+      await tester.tap(find.byTooltip('Yêu cầu tài sản'));
+      await tester.pumpAndSettle();
+      expect(find.text('Xem tiến trình sửa chữa'), findsNothing);
+      for (final title in [
+        'Đổi / báo phế tài sản',
+        'Yêu cầu nâng cấp tài sản',
+        'Gửi yêu cầu sửa chữa',
+      ]) {
+        expect(
+          tester.widget<ListTile>(find.widgetWithText(ListTile, title)).enabled,
+          isTrue,
+        );
+      }
+    });
+  }
 
   for (final type in ['exchange', 'upgrade']) {
     testWidgets('active $type request preserves viewing and repair gating', (

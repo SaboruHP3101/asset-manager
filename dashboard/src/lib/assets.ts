@@ -5,6 +5,30 @@ export async function getAssets(signal?: AbortSignal): Promise<Asset[]> {
   return request<Asset[]>("/assets", { signal });
 }
 
+type AssetHistory = {
+  changes: {
+    id: string;
+    createdAt: string;
+    employeeName: string;
+    oldData: Record<string, unknown> | null;
+    newData: Record<string, unknown> | null;
+  }[];
+  handovers: {
+    id: string;
+    handoverType: string;
+    handoverDate: string;
+    status: string;
+    recipientName: string | null;
+    departmentName: string | null;
+    note: string | null;
+  }[];
+};
+
+/** Loads the saved edits and handovers for an asset. */
+export async function getAssetHistory(id: string, signal?: AbortSignal) {
+  return request<AssetHistory>(`/assets/${id}/history`, { signal });
+}
+
 async function request<TData>(
   path: string,
   options: RequestInit = {}

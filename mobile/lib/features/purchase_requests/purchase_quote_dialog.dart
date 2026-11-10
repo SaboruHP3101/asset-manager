@@ -70,6 +70,7 @@ class _PurchaseQuoteDialogState extends State<PurchaseQuoteDialog> {
                 validator: (value) =>
                     value == null ? 'Chọn nhà cung cấp.' : null,
               ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _price,
                 decoration: const InputDecoration(
@@ -80,6 +81,7 @@ class _PurchaseQuoteDialogState extends State<PurchaseQuoteDialog> {
                     ? null
                     : 'Nhập số nguyên không âm.',
               ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _vat,
                 decoration: const InputDecoration(labelText: 'VAT % *'),
@@ -93,6 +95,7 @@ class _PurchaseQuoteDialogState extends State<PurchaseQuoteDialog> {
                       : null;
                 },
               ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _note,
                 decoration: const InputDecoration(labelText: 'Ghi chú'),

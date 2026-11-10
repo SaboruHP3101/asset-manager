@@ -80,6 +80,11 @@ export class AssetsController {
     return this.assetsService.findOne(id);
   }
 
+  @Get(':id/history')
+  findHistory(@Param('id', ParseUUIDPipe) id: string) {
+    return this.assetsService.findHistory(id);
+  }
+
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   update(
@@ -92,7 +97,7 @@ export class AssetsController {
       throw new ForbiddenException('Chỉ phòng IT được cập nhật tài sản.');
     }
 
-    return this.assetsService.update(id, dto);
+    return this.assetsService.update(id, dto, actor.id);
   }
 
   @Delete(':id')
