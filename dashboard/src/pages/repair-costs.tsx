@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { History } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { History, Pencil } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,12 +8,14 @@ import {
   DialogClose,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import {
   Table,
   TableBody,
@@ -31,6 +33,8 @@ import {
 import {
   getRepairCosts,
   getRepairHistory,
+  updateRepairCost,
+  type MonthlyRepairRequest,
   type RepairCostAsset,
 } from "@/lib/repair-costs";
 
@@ -40,7 +44,7 @@ const tableHeaders = [
   "Người đang giữ",
   "Vị trí",
   "Chi phí trong tháng",
-  "Lịch sử",
+  "Hành động",
 ];
 
 const outcomeLabels = {
@@ -165,6 +169,210 @@ function HistoryDialog({ asset }: { asset: RepairCostAsset }) {
   );
 }
 
+function EditCostDialog({
+  asset,
+  month,
+}: {
+  asset: RepairCostAsset;
+  month: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<MonthlyRepairRequest>();
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const save = useMutation({
+    mutationFn: ({
+      request,
+      cost,
+      reason,
+    }: {
+      request: MonthlyRepairRequest;
+      cost: string;
+      reason: string;
+    }) => updateRepairCost(request, cost, reason),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["repair-costs", month] }),
+        queryClient.invalidateQueries({
+          queryKey: ["repair-cost-history", asset.id],
+        }),
+      ]);
+      setOpen(false);
+      toast.success("Đã lưu chi phí sửa chữa.");
+    },
+    onError: async (error) => {
+      if (error.cause === 404 || error.cause === 409) {
+        await queryClient.invalidateQueries({
+          queryKey: ["repair-costs", month],
+        });
+      }
+    },
+  });
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected || save.isPending) return;
+
+    const form = new FormData(event.currentTarget);
+    save.mutate({
+      request: selected,
+      cost: String(form.get("cost")),
+      reason: String(form.get("reason")).trim(),
+    });
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (save.isPending) return;
+        if (nextOpen) {
+          save.reset();
+          setSelected(
+            asset.requests.length === 1 ? asset.requests[0] : undefined
+          );
+        }
+        setOpen(nextOpen);
+      }}
+    >
+      <DialogTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-11 cursor-pointer"
+          />
+        }
+        title="Sửa chi phí"
+      >
+        <Pencil aria-hidden="true" />
+      </DialogTrigger>
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto motion-reduce:animate-none"
+      >
+        <DialogHeader>
+          <DialogTitle>
+            {selected ? "Sửa chi phí sửa chữa" : "Chọn phiếu sửa chữa"}
+          </DialogTitle>
+          <DialogDescription className="wrap-anywhere">
+            {asset.code}
+            {selected ? ` · ${selected.issue}` : ` · ${month}`}
+          </DialogDescription>
+        </DialogHeader>
+        {selected ? (
+          <form className="grid gap-4" onSubmit={submit}>
+            <fieldset disabled={save.isPending} className="grid min-w-0 gap-4">
+              <label className="grid gap-2 font-medium">
+                Trước
+                <Input
+                  readOnly
+                  disabled
+                  value={formatCost(selected.cost)}
+                  className="bg-muted tabular-nums"
+                />
+              </label>
+              <label className="grid gap-2 font-medium">
+                Sau (VND)
+                <Input
+                  name="cost"
+                  inputMode="numeric"
+                  pattern="[0-9]{1,15}"
+                  maxLength={15}
+                  required
+                  autoFocus
+                  placeholder="Nhập số tiền mới"
+                  className="tabular-nums"
+                />
+              </label>
+              <label className="grid gap-2 font-medium">
+                Lý do (bắt buộc)
+                <textarea
+                  name="reason"
+                  rows={3}
+                  required
+                  maxLength={2000}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-base font-normal focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
+                  onInput={(event) => {
+                    const field = event.currentTarget;
+                    field.setCustomValidity(
+                      field.value && !field.value.trim()
+                        ? "Vui lòng nhập lý do sửa chi phí."
+                        : ""
+                    );
+                  }}
+                />
+              </label>
+            </fieldset>
+            {save.isError ? (
+              <Alert variant="destructive" role="alert">
+                <AlertDescription>{save.error.message}</AlertDescription>
+              </Alert>
+            ) : null}
+            <DialogFooter>
+              <DialogClose
+                render={
+                  <Button
+                    variant="outline"
+                    className="min-h-11 cursor-pointer"
+                    disabled={save.isPending}
+                  />
+                }
+              >
+                Hủy
+              </DialogClose>
+              <Button
+                type="submit"
+                className="min-h-11 cursor-pointer"
+                disabled={save.isPending}
+              >
+                {save.isPending ? "Đang lưu..." : "Lưu chi phí"}
+              </Button>
+            </DialogFooter>
+          </form>
+        ) : (
+          <>
+            <ul className="grid gap-2">
+              {asset.requests.map((request) => (
+                <li key={request.id}>
+                  <Button
+                    variant="outline"
+                    className="h-auto min-h-11 w-full cursor-pointer justify-between gap-3 py-2 text-left"
+                    onClick={() => setSelected(request)}
+                  >
+                    <span className="min-w-0 wrap-anywhere whitespace-normal">
+                      {request.issue}
+                      <span className="block text-xs text-muted-foreground">
+                        {formatVietnamDate(new Date(request.closedAt))} ·{" "}
+                        {request.id.slice(0, 8)}
+                      </span>
+                    </span>
+                    <span className="shrink-0 tabular-nums">
+                      {formatCost(request.cost)}
+                    </span>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <DialogFooter>
+              <DialogClose
+                render={
+                  <Button
+                    variant="outline"
+                    className="min-h-11 cursor-pointer"
+                  />
+                }
+              >
+                Hủy
+              </DialogClose>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function RepairCostsPage() {
   const [month, setMonth] = useState(() => formatVietnamMonth(new Date()));
   const costs = useQuery({
@@ -246,9 +454,12 @@ export default function RepairCostsPage() {
                       {asset.location || "Chưa có vị trí"}
                     </TableCell>
                     <TableCell className="tabular-nums">
-                      {formatCost(asset.cost)}
+                      <div className="flex items-center gap-1">
+                        {formatCost(asset.cost)}
+                      </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="flex place-items-center">
+                      <EditCostDialog asset={asset} month={month} />
                       <HistoryDialog asset={asset} />
                     </TableCell>
                   </TableRow>

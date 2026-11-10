@@ -60,6 +60,24 @@ export class RepairCostMonthDto {
   month: string;
 }
 
+/** Điều chỉnh chi phí của một phiếu đã nghiệm thu. */
+export class UpdateRepairCostDto {
+  @ValidateIf((_dto: UpdateRepairCostDto, value: unknown) => value !== null)
+  @IsString()
+  previousCost: string | null;
+
+  @Matches(/^\d{1,15}$/, {
+    message:
+      'Chi phí sửa chữa phải là số nguyên VND không âm, tối đa 15 chữ số.',
+  })
+  cost: string;
+
+  @IsString()
+  @Matches(/\S/, { message: 'Vui lòng nhập lý do sửa chi phí.' })
+  @MaxLength(2000)
+  reason: string;
+}
+
 /** Phản hồi nghiệm thu của chính nhân viên đã báo hỏng tài sản. */
 export class ConfirmRepairDto {
   /** false đưa yêu cầu về in_progress để IT xử lý lại thay vì đóng luồng. */

@@ -29,6 +29,7 @@ import {
   RepairCostMonthDto,
   RepairDecisionDto,
   RepairHandoverDecisionDto,
+  UpdateRepairCostDto,
 } from './dto/repair-workflow.dto.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import {
@@ -113,6 +114,16 @@ export class RepairRequestsController {
     @CurrentEmployee() actor: AuthenticatedEmployee,
   ) {
     return this.repairCostsService.listCostHistory(assetId, actor);
+  }
+
+  /** Điều chỉnh chi phí đã nghiệm thu của một phiếu. */
+  @Patch('costs/:requestId')
+  updateCost(
+    @Param('requestId', ParseUUIDPipe) requestId: string,
+    @Body() dto: UpdateRepairCostDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    return this.repairCostsService.updateCost(requestId, dto, actor.id);
   }
 
   @Get('it-assignees')

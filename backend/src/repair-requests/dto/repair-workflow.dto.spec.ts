@@ -5,6 +5,7 @@ import {
   RepairCostMonthDto,
   RepairDecisionDto,
   RepairHandoverDecisionDto,
+  UpdateRepairCostDto,
 } from './repair-workflow.dto.js';
 
 describe('repair workflow DTOs', () => {
@@ -65,5 +66,29 @@ describe('repair workflow DTOs', () => {
     const errors = await validate(dto);
 
     expect(errors.some((error) => error.property === 'note')).toBe(true);
+  });
+
+  it('chấp nhận điều chỉnh phiếu chưa ghi chi phí về 0 VND', async () => {
+    const dto = Object.assign(new UpdateRepairCostDto(), {
+      previousCost: null,
+      cost: '0',
+      reason: 'Bảo hành miễn phí',
+    });
+
+    expect(await validate(dto)).toEqual([]);
+  });
+
+  it('từ chối cập nhật thiếu chi phí trước, chi phí lẻ và lý do chỉ có khoảng trắng', async () => {
+    const dto = Object.assign(new UpdateRepairCostDto(), {
+      cost: '1.5',
+      reason: '   ',
+    });
+    const errors = await validate(dto);
+
+    expect(errors.map((error) => error.property)).toEqual([
+      'previousCost',
+      'cost',
+      'reason',
+    ]);
   });
 });

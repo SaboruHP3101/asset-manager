@@ -1,5 +1,12 @@
 import { fetcher } from "@/lib/fetcher";
 
+export type MonthlyRepairRequest = {
+  id: string;
+  closedAt: string;
+  issue: string;
+  cost: `${number}` | null;
+};
+
 export type RepairCostAsset = {
   id: string;
   code: string;
@@ -7,6 +14,7 @@ export type RepairCostAsset = {
   holder: string | null;
   location: string | null;
   cost: `${number}` | null;
+  requests: MonthlyRepairRequest[];
 };
 
 type MonthlyRepairCosts = {
@@ -32,7 +40,7 @@ async function request<T>(path: string, signal: AbortSignal): Promise<T> {
   if (response.status === 403) {
     throw new Error("Chỉ phòng IT được xem chi phí sửa chữa.");
   }
-  
+
   if (!response.ok) {
     throw new Error("Không thể tải chi phí sửa chữa. Vui lòng thử lại.");
   }
@@ -49,4 +57,32 @@ export function getRepairCosts(month: string, signal: AbortSignal) {
 
 export function getRepairHistory(assetId: string, signal: AbortSignal) {
   return request<RepairAttempt[]>(`/${assetId}/history`, signal);
+}
+
+export async function updateRepairCost(
+  request: MonthlyRepairRequest,
+  cost: string,
+  reason: string
+) {
+  const response = await fetcher(`/repair-requests/costs/${request.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ previousCost: request.cost, cost, reason }),
+  });
+
+  if (response.status === 401) {
+    throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+  }
+
+  if (response.status === 404 || response.status === 409) {
+    throw new Error(
+      "Dữ liệu phiếu đã thay đổi. Hãy đóng hộp thoại và mở lại.",
+      {
+        cause: response.status,
+      }
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error("Không thể lưu chi phí sửa chữa. Vui lòng thử lại.");
+  }
 }
