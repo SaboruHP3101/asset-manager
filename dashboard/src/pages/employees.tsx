@@ -1,39 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import {
-  CircleCheck,
-  CircleMinus,
-  Pencil,
-  Plus,
-  ToggleLeft,
-  ToggleRight,
-} from "lucide-react";
+import { Pencil, Plus, ToggleLeft, ToggleRight } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { getEmployees } from "@/lib/employees";
 import EmployeeDialog from "@/components/employee-dialog";
 import EmployeeActivationDialog from "@/components/employee-activation-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
+import StatusChip from "@/components/status-chip";
 import type { Employee } from "@/types";
-
-const tableHeaders = [
-  "Mã nhân viên",
-  "Họ tên",
-  "Email",
-  "Số điện thoại",
-  "Trưởng phòng",
-  "Trạng thái",
-  "Hành động",
-];
 
 export default function EmployeesPage() {
   const { token } = useAuth();
@@ -46,6 +22,61 @@ export default function EmployeesPage() {
     retry: false,
     staleTime: 60_000,
   });
+
+  const columns: DataTableColumn<Employee>[] = [
+    {
+      id: "code",
+      header: "Mã nhân viên",
+      cell: (employee) => employee.employeeCode,
+      cellClassName: "font-medium",
+    },
+    { id: "name", header: "Họ tên", cell: (employee) => employee.fullName },
+    { id: "email", header: "Email", cell: (employee) => employee.email },
+    {
+      id: "phone",
+      header: "Số điện thoại",
+      cell: (employee) => employee.phoneNumber || "—",
+    },
+    {
+      id: "head",
+      header: "Trưởng phòng",
+      cell: (employee) => (employee.isDepartmentHead ? "Có" : "Không"),
+    },
+    {
+      id: "status",
+      header: "Trạng thái",
+      cell: (employee) => (
+        <StatusChip
+          status={employee.isActive ? "active" : "inactive"}
+          label={employee.isActive ? "Đang hoạt động" : "Ngừng hoạt động"}
+        />
+      ),
+    },
+    {
+      id: "actions",
+      header: "Hành động",
+      cell: (employee) => (
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="Chỉnh sửa"
+            onClick={() => setEditing(employee)}
+          >
+            <Pencil />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title={employee.isActive ? "Vô hiệu hóa" : "Kích hoạt"}
+            onClick={() => setActivating(employee)}
+          >
+            {employee.isActive ? <ToggleRight /> : <ToggleLeft />}
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -77,94 +108,13 @@ export default function EmployeesPage() {
           </AlertDescription>
         </Alert>
       ) : (
-        <div className="overflow-hidden rounded-xl border">
-          <Table className="min-w-[760px]">
-            <TableCaption className="sr-only">Danh sách nhân viên</TableCaption>
-            <TableHeader>
-              <TableRow>
-                {tableHeaders.map((label) => (
-                  <TableHead key={label} className="font-semibold" scope="col">
-                    {label}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {employees.isPending ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center">
-                    <p role="status">Đang tải nhân viên...</p>
-                  </TableCell>
-                </TableRow>
-              ) : employees.data.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="h-32 text-center text-muted-foreground"
-                  >
-                    Chưa có nhân viên.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                employees.data.map((employee) => (
-                  <TableRow key={employee.id}>
-                    <TableCell className="font-medium">
-                      {employee.employeeCode}
-                    </TableCell>
-                    <TableCell>{employee.fullName}</TableCell>
-                    <TableCell>{employee.email}</TableCell>
-                    <TableCell>{employee.phoneNumber || "—"}</TableCell>
-                    <TableCell>
-                      {employee.isDepartmentHead ? "Có" : "Không"}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ${employee.isActive ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}
-                      >
-                        {employee.isActive ? (
-                          <CircleCheck
-                            className="size-3 shrink-0"
-                            aria-hidden="true"
-                          />
-                        ) : (
-                          <CircleMinus
-                            className="size-3 shrink-0"
-                            aria-hidden="true"
-                          />
-                        )}
-                        {employee.isActive
-                          ? "Đang hoạt động"
-                          : "Ngừng hoạt động"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          title="Chỉnh sửa"
-                          onClick={() => setEditing(employee)}
-                        >
-                          <Pencil />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          title={
-                            employee.isActive ? "Vô hiệu hóa" : "Kích hoạt"
-                          }
-                          onClick={() => setActivating(employee)}
-                        >
-                          {employee.isActive ? <ToggleRight /> : <ToggleLeft />}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={employees.data ?? []}
+          tableClassName="min-w-[760px]"
+          emptyContent="Chưa có nhân viên."
+          loading="Đang tải nhân viên..."
+        />
       )}
       {editing !== undefined ? (
         <EmployeeDialog

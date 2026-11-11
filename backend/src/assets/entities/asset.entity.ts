@@ -1,3 +1,5 @@
+import type { assetManagementOwnerEnum } from '../../db/schema.js';
+
 export class Asset {
   id: string;
   assetCode: string;
@@ -7,6 +9,9 @@ export class Asset {
   currentUserId?: string | null;
   currentManagingDepartmentId?: string | null;
   purchaseOrderItemId?: string | null;
+  purchaseOrderId?: string | null;
+  purchaseOrderOwner?:
+    (typeof assetManagementOwnerEnum.enumValues)[number] | null;
   status: string;
   initialValue: string;
   purchaseDate: string;

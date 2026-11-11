@@ -1,22 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth-provider";
-import AssetStatusChip from "@/components/asset-status-chip";
+import StatusChip from "@/components/status-chip";
 import ExportExcelButton from "@/components/export-excel-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { getItWarehouseAssets } from "@/lib/warehouses";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { assetStatusLabels } from "@/lib/assets";
+import { getItWarehouseAssets } from "@/lib/warehouses";
 
-const columns = ["Mã tài sản", "Tên tài sản", "Danh mục", "Trạng thái"];
+type WarehouseAsset = Awaited<ReturnType<typeof getItWarehouseAssets>>[number];
 
 export default function WarehousePage() {
   const { token } = useAuth();
@@ -27,6 +19,33 @@ export default function WarehousePage() {
     retry: false,
     staleTime: 60_000,
   });
+
+  const columns: DataTableColumn<WarehouseAsset>[] = [
+    {
+      id: "code",
+      header: "Mã tài sản",
+      cell: (asset) => asset.assetCode,
+      cellClassName: "font-medium",
+    },
+    { id: "name", header: "Tên tài sản", cell: (asset) => asset.name || "—" },
+    {
+      id: "category",
+      header: "Danh mục",
+      cell: (asset) => asset.category || "—",
+    },
+    {
+      id: "status",
+      header: "Trạng thái",
+      cell: (asset) => (
+        <StatusChip
+          status={asset.status}
+          label={
+            assetStatusLabels[asset.status.toLowerCase()] ?? "Chưa xác định"
+          }
+        />
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -40,7 +59,7 @@ export default function WarehousePage() {
         <ExportExcelButton
           fileName="tai-san-kho-it"
           sheetName="Kho IT"
-          headers={columns}
+          headers={columns.map((column) => column.header)}
           rows={(assets.data ?? []).map((asset) => [
             asset.assetCode,
             asset.name || "—",
@@ -66,53 +85,13 @@ export default function WarehousePage() {
           </AlertDescription>
         </Alert>
       ) : (
-        <div className="overflow-hidden rounded-xl border">
-          <Table className="min-w-[640px]">
-            <TableCaption className="sr-only">
-              Tài sản trong kho IT
-            </TableCaption>
-            <TableHeader>
-              <TableRow>
-                {columns.map((label) => (
-                  <TableHead key={label} className="font-semibold" scope="col">
-                    {label}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {assets.isPending ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center">
-                    <p role="status">Đang tải tài sản trong kho...</p>
-                  </TableCell>
-                </TableRow>
-              ) : assets.data.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    className="h-32 text-center text-muted-foreground"
-                  >
-                    Kho IT chưa có tài sản.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                assets.data.map((asset) => (
-                  <TableRow key={asset.id}>
-                    <TableCell className="font-medium">
-                      {asset.assetCode}
-                    </TableCell>
-                    <TableCell>{asset.name || "—"}</TableCell>
-                    <TableCell>{asset.category || "—"}</TableCell>
-                    <TableCell>
-                      <AssetStatusChip status={asset.status} />
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={assets.data ?? []}
+          tableClassName="min-w-[640px]"
+          emptyContent="Kho IT chưa có tài sản."
+          loading="Đang tải tài sản trong kho..."
+        />
       )}
     </div>
   );

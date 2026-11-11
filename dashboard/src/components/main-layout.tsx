@@ -1,11 +1,11 @@
 import { NavLink, Outlet, useLocation } from "react-router";
 import {
-  LayoutDashboard,
   Users,
   Package,
   Tags,
   Warehouse,
   ReceiptText,
+  ClipboardList,
   LogOut,
   Moon,
   Sun,
@@ -33,47 +33,66 @@ import { useEffect } from "react";
 
 export const resourcePages = [
   {
-    path: "/employees",
-    title: "Nhân viên",
-    description: "Thông tin nhân viên.",
-    icon: Users,
-  },
-  {
-    path: "/assets",
-    title: "Tài sản",
-    description: "Chi tiết tài sản, tình trạng và nơi quản lý.",
-    icon: Package,
+    path: "/purchase-orders",
+    title: "Đơn mua tài sản",
+    shared: true,
+    icon: ClipboardList,
   },
   {
     path: "/asset-categories",
     title: "Danh mục tài sản",
-    description: "Phân nhóm và phân loại tài sản.",
     icon: Tags,
   },
   {
     path: "/warehouse",
     title: "Kho IT",
-    description: "Tài sản đang được lưu giữ tại kho IT.",
     icon: Warehouse,
   },
   {
     path: "/repair-costs",
     title: "Chi phí sửa chữa",
-    description: "Chi phí theo tháng và lịch sử sửa chữa tài sản.",
     icon: ReceiptText,
+  },
+  {
+    path: "/employees",
+    title: "Nhân viên",
+    icon: Users,
+  },
+  {
+    path: "/assets",
+    title: "Tài sản",
+    icon: Package,
   },
 ];
 
-const navigation = [
-  { path: "/", title: "Tổng quan", icon: LayoutDashboard },
-  ...resourcePages,
-];
+export function canAccessResource(
+  page: (typeof resourcePages)[number],
+  department?: string
+) {
+  return (
+    department === "IT" ||
+    (department === "PROCUREMENT" && page.shared === true)
+  );
+}
 
 function ResourceSidebar() {
   const { profile, logout } = useAuth();
   const { setTheme } = useTheme();
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
+  const visiblePages = resourcePages.filter((page) =>
+    canAccessResource(page, profile?.department)
+  );
+  const groups = [
+    {
+      label: "Mua sắm",
+      pages: visiblePages.filter((page) => page.shared === true),
+    },
+    {
+      label: "Quản lý IT",
+      pages: visiblePages.filter((page) => page.shared !== true),
+    },
+  ];
 
   return (
     <Sidebar collapsible="icon">
@@ -83,43 +102,47 @@ function ResourceSidebar() {
             <Package className="size-4.5" />
           </span>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <p className="truncate text-sm font-semibold">
-              IT Resource Manager
-            </p>
+            <p className="truncate text-sm font-semibold">Quản lý tài sản</p>
             <p className="text-xs text-muted-foreground">Quản lý tài nguyên</p>
           </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Tài nguyên</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <nav>
-              <SidebarMenu>
-                {navigation.map((item) => (
-                  <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton
-                      render={<NavLink to={item.path} end />}
-                      isActive={pathname === item.path}
-                      tooltip={item.title}
-                      onClick={() => setOpenMobile(false)}
-                    >
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </nav>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {groups
+          .filter((group) => group.pages.length > 0)
+          .map(({ label, pages }) => (
+            <SidebarGroup key={label}>
+              <SidebarGroupLabel>{label}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <nav aria-label={label}>
+                  <SidebarMenu>
+                    {pages.map((item) => (
+                      <SidebarMenuItem key={item.path}>
+                        <SidebarMenuButton
+                          render={<NavLink to={item.path} end />}
+                          isActive={pathname === item.path}
+                          tooltip={item.title}
+                          onClick={() => setOpenMobile(false)}
+                        >
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </nav>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
       </SidebarContent>
       <SidebarFooter className="border-t">
         <div className="flex items-center gap-2 px-2 py-2 group-data-[collapsible=icon]:hidden">
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{profile?.fullName}</p>
             <p className="truncate text-xs text-muted-foreground">
-              {profile?.isDepartmentHead ? "Trưởng phòng IT" : "Nhân viên IT"}
+              {profile?.isDepartmentHead ? "Trưởng phòng" : "Nhân viên"}
+              {" · "}
+              {profile?.department === "PROCUREMENT" ? "Thu mua" : "IT"}
             </p>
           </div>
           <Button
@@ -139,11 +162,7 @@ function ResourceSidebar() {
         </div>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={logout}
-              tooltip="Đăng xuất"
-              aria-label="Đăng xuất"
-            >
+            <SidebarMenuButton onClick={logout} tooltip="Đăng xuất">
               <LogOut />
               <span>Đăng xuất</span>
             </SidebarMenuButton>
@@ -157,7 +176,7 @@ function ResourceSidebar() {
 export function MainLayout() {
   const { pathname } = useLocation();
   const title =
-    navigation.find((item) => item.path === pathname)?.title ??
+    resourcePages.find((item) => item.path === pathname)?.title ??
     "Không tìm thấy trang";
 
   useEffect(() => {

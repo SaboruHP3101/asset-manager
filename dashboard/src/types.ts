@@ -1,3 +1,5 @@
+import type { ManagementOwner } from "@/lib/purchase-orders";
+
 export type Employee = {
   id: string;
   employeeCode: string;
@@ -18,6 +20,8 @@ export type EmployeeFormValue = Pick<
 export type Asset = {
   id: string;
   assetCode: string;
+  purchaseOrderId?: string | null;
+  purchaseOrderOwner?: ManagementOwner | null;
   name: string | null;
   category: string | null;
   assignedTo: string | null;

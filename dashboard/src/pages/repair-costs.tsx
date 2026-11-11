@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { History, Pencil } from "lucide-react";
+import ExportExcelButton from "@/components/export-excel-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,14 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 import {
   formatVietnamDate,
   formatVietnamMonth,
@@ -38,15 +32,6 @@ import {
   type RepairCostAsset,
 } from "@/lib/repair-costs";
 
-const tableHeaders = [
-  "Mã tài sản",
-  "Tên tài sản",
-  "Người đang giữ",
-  "Vị trí",
-  "Chi phí trong tháng",
-  "Hành động",
-];
-
 const outcomeLabels = {
   accepted: "Đã nghiệm thu",
   pending: "Chờ nghiệm thu",
@@ -57,6 +42,38 @@ const outcomeLabels = {
 function formatCost(cost: `${number}` | null) {
   return cost === null ? "Chưa ghi nhận" : formatVnd(cost);
 }
+
+const reportColumns = [
+  {
+    id: "code",
+    header: "Mã tài sản",
+    cell: (asset: RepairCostAsset) => asset.code,
+    cellClassName: "font-medium",
+  },
+  {
+    id: "name",
+    header: "Tên tài sản",
+    cell: (asset: RepairCostAsset) => asset.name,
+    cellClassName: "min-w-32 wrap-anywhere whitespace-normal",
+  },
+  {
+    id: "holder",
+    header: "Người đang giữ",
+    cell: (asset: RepairCostAsset) => asset.holder ?? "Chưa giao",
+  },
+  {
+    id: "location",
+    header: "Vị trí",
+    cell: (asset: RepairCostAsset) => asset.location || "Chưa có vị trí",
+    cellClassName: "min-w-28 wrap-anywhere whitespace-normal",
+  },
+  {
+    id: "cost",
+    header: "Chi phí trong tháng",
+    cell: (asset: RepairCostAsset) => formatCost(asset.cost),
+    cellClassName: "tabular-nums",
+  },
+] satisfies DataTableColumn<RepairCostAsset>[];
 
 function LoadError({
   error,
@@ -382,6 +399,20 @@ export default function RepairCostsPage() {
     retry: false,
   });
 
+  const columns: DataTableColumn<RepairCostAsset>[] = [
+    ...reportColumns,
+    {
+      id: "actions",
+      header: "Hành động",
+      cell: (asset) => (
+        <div className="flex items-center">
+          <EditCostDialog asset={asset} month={month} />
+          <HistoryDialog asset={asset} />
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -393,15 +424,26 @@ export default function RepairCostsPage() {
             Tổng hợp theo tháng nghiệm thu và đóng phiếu.
           </p>
         </div>
-        <div className="grid gap-2">
-          <Label htmlFor="repair-cost-month">Tháng báo cáo</Label>
-          <Input
-            id="repair-cost-month"
-            type="month"
-            placeholder="YYYY-MM"
-            className="min-h-11 w-auto cursor-pointer"
-            value={month}
-            onInput={(event) => setMonth(event.currentTarget.value)}
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex gap-2">
+            <Label htmlFor="repair-cost-month">Tháng báo cáo</Label>
+            <Input
+              id="repair-cost-month"
+              type="month"
+              placeholder="YYYY-MM"
+              className="min-h-11 w-auto cursor-pointer"
+              value={month}
+              onInput={(event) => setMonth(event.currentTarget.value)}
+            />
+          </div>
+          <ExportExcelButton
+            fileName={`chi-phi-sua-chua-${month}`}
+            sheetName="Chi phí sửa chữa"
+            headers={reportColumns.map((column) => column.header)}
+            rows={(costs.data?.assets ?? []).map((asset) =>
+              reportColumns.map((column) => column.cell(asset))
+            )}
+            disabled={!costs.isEnabled || !costs.isSuccess || costs.isFetching}
           />
         </div>
       </div>
@@ -431,42 +473,7 @@ export default function RepairCostsPage() {
               Mỗi phiếu chỉ tính số tiền ở lần được nghiệm thu.
             </p>
           </div>
-          <div className="overflow-hidden rounded-xl border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {tableHeaders.map((title) => (
-                    <TableHead key={title} scope="col">
-                      {title}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {costs.data.assets.map((asset) => (
-                  <TableRow key={asset.id}>
-                    <TableCell className="font-medium">{asset.code}</TableCell>
-                    <TableCell className="min-w-32 wrap-anywhere whitespace-normal">
-                      {asset.name}
-                    </TableCell>
-                    <TableCell>{asset.holder ?? "Chưa giao"}</TableCell>
-                    <TableCell className="min-w-28 wrap-anywhere whitespace-normal">
-                      {asset.location || "Chưa có vị trí"}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      <div className="flex items-center gap-1">
-                        {formatCost(asset.cost)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="flex place-items-center">
-                      <EditCostDialog asset={asset} month={month} />
-                      <HistoryDialog asset={asset} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable columns={columns} data={costs.data.assets} />
         </>
       )}
     </div>

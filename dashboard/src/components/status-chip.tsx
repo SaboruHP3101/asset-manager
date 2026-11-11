@@ -10,7 +10,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { assetStatusLabels } from "@/lib/assets";
 
 const statusTones: Record<string, string> = {
   active: "success",
@@ -55,7 +54,13 @@ const statusIcons: Record<string, LucideIcon> = {
   inactive: CircleMinus,
 };
 
-export default function AssetStatusChip({ status }: { status: string }) {
+export default function StatusChip({
+  status,
+  label,
+}: {
+  status: string;
+  label: string;
+}) {
   const value = status.toLowerCase();
   const Icon = statusIcons[value] ?? CircleHelp;
 
@@ -67,7 +72,7 @@ export default function AssetStatusChip({ status }: { status: string }) {
       )}
     >
       <Icon className="size-3 shrink-0" aria-hidden="true" />
-      {assetStatusLabels[value] ?? "Chưa xác định"}
+      {label}
     </span>
   );
 }

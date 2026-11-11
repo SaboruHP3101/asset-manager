@@ -24,10 +24,6 @@ export class JwtAuthGuard implements CanActivate {
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
-  /**
-   * JWT chỉ cung cấp định danh. Thông tin quyền được đọc lại từ DB để việc đổi
-   * role, phòng ban hoặc vô hiệu hóa tài khoản có hiệu lực ngay với token cũ.
-   */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const header = request.headers.authorization;

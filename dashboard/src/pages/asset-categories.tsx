@@ -8,18 +8,7 @@ import AssetCategoryDeleteDialog from "@/components/asset-category-delete-dialog
 import ExportExcelButton from "@/components/export-excel-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
-const columns = ["Mã danh mục", "Tên danh mục", "Mô tả"];
-const tableHeaders = [...columns, "Hành động"];
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 
 export default function AssetCategoriesPage() {
   const [editing, setEditing] = useState<AssetCategory | null | undefined>();
@@ -54,6 +43,44 @@ export default function AssetCategoriesPage() {
     categories.data?.filter((category) => category.parentCategoryId === null) ??
     [];
 
+  const columns: DataTableColumn<AssetCategory>[] = [
+    {
+      id: "code",
+      header: "Mã danh mục",
+      cell: (category) => category.code,
+      cellClassName: "font-medium",
+    },
+    { id: "name", header: "Tên danh mục", cell: (category) => category.name },
+    {
+      id: "description",
+      header: "Mô tả",
+      cell: (category) => category.description || "—",
+      cellClassName: "max-w-sm break-words whitespace-normal",
+    },
+    {
+      id: "actions",
+      header: "Hành động",
+      cell: (category) => (
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setEditing(category)}
+          >
+            <Pencil />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setDeleting(category)}
+          >
+            <Trash2 />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -69,7 +96,9 @@ export default function AssetCategoriesPage() {
           <ExportExcelButton
             fileName="danh-muc-tai-san"
             sheetName="Danh mục tài sản"
-            headers={columns}
+            headers={columns
+              .filter((column) => column.id !== "actions")
+              .map((column) => column.header)}
             rows={roots.map((category) => [
               category.code,
               category.name,
@@ -99,70 +128,13 @@ export default function AssetCategoriesPage() {
           </AlertDescription>
         </Alert>
       ) : (
-        <div className="overflow-hidden rounded-xl border">
-          <Table className="min-w-[600px]">
-            <TableCaption className="sr-only">
-              Danh mục tài sản cấp gốc
-            </TableCaption>
-            <TableHeader>
-              <TableRow>
-                {tableHeaders.map((label) => (
-                  <TableHead key={label} scope="col" className="font-semibold">
-                    {label}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {categories.isPending ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center">
-                    <p role="status">Đang tải danh mục...</p>
-                  </TableCell>
-                </TableRow>
-              ) : roots.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    className="h-32 text-center text-muted-foreground"
-                  >
-                    Chưa có danh mục cấp gốc.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                roots.map((category) => (
-                  <TableRow key={category.id}>
-                    <TableCell className="font-medium">
-                      {category.code}
-                    </TableCell>
-                    <TableCell>{category.name}</TableCell>
-                    <TableCell className="max-w-sm break-words whitespace-normal">
-                      {category.description || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => setEditing(category)}
-                        >
-                          <Pencil />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => setDeleting(category)}
-                        >
-                          <Trash2 />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={roots}
+          tableClassName="min-w-[600px]"
+          emptyContent="Chưa có danh mục cấp gốc."
+          loading="Đang tải danh mục..."
+        />
       )}
       {editing !== undefined ? (
         <AssetCategoryDialog

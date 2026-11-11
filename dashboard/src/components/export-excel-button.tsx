@@ -47,7 +47,6 @@ export default function ExportExcelButton({
       type="button"
       variant="outline"
       disabled={disabled || exporting || rows.length === 0}
-      aria-busy={exporting}
       onClick={handleExport}
     >
       {exporting ? (

@@ -47,7 +47,7 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-2 font-semibold lg:hidden">
             <Package className="size-5" />
-            IT Resource Manager
+            Quản lý tài sản
           </div>
           <Card className="border-0 p-4 shadow-none">
             <CardHeader className="px-0">

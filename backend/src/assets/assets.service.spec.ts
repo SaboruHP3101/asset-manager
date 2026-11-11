@@ -17,6 +17,8 @@ describe('AssetsService', () => {
       department: 'IT',
       location: 'Tầng 2',
       status: 'active',
+      purchaseOrderId: 'it-order',
+      purchaseOrderOwner: 'it',
     },
     {
       id: 'first',
@@ -27,6 +29,14 @@ describe('AssetsService', () => {
       department: null,
       location: 'Kho IT',
       status: 'available',
+      purchaseOrderId: null,
+      purchaseOrderOwner: null,
+    },
+    {
+      id: 'procurement-asset',
+      assetCode: 'TS-03',
+      purchaseOrderId: 'procurement-order',
+      purchaseOrderOwner: 'procurement',
     },
   ];
   const leftJoin = vi.fn();
@@ -73,6 +83,8 @@ describe('AssetsService', () => {
       .mockReturnValueOnce({ leftJoin })
       .mockReturnValueOnce({ leftJoin })
       .mockReturnValueOnce({ leftJoin })
+      .mockReturnValueOnce({ leftJoin })
+      .mockReturnValueOnce({ leftJoin })
       .mockResolvedValueOnce(rows);
   });
 
@@ -84,6 +96,8 @@ describe('AssetsService', () => {
       schema.employees,
       schema.departments,
       schema.warehouses,
+      schema.purchaseOrderItems,
+      schema.purchaseRequestItems,
     ]);
     const fields = select.mock.calls[0][0];
 
@@ -91,12 +105,20 @@ describe('AssetsService', () => {
     expect(fields.category).toBe(schema.assetCategories.name);
     expect(fields.assignedTo).toBe(schema.employees.fullName);
     expect(fields.department).toBe(schema.departments.name);
+    expect(fields.purchaseOrderId).toBe(
+      schema.purchaseOrderItems.purchaseOrderId,
+    );
+    expect(fields.purchaseOrderOwner).toBe(
+      schema.purchaseRequestItems.managementOwnerSnapshot,
+    );
     expect(fields).not.toHaveProperty('password');
   });
 
   it('returns an empty list when there are no assets', async () => {
     leftJoin
       .mockReset()
+      .mockReturnValueOnce({ leftJoin })
+      .mockReturnValueOnce({ leftJoin })
       .mockReturnValueOnce({ leftJoin })
       .mockReturnValueOnce({ leftJoin })
       .mockReturnValueOnce({ leftJoin })

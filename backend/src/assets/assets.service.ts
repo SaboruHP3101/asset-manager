@@ -71,6 +71,8 @@ export class AssetsService {
         category: schema.assetCategories.name,
         assignedTo: schema.employees.fullName,
         department: schema.departments.name,
+        purchaseOrderId: schema.purchaseOrderItems.purchaseOrderId,
+        purchaseOrderOwner: schema.purchaseRequestItems.managementOwnerSnapshot,
         location: sql<
           string | null
         >`coalesce(${schema.warehouses.name}, ${schema.assets.currentLocation})`,
@@ -91,6 +93,17 @@ export class AssetsService {
       .leftJoin(
         schema.warehouses,
         eq(schema.assets.currentWarehouseId, schema.warehouses.id),
+      )
+      .leftJoin(
+        schema.purchaseOrderItems,
+        eq(schema.assets.purchaseOrderItemId, schema.purchaseOrderItems.id),
+      )
+      .leftJoin(
+        schema.purchaseRequestItems,
+        eq(
+          schema.purchaseOrderItems.purchaseRequestItemId,
+          schema.purchaseRequestItems.id,
+        ),
       );
 
     return records.map((record) => new Asset(record));

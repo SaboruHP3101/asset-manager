@@ -58,8 +58,8 @@ function validateProfile(data: Profile) {
     throw new AuthError("Thông tin tài khoản không hợp lệ. Vui lòng thử lại.");
   }
 
-  if (data.department !== "IT") {
-    throw new AuthError("Dashboard chỉ dành cho nhân viên phòng IT.", 403);
+  if (data.department !== "IT" && data.department !== "PROCUREMENT") {
+    throw new AuthError("Dashboard chỉ dành cho phòng IT và Thu mua.", 403);
   }
 
   return data;

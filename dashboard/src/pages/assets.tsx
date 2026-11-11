@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "react-router";
 import { History, Pencil } from "lucide-react";
 import AssetEditDialog from "@/components/asset-edit-dialog";
-import AssetStatusChip from "@/components/asset-status-chip";
+import StatusChip from "@/components/status-chip";
 import ExportExcelButton from "@/components/export-excel-button";
 import type { Asset } from "@/types";
 import { useAuth } from "@/components/auth-provider";
@@ -17,15 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 import {
   assetDepartmentLabels,
   assetStatusLabels,
@@ -35,17 +28,6 @@ import {
 } from "@/lib/assets";
 import { formatVietnamDate, formatVnd } from "@/lib/format";
 import { RepairHistory } from "@/pages/repair-costs";
-
-const columns = [
-  "Mã tài sản",
-  "Tên tài sản",
-  "Danh mục",
-  "Người sử dụng",
-  "Phòng ban",
-  "Vị trí",
-  "Trạng thái",
-];
-const tableHeaders = [...columns, "Hành động"];
 
 const historyFields = {
   assetCode: "Mã tài sản",
@@ -76,7 +58,7 @@ function AssetHistoryDialog({ asset }: { asset: Asset }) {
   return (
     <Dialog>
       <DialogTrigger render={<Button variant="ghost" size="icon-sm" />}>
-        <History aria-hidden="true" />
+        <History />
       </DialogTrigger>
       <DialogContent
         showCloseButton={false}
@@ -88,7 +70,15 @@ function AssetHistoryDialog({ asset }: { asset: Asset }) {
             {asset.assetCode} · {asset.name}
           </DialogDescription>
         </DialogHeader>
-        <section aria-label="Chi phí sửa chữa" className="space-y-2">
+        {asset.purchaseOrderId && asset.purchaseOrderOwner && (
+          <Link
+            className="w-fit text-sm font-medium text-primary underline underline-offset-4"
+            to={`/purchase-orders?owner=${asset.purchaseOrderOwner}&order=${asset.purchaseOrderId}`}
+          >
+            Xem đơn mua gốc
+          </Link>
+        )}
+        <section className="space-y-2">
           <h3 className="font-semibold">Chi phí sửa chữa</h3>
           <RepairHistory assetId={asset.id} />
         </section>
@@ -277,6 +267,68 @@ export default function AssetsPage() {
     staleTime: 60_000,
   });
 
+  const columns: DataTableColumn<Asset>[] = [
+    {
+      id: "code",
+      header: "Mã tài sản",
+      cell: (asset) => asset.assetCode,
+      cellClassName: "font-medium",
+    },
+    { id: "name", header: "Tên tài sản", cell: (asset) => asset.name || "—" },
+    {
+      id: "category",
+      header: "Danh mục",
+      cell: (asset) => asset.category || "—",
+    },
+    {
+      id: "assignee",
+      header: "Người sử dụng",
+      cell: (asset) => asset.assignedTo || "—",
+    },
+    {
+      id: "department",
+      header: "Phòng ban",
+      cell: (asset) =>
+        asset.department
+          ? (assetDepartmentLabels[asset.department] ?? asset.department)
+          : "—",
+    },
+    {
+      id: "location",
+      header: "Vị trí",
+      cell: (asset) => asset.location || "—",
+    },
+    {
+      id: "status",
+      header: "Trạng thái",
+      cell: (asset) => (
+        <StatusChip
+          status={asset.status}
+          label={
+            assetStatusLabels[asset.status.toLowerCase()] ?? "Chưa xác định"
+          }
+        />
+      ),
+    },
+    {
+      id: "actions",
+      header: "Hành động",
+      cell: (asset) => (
+        <div className="flex items-center gap-1">
+          <AssetHistoryDialog asset={asset} />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="Chỉnh sửa"
+            onClick={() => setEditing(asset)}
+          >
+            <Pencil />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -289,7 +341,9 @@ export default function AssetsPage() {
         <ExportExcelButton
           fileName="danh-sach-tai-san"
           sheetName="Tài sản"
-          headers={columns}
+          headers={columns
+            .filter((column) => column.id !== "actions")
+            .map((column) => column.header)}
           rows={(assets.data ?? []).map((asset) => [
             asset.assetCode,
             asset.name || "—",
@@ -320,72 +374,14 @@ export default function AssetsPage() {
           </AlertDescription>
         </Alert>
       ) : (
-        <div className="overflow-hidden rounded-xl border">
-          <Table className="min-w-[960px]">
-            <TableCaption className="sr-only">Danh sách tài sản</TableCaption>
-            <TableHeader>
-              <TableRow>
-                {tableHeaders.map((label) => (
-                  <TableHead key={label} className="font-semibold" scope="col">
-                    {label}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {assets.isPending ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center">
-                    <p role="status">Đang tải tài sản...</p>
-                  </TableCell>
-                </TableRow>
-              ) : assets.data.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="h-32 text-center text-muted-foreground"
-                  >
-                    Chưa có tài sản.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                assets.data.map((asset) => (
-                  <TableRow key={asset.id}>
-                    <TableCell className="font-medium">
-                      {asset.assetCode}
-                    </TableCell>
-                    <TableCell>{asset.name || "—"}</TableCell>
-                    <TableCell>{asset.category || "—"}</TableCell>
-                    <TableCell>{asset.assignedTo || "—"}</TableCell>
-                    <TableCell>
-                      {asset.department
-                        ? (assetDepartmentLabels[asset.department] ??
-                          asset.department)
-                        : "—"}
-                    </TableCell>
-                    <TableCell>{asset.location || "—"}</TableCell>
-                    <TableCell>
-                      <AssetStatusChip status={asset.status} />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <AssetHistoryDialog asset={asset} />
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          title="Chỉnh sửa"
-                          onClick={() => setEditing(asset)}
-                        >
-                          <Pencil />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={assets.data ?? []}
+
+          tableClassName="min-w-[960px]"
+          emptyContent="Chưa có tài sản."
+          loading="Đang tải tài sản..."
+        />
       )}
       {editing ? (
         <AssetEditDialog asset={editing} onClose={() => setEditing(null)} />
