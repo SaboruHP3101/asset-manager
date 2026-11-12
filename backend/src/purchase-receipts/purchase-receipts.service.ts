@@ -1,21 +1,16 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Inject,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { randomUUID } from 'node:crypto';
-import { unlink } from 'node:fs/promises';
+import { removeUploadedFiles } from '../attachments/upload-cleanup.js';
 import { PurchaseAuthorizationService } from '../auth/purchase-authorization.service.js';
+import { WORKFLOW_ACTIONS } from '../auth/workflow-actions.config.js';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
-import {
-  getAllowedWorkflowActions,
-  WORKFLOW_ACTIONS,
-} from '../auth/workflow-actions.config.js';
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -25,6 +20,17 @@ import {
   InspectPurchaseReceiptUnitDto,
   RecordPurchaseReceiptDto,
 } from './dto/purchase-receipt.dto.js';
+import { validateReceiptSerialNumbers } from './purchase-receipt-calculations.js';
+import { inspectUnit } from './purchase-receipt-inspection.js';
+import {
+  findInspectionQueue,
+  findOne,
+  findOrderProgress,
+  loadOrderItems,
+  loadOrderProgress,
+  lockOrder,
+  requireOrderContext,
+} from './purchase-receipt-queries.js';
 
 type Database = NodePgDatabase<typeof schema>;
 type ManagementOwner =
@@ -32,70 +38,6 @@ type ManagementOwner =
 type ReceiptFiles = Partial<
   Record<'deliveryNote' | 'invoice' | 'warranty', Express.Multer.File[]>
 >;
-
-export interface ReceiptProgressLine {
-  ordered: number;
-  delivered: number;
-  accepted: number;
-  rejected: number;
-  pending: number;
-  remaining: number;
-}
-
-export function calculateReceiptProgress(
-  ordered: number,
-  delivered: number,
-  accepted: number,
-  rejected: number,
-): ReceiptProgressLine {
-  const pending = delivered - accepted - rejected;
-
-  return {
-    ordered,
-    delivered,
-    accepted,
-    rejected,
-    pending,
-    remaining: ordered - accepted - pending,
-  };
-}
-
-export function validateReceiptSerialNumbers(
-  serialNumbers: string[] | undefined,
-  deliveredQuantity: number,
-  requiresSerials: boolean,
-  itemName: string,
-): string[] {
-  const values = serialNumbers ?? [];
-  const normalized = values.map((serial) => serial.trim());
-
-  if (normalized.some((serial) => serial.length === 0)) {
-    throw new BadRequestException(
-      `Mã sản phẩm của ${itemName} không được để trống.`,
-    );
-  }
-
-  if (new Set(normalized).size !== normalized.length) {
-    throw new BadRequestException(
-      `Danh sách mã sản phẩm của ${itemName} có mã bị trùng.`,
-    );
-  }
-
-  if (normalized.length > deliveredQuantity) {
-    throw new BadRequestException(
-      `Số mã sản phẩm của ${itemName} vượt số lượng giao.`,
-    );
-  }
-
-  if (requiresSerials && normalized.length !== deliveredQuantity) {
-    throw new BadRequestException(
-      `${itemName} cần đủ ${deliveredQuantity} mã sản phẩm.`,
-    );
-  }
-
-  return normalized;
-}
-
 @Injectable()
 export class PurchaseReceiptsService {
   constructor(
@@ -104,7 +46,35 @@ export class PurchaseReceiptsService {
     private readonly audit: RequestAuditService,
     private readonly notifications: NotificationsService,
   ) {}
+  findInspectionQueue(actor: AuthenticatedEmployee) {
+    return findInspectionQueue(this.authorization, this.db, actor);
+  }
 
+  findOrderProgress(orderId: string, actor: AuthenticatedEmployee) {
+    return findOrderProgress(this.authorization, this.db, orderId, actor);
+  }
+
+  inspectUnit(
+    unitId: string,
+    dto: InspectPurchaseReceiptUnitDto,
+    evidence: Express.Multer.File | undefined,
+    actor: AuthenticatedEmployee,
+  ) {
+    return inspectUnit(
+      this.audit,
+      this.authorization,
+      this.db,
+      this.notifications,
+      unitId,
+      dto,
+      evidence,
+      actor,
+    );
+  }
+
+  findOne(id: string, actor: AuthenticatedEmployee) {
+    return findOne(this.authorization, this.db, id, actor);
+  }
   async record(
     orderId: string,
     dto: RecordPurchaseReceiptDto,
@@ -122,15 +92,13 @@ export class PurchaseReceiptsService {
     const receiptId = randomUUID();
 
     try {
-      await this.db.transaction(async (transaction) => {
-        const tx = transaction as unknown as Database;
-
-        await this.lockOrder(tx, orderId);
-        const context = await this.requireOrderContext(tx, orderId, [
+      await this.db.transaction(async (tx) => {
+        await lockOrder(tx, orderId);
+        const context = await requireOrderContext(tx, orderId, [
           'issued',
           'partially_received',
         ]);
-        const orderItems = await this.loadOrderItems(tx, orderId);
+        const orderItems = await loadOrderItems(tx, orderId);
         const inputIds = dto.items.map((item) => item.purchaseOrderItemId);
 
         if (new Set(inputIds).size !== inputIds.length) {
@@ -152,7 +120,7 @@ export class PurchaseReceiptsService {
           );
         }
 
-        const progress = await this.loadOrderProgress(tx, orderItems);
+        const progress = await loadOrderProgress(tx, orderItems);
         const serialsByItemId = new Map<string, string[]>();
 
         for (const item of selectedItems) {
@@ -272,295 +240,7 @@ export class PurchaseReceiptsService {
       throw error;
     }
 
-    return this.findOne(receiptId, actor);
-  }
-
-  async findInspectionQueue(actor: AuthenticatedEmployee) {
-    const owner = this.inspectionOwner(actor);
-
-    return this.db
-      .select({
-        unitId: schema.purchaseReceiptUnits.id,
-        receiptId: schema.purchaseReceipts.id,
-        receiptCode: schema.purchaseReceipts.receiptCode,
-        deliveryDate: schema.purchaseReceipts.deliveryDate,
-        purchaseOrderId: schema.purchaseOrders.id,
-        purchaseOrderCode: schema.purchaseOrders.purchaseOrderCode,
-        itemName: schema.purchaseOrderItems.itemNameSnapshot,
-        trackingMode: schema.purchaseReceiptItems.trackingModeSnapshot,
-        sequenceNumber: schema.purchaseReceiptUnits.sequenceNumber,
-        serialNumber: schema.purchaseReceiptUnits.serialNumber,
-      })
-      .from(schema.purchaseReceiptUnits)
-      .innerJoin(
-        schema.purchaseReceiptItems,
-        eq(
-          schema.purchaseReceiptUnits.purchaseReceiptItemId,
-          schema.purchaseReceiptItems.id,
-        ),
-      )
-      .innerJoin(
-        schema.purchaseReceipts,
-        eq(
-          schema.purchaseReceiptItems.purchaseReceiptId,
-          schema.purchaseReceipts.id,
-        ),
-      )
-      .innerJoin(
-        schema.purchaseOrderItems,
-        eq(
-          schema.purchaseReceiptItems.purchaseOrderItemId,
-          schema.purchaseOrderItems.id,
-        ),
-      )
-      .innerJoin(
-        schema.purchaseOrders,
-        eq(schema.purchaseOrderItems.purchaseOrderId, schema.purchaseOrders.id),
-      )
-      .where(
-        and(
-          eq(schema.purchaseReceiptUnits.inspectionResult, 'pending'),
-          eq(schema.purchaseReceiptItems.managementOwnerSnapshot, owner),
-        ),
-      )
-      .orderBy(
-        asc(schema.purchaseReceipts.createdAt),
-        asc(schema.purchaseReceiptItems.createdAt),
-        asc(schema.purchaseReceiptUnits.sequenceNumber),
-      );
-  }
-
-  async findOrderProgress(orderId: string, actor: AuthenticatedEmployee) {
-    const context = await this.requireOrderContext(this.db, orderId, [
-      'issued',
-      'partially_received',
-      'fully_received',
-      'closed_short',
-    ]);
-
-    await this.authorization.assertCanViewRequest(
-      context.purchaseRequestId,
-      actor,
-    );
-    const items = await this.loadOrderItems(this.db, orderId);
-    const progress = await this.loadOrderProgress(this.db, items);
-
-    return items.map((item) => ({
-      purchaseOrderItemId: item.id,
-      itemName: item.itemNameSnapshot,
-      trackingMode: item.trackingModeSnapshot,
-      managementOwner: item.managementOwnerSnapshot,
-      ...progress.get(item.id),
-    }));
-  }
-
-  async inspectUnit(
-    unitId: string,
-    dto: InspectPurchaseReceiptUnitDto,
-    evidence: Express.Multer.File | undefined,
-    actor: AuthenticatedEmployee,
-  ) {
-    try {
-      const result = await this.db.transaction(async (transaction) => {
-        const tx = transaction as unknown as Database;
-
-        await tx.execute(
-          sql`select id from purchase_receipt_units where id = ${unitId} for update`,
-        );
-        const context = await this.requireUnitContext(tx, unitId);
-        const action =
-          context.managementOwnerSnapshot === 'it'
-            ? WORKFLOW_ACTIONS.purchaseReceiptInspectIt
-            : WORKFLOW_ACTIONS.purchaseReceiptInspectProcurement;
-
-        this.authorization.assertAction(actor, action);
-        this.authorization.assertManagementOwner(
-          actor,
-          context.managementOwnerSnapshot,
-        );
-
-        if (context.inspectionResult !== 'pending') {
-          const [asset] = await tx
-            .select({
-              id: schema.assets.id,
-              assetCode: schema.assets.assetCode,
-              qrCode: schema.assets.qrCode,
-            })
-            .from(schema.assets)
-            .where(eq(schema.assets.purchaseReceiptUnitId, unitId));
-
-          return { unitId, inspectionResult: context.inspectionResult, asset };
-        }
-
-        const now = new Date();
-        let evidenceAttachmentId: string | null = null;
-
-        if (evidence) {
-          const [attachment] = await tx
-            .insert(schema.attachments)
-            .values({
-              entityType: 'purchase_receipt_unit',
-              entityId: unitId,
-              fileName: evidence.originalname,
-              url: `/uploads/purchase-receipts/${evidence.filename}`,
-              mimeType: evidence.mimetype,
-              size: evidence.size,
-              uploadedByEmployeeId: actor.id,
-            })
-            .returning({ id: schema.attachments.id });
-
-          evidenceAttachmentId = attachment.id;
-        }
-
-        const inspectionResult = dto.accepted ? 'accepted' : 'rejected';
-
-        await tx
-          .update(schema.purchaseReceiptUnits)
-          .set({
-            inspectionResult,
-            inspectedBy: actor.id,
-            inspectedAt: now,
-            rejectionReason: dto.accepted ? null : dto.reason,
-            evidenceAttachmentId,
-            updatedAt: now,
-            updatedBy: actor.id,
-          })
-          .where(eq(schema.purchaseReceiptUnits.id, unitId));
-
-        let asset:
-          { id: string; assetCode: string; qrCode: string } | undefined;
-
-        if (
-          dto.accepted &&
-          context.trackingModeSnapshot === 'individual_asset'
-        ) {
-          const assetId = randomUUID();
-          const assetCode = this.createAssetCode(assetId);
-          const [createdAsset] = await tx
-            .insert(schema.assets)
-            .values({
-              id: assetId,
-              assetCode,
-              qrCode: `asset:${assetId}`,
-              assetCategoryId: context.assetCategoryId,
-              supplierId: context.supplierId,
-              purchaseOrderItemId: context.purchaseOrderItemId,
-              purchaseReceiptUnitId: unitId,
-              name: context.itemNameSnapshot,
-              currentValue: context.unitPriceExclVat,
-              status: 'awaiting_allocation',
-              initialValue: context.unitPriceExclVat,
-              purchaseDate: context.orderDate,
-              inServiceDate: context.deliveryDate,
-              createdBy: actor.id,
-              updatedBy: actor.id,
-            })
-            .returning({
-              id: schema.assets.id,
-              assetCode: schema.assets.assetCode,
-              qrCode: schema.assets.qrCode,
-            });
-
-          asset = createdAsset;
-        }
-
-        await this.refreshReceiptItem(
-          tx,
-          context.purchaseReceiptItemId,
-          actor.id,
-        );
-        const receiptStatus = await this.refreshReceipt(
-          tx,
-          context.receiptId,
-          actor.id,
-        );
-        const orderStatus = await this.refreshOrder(
-          tx,
-          context.purchaseOrderId,
-          actor.id,
-        );
-
-        await this.audit.logPurchase(tx, {
-          requestId: context.purchaseRequestId,
-          revision: context.requestRevision,
-          actionType: dto.accepted
-            ? 'purchase.receipt.accept_unit'
-            : 'purchase.receipt.reject_unit',
-          actor,
-          result: dto.accepted ? 'approved' : 'rejected',
-          previousStatus: context.receiptStatus,
-          newStatus: receiptStatus,
-          reason: dto.reason,
-          entityType: 'receipt',
-          entityId: context.receiptId,
-          metadata: {
-            unitId,
-            purchaseOrderId: context.purchaseOrderId,
-            orderStatus,
-            note: dto.note,
-            assetId: asset?.id,
-          },
-        });
-
-        if (asset) {
-          const departmentHeads = await tx
-            .select({ id: schema.employees.id })
-            .from(schema.employees)
-            .where(
-              and(
-                eq(schema.employees.departmentId, context.requestDepartmentId),
-                eq(schema.employees.isDepartmentHead, true),
-                eq(schema.employees.isActive, true),
-              ),
-            );
-
-          await this.notifications.createMany(
-            tx,
-            departmentHeads.map((head) => ({
-              recipientId: head.id,
-              eventType: 'asset_pending_initial_allocation' as const,
-              entityType: 'asset' as const,
-              entityId: asset.id,
-              title: 'Tài sản chờ cấp phát',
-              body: `${asset.assetCode} đã kiểm tra đạt và đang chờ cấp phát.`,
-              metadata: { purchaseRequestId: context.purchaseRequestId },
-            })),
-          );
-        }
-
-        if (receiptStatus === 'inspected') {
-          await this.notifications.create(tx, {
-            recipientId: context.recordedBy,
-            eventType: 'purchase_receipt_inspection_completed',
-            entityType: 'receipt',
-            entityId: context.receiptId,
-            title: 'Đợt giao đã kiểm tra xong',
-            body: `${context.receiptCode} đã hoàn tất kiểm tra.`,
-            metadata: { purchaseOrderId: context.purchaseOrderId },
-          });
-        }
-
-        if (!dto.accepted) {
-          await this.notifications.create(tx, {
-            recipientId: context.recordedBy,
-            eventType: 'purchase_receipt_has_rejected_items',
-            entityType: 'receipt',
-            entityId: context.receiptId,
-            title: 'Đợt giao có hàng không đạt',
-            body: `${context.receiptCode} có hàng không đạt: ${dto.reason}`,
-            metadata: { purchaseOrderId: context.purchaseOrderId, unitId },
-          });
-        }
-
-        return { unitId, inspectionResult, asset };
-      });
-
-      return result;
-    } catch (error) {
-      if (evidence) await unlink(evidence.path).catch(() => undefined);
-
-      throw error;
-    }
+    return findOne(this.authorization, this.db, receiptId, actor);
   }
 
   async closeShort(
@@ -573,16 +253,14 @@ export class PurchaseReceiptsService {
       WORKFLOW_ACTIONS.purchaseReceiptCloseShort,
     );
 
-    await this.db.transaction(async (transaction) => {
-      const tx = transaction as unknown as Database;
-
-      await this.lockOrder(tx, orderId);
-      const order = await this.requireOrderContext(tx, orderId, [
+    await this.db.transaction(async (tx) => {
+      await lockOrder(tx, orderId);
+      const order = await requireOrderContext(tx, orderId, [
         'issued',
         'partially_received',
       ]);
-      const items = await this.loadOrderItems(tx, orderId);
-      const progress = await this.loadOrderProgress(tx, items);
+      const items = await loadOrderItems(tx, orderId);
+      const progress = await loadOrderProgress(tx, items);
 
       if ([...progress.values()].some((line) => line.pending > 0)) {
         throw new ConflictException(
@@ -624,337 +302,6 @@ export class PurchaseReceiptsService {
     });
 
     return { id: orderId, status: 'closed_short' };
-  }
-
-  async findOne(id: string, actor: AuthenticatedEmployee) {
-    const [receipt] = await this.db
-      .select({
-        receipt: schema.purchaseReceipts,
-        purchaseRequestId: schema.purchaseOrders.purchaseRequestId,
-        purchaseOrderCode: schema.purchaseOrders.purchaseOrderCode,
-      })
-      .from(schema.purchaseReceipts)
-      .innerJoin(
-        schema.purchaseOrders,
-        eq(schema.purchaseReceipts.purchaseOrderId, schema.purchaseOrders.id),
-      )
-      .where(eq(schema.purchaseReceipts.id, id));
-
-    if (!receipt) throw new NotFoundException('Không tìm thấy đợt giao hàng.');
-
-    await this.authorization.assertCanViewRequest(
-      receipt.purchaseRequestId,
-      actor,
-    );
-
-    const items = await this.db
-      .select({
-        id: schema.purchaseReceiptItems.id,
-        itemName: schema.purchaseOrderItems.itemNameSnapshot,
-        deliveredQuantity: schema.purchaseReceiptItems.deliveredQuantity,
-        acceptedQuantity: schema.purchaseReceiptItems.acceptedQuantity,
-        rejectedQuantity: schema.purchaseReceiptItems.rejectedQuantity,
-        managementOwner: schema.purchaseReceiptItems.managementOwnerSnapshot,
-        trackingMode: schema.purchaseReceiptItems.trackingModeSnapshot,
-      })
-      .from(schema.purchaseReceiptItems)
-      .innerJoin(
-        schema.purchaseOrderItems,
-        eq(
-          schema.purchaseReceiptItems.purchaseOrderItemId,
-          schema.purchaseOrderItems.id,
-        ),
-      )
-      .where(eq(schema.purchaseReceiptItems.purchaseReceiptId, id));
-
-    return {
-      id,
-      status: receipt.receipt.status,
-      allowedActions: this.allowedReceiptActions(actor),
-      data: {
-        ...receipt.receipt,
-        purchaseOrderCode: receipt.purchaseOrderCode,
-        items: items.map((item) => ({
-          ...item,
-          pendingQuantity:
-            item.deliveredQuantity -
-            item.acceptedQuantity -
-            item.rejectedQuantity,
-        })),
-      },
-    };
-  }
-
-  private async loadOrderItems(db: Database, orderId: string) {
-    return db
-      .select({
-        id: schema.purchaseOrderItems.id,
-        purchaseRequestItemId: schema.purchaseOrderItems.purchaseRequestItemId,
-        itemNameSnapshot: schema.purchaseOrderItems.itemNameSnapshot,
-        quantity: schema.purchaseOrderItems.quantity,
-        unitPriceExclVat: schema.purchaseOrderItems.unitPriceExclVat,
-        assetCategoryId: schema.purchaseRequestItems.assetCategoryId,
-        managementOwnerSnapshot:
-          schema.purchaseRequestItems.managementOwnerSnapshot,
-        trackingModeSnapshot: schema.purchaseRequestItems.trackingModeSnapshot,
-      })
-      .from(schema.purchaseOrderItems)
-      .innerJoin(
-        schema.purchaseRequestItems,
-        eq(
-          schema.purchaseOrderItems.purchaseRequestItemId,
-          schema.purchaseRequestItems.id,
-        ),
-      )
-      .where(eq(schema.purchaseOrderItems.purchaseOrderId, orderId));
-  }
-
-  private async loadOrderProgress(
-    db: Database,
-    items: Awaited<ReturnType<PurchaseReceiptsService['loadOrderItems']>>,
-  ) {
-    if (items.length === 0) return new Map<string, ReceiptProgressLine>();
-
-    const rows = await db
-      .select({
-        purchaseOrderItemId: schema.purchaseReceiptItems.purchaseOrderItemId,
-        delivered: sql<number>`coalesce(sum(${schema.purchaseReceiptItems.deliveredQuantity}), 0)::int`,
-        accepted: sql<number>`coalesce(sum(${schema.purchaseReceiptItems.acceptedQuantity}), 0)::int`,
-        rejected: sql<number>`coalesce(sum(${schema.purchaseReceiptItems.rejectedQuantity}), 0)::int`,
-      })
-      .from(schema.purchaseReceiptItems)
-      .where(
-        inArray(
-          schema.purchaseReceiptItems.purchaseOrderItemId,
-          items.map((item) => item.id),
-        ),
-      )
-      .groupBy(schema.purchaseReceiptItems.purchaseOrderItemId);
-    const totals = new Map(rows.map((row) => [row.purchaseOrderItemId, row]));
-
-    return new Map(
-      items.map((item) => {
-        const total = totals.get(item.id);
-
-        return [
-          item.id,
-          calculateReceiptProgress(
-            item.quantity,
-            total?.delivered ?? 0,
-            total?.accepted ?? 0,
-            total?.rejected ?? 0,
-          ),
-        ];
-      }),
-    );
-  }
-
-  private async requireOrderContext(
-    db: Database,
-    orderId: string,
-    statuses: Array<typeof schema.purchaseOrders.$inferSelect.status>,
-  ) {
-    const [order] = await db
-      .select({
-        id: schema.purchaseOrders.id,
-        status: schema.purchaseOrders.status,
-        purchaseRequestId: schema.purchaseOrders.purchaseRequestId,
-        requestRevision: schema.purchaseRequestRevisions.revisionNumber,
-        supplierId: schema.purchaseOrders.supplierId,
-      })
-      .from(schema.purchaseOrders)
-      .innerJoin(
-        schema.purchaseRequestRevisions,
-        eq(
-          schema.purchaseOrders.requestRevisionId,
-          schema.purchaseRequestRevisions.id,
-        ),
-      )
-      .where(eq(schema.purchaseOrders.id, orderId));
-
-    if (!order) throw new NotFoundException('Không tìm thấy đơn đặt mua.');
-
-    if (!statuses.includes(order.status)) {
-      throw new ConflictException('Trạng thái PO không cho phép thao tác này.');
-    }
-
-    return order;
-  }
-
-  private async requireUnitContext(db: Database, unitId: string) {
-    const [context] = await db
-      .select({
-        inspectionResult: schema.purchaseReceiptUnits.inspectionResult,
-        purchaseReceiptItemId: schema.purchaseReceiptItems.id,
-        managementOwnerSnapshot:
-          schema.purchaseReceiptItems.managementOwnerSnapshot,
-        trackingModeSnapshot: schema.purchaseReceiptItems.trackingModeSnapshot,
-        receiptId: schema.purchaseReceipts.id,
-        receiptCode: schema.purchaseReceipts.receiptCode,
-        receiptStatus: schema.purchaseReceipts.status,
-        deliveryDate: schema.purchaseReceipts.deliveryDate,
-        recordedBy: schema.purchaseReceipts.recordedBy,
-        purchaseOrderId: schema.purchaseOrders.id,
-        purchaseRequestId: schema.purchaseOrders.purchaseRequestId,
-        requestRevision: schema.purchaseRequestRevisions.revisionNumber,
-        supplierId: schema.purchaseOrders.supplierId,
-        orderDate: schema.purchaseOrders.orderDate,
-        purchaseOrderItemId: schema.purchaseOrderItems.id,
-        itemNameSnapshot: schema.purchaseOrderItems.itemNameSnapshot,
-        unitPriceExclVat: schema.purchaseOrderItems.unitPriceExclVat,
-        assetCategoryId: schema.purchaseRequestItems.assetCategoryId,
-        requestDepartmentId: schema.purchaseRequests.departmentId,
-      })
-      .from(schema.purchaseReceiptUnits)
-      .innerJoin(
-        schema.purchaseReceiptItems,
-        eq(
-          schema.purchaseReceiptUnits.purchaseReceiptItemId,
-          schema.purchaseReceiptItems.id,
-        ),
-      )
-      .innerJoin(
-        schema.purchaseReceipts,
-        eq(
-          schema.purchaseReceiptItems.purchaseReceiptId,
-          schema.purchaseReceipts.id,
-        ),
-      )
-      .innerJoin(
-        schema.purchaseOrderItems,
-        eq(
-          schema.purchaseReceiptItems.purchaseOrderItemId,
-          schema.purchaseOrderItems.id,
-        ),
-      )
-      .innerJoin(
-        schema.purchaseRequestItems,
-        eq(
-          schema.purchaseOrderItems.purchaseRequestItemId,
-          schema.purchaseRequestItems.id,
-        ),
-      )
-      .innerJoin(
-        schema.purchaseOrders,
-        eq(schema.purchaseOrderItems.purchaseOrderId, schema.purchaseOrders.id),
-      )
-      .innerJoin(
-        schema.purchaseRequestRevisions,
-        eq(
-          schema.purchaseOrders.requestRevisionId,
-          schema.purchaseRequestRevisions.id,
-        ),
-      )
-      .innerJoin(
-        schema.purchaseRequests,
-        eq(schema.purchaseOrders.purchaseRequestId, schema.purchaseRequests.id),
-      )
-      .where(eq(schema.purchaseReceiptUnits.id, unitId));
-
-    if (!context)
-      throw new NotFoundException('Không tìm thấy đơn vị kiểm tra.');
-
-    return context;
-  }
-
-  private async refreshReceiptItem(
-    db: Database,
-    receiptItemId: string,
-    actorId: string,
-  ) {
-    const [counts] = await db
-      .select({
-        accepted: sql<number>`count(*) filter (where ${schema.purchaseReceiptUnits.inspectionResult} = 'accepted')::int`,
-        rejected: sql<number>`count(*) filter (where ${schema.purchaseReceiptUnits.inspectionResult} = 'rejected')::int`,
-      })
-      .from(schema.purchaseReceiptUnits)
-      .where(
-        eq(schema.purchaseReceiptUnits.purchaseReceiptItemId, receiptItemId),
-      );
-    const inspected = counts.accepted + counts.rejected;
-    const [item] = await db
-      .select({
-        deliveredQuantity: schema.purchaseReceiptItems.deliveredQuantity,
-      })
-      .from(schema.purchaseReceiptItems)
-      .where(eq(schema.purchaseReceiptItems.id, receiptItemId));
-
-    await db
-      .update(schema.purchaseReceiptItems)
-      .set({
-        acceptedQuantity: counts.accepted,
-        rejectedQuantity: counts.rejected,
-        inspectionResult:
-          inspected === 0
-            ? 'pending'
-            : inspected === item.deliveredQuantity
-              ? counts.rejected === 0
-                ? 'accepted'
-                : 'rejected'
-              : 'pending',
-        updatedAt: new Date(),
-        updatedBy: actorId,
-      })
-      .where(eq(schema.purchaseReceiptItems.id, receiptItemId));
-  }
-
-  private async refreshReceipt(
-    db: Database,
-    receiptId: string,
-    actorId: string,
-  ) {
-    const [counts] = await db
-      .select({
-        total: sql<number>`count(*)::int`,
-        decided: sql<number>`count(*) filter (where ${schema.purchaseReceiptUnits.inspectionResult} <> 'pending')::int`,
-      })
-      .from(schema.purchaseReceiptUnits)
-      .innerJoin(
-        schema.purchaseReceiptItems,
-        eq(
-          schema.purchaseReceiptUnits.purchaseReceiptItemId,
-          schema.purchaseReceiptItems.id,
-        ),
-      )
-      .where(eq(schema.purchaseReceiptItems.purchaseReceiptId, receiptId));
-    const status =
-      counts.decided === counts.total
-        ? 'inspected'
-        : counts.decided > 0
-          ? 'inspecting'
-          : 'pending_inspection';
-    const now = new Date();
-
-    await db
-      .update(schema.purchaseReceipts)
-      .set({
-        status,
-        inspectedAt: status === 'inspected' ? now : null,
-        inspectedBy: status === 'inspected' ? actorId : null,
-        updatedAt: now,
-        updatedBy: actorId,
-      })
-      .where(eq(schema.purchaseReceipts.id, receiptId));
-
-    return status;
-  }
-
-  private async refreshOrder(db: Database, orderId: string, actorId: string) {
-    const items = await this.loadOrderItems(db, orderId);
-    const progress = await this.loadOrderProgress(db, items);
-    const lines = [...progress.values()];
-    const status = lines.every((line) => line.accepted >= line.ordered)
-      ? 'fully_received'
-      : lines.some((line) => line.accepted > 0)
-        ? 'partially_received'
-        : 'issued';
-
-    await db
-      .update(schema.purchaseOrders)
-      .set({ status, updatedAt: new Date(), updatedBy: actorId })
-      .where(eq(schema.purchaseOrders.id, orderId));
-
-    return status;
   }
 
   private async insertReceiptAttachments(
@@ -1034,31 +381,6 @@ export class PurchaseReceiptsService {
     );
   }
 
-  private allowedReceiptActions(actor: AuthenticatedEmployee) {
-    const actions = getAllowedWorkflowActions(
-      actor.roleName,
-      actor.isDepartmentHead,
-      actor.departmentName,
-    );
-
-    return actions.filter((action) => action.startsWith('purchase.receipt.'));
-  }
-
-  private inspectionOwner(actor: AuthenticatedEmployee): ManagementOwner {
-    const action =
-      actor.departmentName === 'IT'
-        ? WORKFLOW_ACTIONS.purchaseReceiptInspectIt
-        : WORKFLOW_ACTIONS.purchaseReceiptInspectProcurement;
-
-    this.authorization.assertAction(actor, action);
-
-    if (actor.departmentName === 'IT') return 'it';
-
-    if (actor.departmentName === 'PROCUREMENT') return 'procurement';
-
-    throw new ForbiddenException('Không thuộc bộ phận kiểm tra tài sản.');
-  }
-
   private assertProcurementAction(
     actor: AuthenticatedEmployee,
     action:
@@ -1069,25 +391,19 @@ export class PurchaseReceiptsService {
     this.authorization.assertDepartment(actor, 'PROCUREMENT');
   }
 
-  private lockOrder(db: Database, orderId: string) {
-    return db.execute(
-      sql`select id from purchase_orders where id = ${orderId} for update`,
-    );
-  }
-
   private createReceiptCode() {
     return `RCV-${new Date().getFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`;
   }
 
-  private createAssetCode(assetId: string) {
-    return `AST-${new Date().getFullYear()}-${assetId.slice(0, 8).toUpperCase()}`;
-  }
-
   private async removeFiles(files: ReceiptFiles) {
-    const paths = Object.values(files)
-      .flatMap((entries) => entries ?? [])
-      .map((file) => file.path);
-
-    await Promise.all(paths.map((path) => unlink(path).catch(() => undefined)));
+    await removeUploadedFiles(
+      Object.values(files).flatMap((entries) => entries ?? []),
+    );
   }
 }
+
+export {
+  calculateReceiptProgress,
+  validateReceiptSerialNumbers,
+  type ReceiptProgressLine,
+} from './purchase-receipt-calculations.js';
