@@ -8,6 +8,11 @@ import { assets, assetHandoverHistory, repairRequests } from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
 import { RequestAuditService } from '../request-audit/request-audit.service.js';
 import { RepairRequestsService } from './repair-requests.service.js';
+import { removeUploadedFiles } from '../attachments/upload-cleanup.js';
+
+vi.mock('../attachments/upload-cleanup.js', () => ({
+  removeUploadedFiles: vi.fn(),
+}));
 
 const reporter: AuthenticatedEmployee = {
   id: 'reporter',
@@ -105,6 +110,27 @@ describe('RepairRequestsService', () => {
     ).rejects.toThrow(ConflictException);
 
     expect(tx.execute).toHaveBeenCalledBefore(tx.select);
+    expect(tx.insert).not.toHaveBeenCalled();
+  });
+
+  it('removes uploaded evidence when repair creation is rejected', async () => {
+    where.mockResolvedValueOnce([]);
+    const evidence = {
+      path: 'unused-repair-evidence.png',
+    } as Express.Multer.File;
+
+    await expect(
+      service.createMine(
+        reporter,
+        {
+          assetId: repair.assetId,
+          issueDescription: 'Broken',
+        },
+        [evidence],
+      ),
+    ).rejects.toThrow();
+
+    expect(removeUploadedFiles).toHaveBeenCalledWith([evidence]);
     expect(tx.insert).not.toHaveBeenCalled();
   });
 
