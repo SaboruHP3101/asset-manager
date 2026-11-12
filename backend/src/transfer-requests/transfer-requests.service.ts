@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
@@ -27,7 +27,7 @@ export class TransferRequestsService {
   /** Tạo yêu cầu ở trạng thái requested và ghi nhận người khởi tạo ngay lập tức. */
   async create(dto: CreateTransferRequestDto, actor: AuthenticatedEmployee) {
     return this.db.transaction(async (tx) => {
-      const db = tx as unknown as NodePgDatabase<typeof schema>;
+      const db = tx;
       const [request] = await db
         .insert(schema.transferRequests)
         .values({
@@ -70,11 +70,14 @@ export class TransferRequestsService {
     return new TransferRequest(request);
   }
 
-  private async requireStatus(
+  private async requireLockedStatus(
     db: NodePgDatabase<typeof schema>,
     id: string,
     expected: (typeof schema.transferStatusEnum.enumValues)[number],
   ) {
+    await db.execute(
+      sql`select id from transfer_requests where id = ${id} for update`,
+    );
     const [request] = await db
       .select()
       .from(schema.transferRequests)
@@ -101,8 +104,8 @@ export class TransferRequestsService {
     actor: AuthenticatedEmployee,
   ) {
     return this.db.transaction(async (tx) => {
-      const db = tx as unknown as NodePgDatabase<typeof schema>;
-      const current = await this.requireStatus(db, id, 'requested');
+      const db = tx;
+      const current = await this.requireLockedStatus(db, id, 'requested');
 
       if (current.fromDepartmentId !== actor.departmentId) {
         throw new BadRequestException(
@@ -143,9 +146,9 @@ export class TransferRequestsService {
   /** Bộ phận tài sản xác minh thông tin trước khi mở bước ký nhận hai phía. */
   async verify(id: string, actor: AuthenticatedEmployee) {
     return this.db.transaction(async (tx) => {
-      const db = tx as unknown as NodePgDatabase<typeof schema>;
+      const db = tx;
 
-      await this.requireStatus(db, id, 'dept_approved');
+      await this.requireLockedStatus(db, id, 'dept_approved');
       const [request] = await db
         .update(schema.transferRequests)
         .set({
@@ -176,8 +179,8 @@ export class TransferRequestsService {
    */
   async confirmHandoff(id: string, actor: AuthenticatedEmployee) {
     return this.db.transaction(async (tx) => {
-      const db = tx as unknown as NodePgDatabase<typeof schema>;
-      const current = await this.requireStatus(db, id, 'handoff_pending');
+      const db = tx;
+      const current = await this.requireLockedStatus(db, id, 'handoff_pending');
       const role =
         current.initiatedBy === actor.id
           ? 'sender'
@@ -216,6 +219,9 @@ export class TransferRequestsService {
       let result = signed;
 
       if (signed.senderConfirmedAt && signed.receiverConfirmedAt) {
+        await db.execute(
+          sql`select id from assets where id = ${signed.assetId} for update`,
+        );
         await db
           .update(schema.assets)
           .set({
