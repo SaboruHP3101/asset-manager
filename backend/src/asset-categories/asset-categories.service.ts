@@ -152,9 +152,20 @@ export class AssetCategoriesService {
             .from(schema.assetCategories);
           const ids = new Set([id]);
 
-          for (const parentId of ids) {
+          const pending = [id];
+
+          while (pending.length) {
+            const parentId = pending.pop()!;
+
             for (const category of categories) {
-              if (category.parentCategoryId === parentId) ids.add(category.id);
+              if (
+                category.parentCategoryId !== parentId ||
+                ids.has(category.id)
+              )
+                continue;
+
+              ids.add(category.id);
+              pending.push(category.id);
             }
           }
 

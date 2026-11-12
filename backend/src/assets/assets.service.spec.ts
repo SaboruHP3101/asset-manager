@@ -4,8 +4,34 @@ import { AssetsService } from './assets.service.js';
 import * as schema from '../db/schema.js';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { DrizzleQueryError } from 'drizzle-orm';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { findMyParentCategories } from './asset-personal-queries.js';
 
 describe('AssetsService', () => {
+  it('ignores cyclic category branches while retaining valid roots', async () => {
+    const db = {
+      select: () => ({
+        from: async () => [
+          { id: 'a', name: 'A', parentId: 'b' },
+          { id: 'b', name: 'B', parentId: 'a' },
+          { id: 'root', name: 'Root', parentId: null },
+          { id: 'leaf', name: 'Leaf', parentId: 'root' },
+        ],
+      }),
+      selectDistinct: () => ({
+        from: () => ({
+          where: async () => [{ categoryId: 'a' }, { categoryId: 'leaf' }],
+        }),
+      }),
+    };
+
+    await expect(
+      findMyParentCategories(
+        db as unknown as NodePgDatabase<typeof schema>,
+        'employee',
+      ),
+    ).resolves.toEqual([{ id: 'root', name: 'Root' }]);
+  });
   let service: AssetsService;
   const rows = [
     {
