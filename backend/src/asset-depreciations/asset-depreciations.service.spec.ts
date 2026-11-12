@@ -64,4 +64,32 @@ describe('AssetDepreciationsService', () => {
     await vi.advanceTimersByTimeAsync(60_000);
     expect(ensure).toHaveBeenCalledTimes(2);
   });
+
+  it('creates a missing month without attempting inserts for existing periods', async () => {
+    const values = vi.fn().mockReturnValue({
+      onConflictDoNothing: () => ({ returning: async () => [] }),
+    });
+    const from = vi
+      .fn()
+      .mockResolvedValueOnce([{ firstMonth: '2026-01-01' }])
+      .mockResolvedValueOnce([
+        { month: '2026-01-01' },
+        { month: '2026-03-01' },
+      ]);
+    const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
+      select: () => ({ from }),
+      insert: () => ({ values }),
+    };
+    const db = {
+      transaction: async (run: (value: typeof tx) => Promise<void>) => run(tx),
+    };
+    const scheduled = new AssetDepreciationsService(
+      db as unknown as NodePgDatabase<typeof schema>,
+    );
+
+    await scheduled.ensureDuePeriods(new Date('2026-04-15T12:00:00Z'));
+
+    expect(values).toHaveBeenCalledExactlyOnceWith({ month: '2026-02-01' });
+  });
 });
