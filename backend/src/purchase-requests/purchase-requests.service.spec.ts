@@ -1,8 +1,10 @@
-import { BadRequestException } from '@nestjs/common';
-import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import type { PurchaseAuthorizationService } from '../auth/purchase-authorization.service.js';
+import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 import type { NotificationsService } from '../notifications/notifications.service.js';
 import type { RequestAuditService } from '../request-audit/request-audit.service.js';
+import { loadCategories } from './purchase-request-drafts.js';
+import { requireRequest } from './purchase-request-queries.js';
 import { PurchaseRequestsService } from './purchase-requests.service.js';
 
 const actor: AuthenticatedEmployee = {
@@ -29,8 +31,6 @@ function serviceFor(owner: 'it' | 'procurement') {
     [{ id: 'revision-id' }],
     [{ id: 'item-id', managementOwnerSnapshot: owner }],
     [{ requestItemId: 'item-id', isSelected: true }],
-    [{ id: 'revision-id' }],
-    [{ id: 'item-id', managementOwnerSnapshot: owner }],
     [{ id: 'it-head-id' }],
   ];
   let selectIndex = 0;
@@ -54,6 +54,7 @@ function serviceFor(owner: 'it' | 'procurement') {
   });
   const where = vi.fn().mockResolvedValue(undefined);
   const db = {
+    execute: vi.fn(),
     select,
     update: vi.fn(() => ({ set: vi.fn(() => ({ where })) })),
     transaction: vi.fn((callback: (transaction: unknown) => Promise<unknown>) =>
@@ -145,14 +146,8 @@ describe('PurchaseRequestsService category validation', () => {
 
       return { from: vi.fn(() => ({ where })) };
     });
-    const service = new PurchaseRequestsService(
-      { select } as never,
-      {} as PurchaseAuthorizationService,
-      {} as RequestAuditService,
-      {} as NotificationsService,
-    );
 
-    return service as unknown as {
+    return {
       loadCategories: (
         dto: {
           items: {
@@ -160,9 +155,14 @@ describe('PurchaseRequestsService category validation', () => {
             customCategoryDescription?: string;
           }[];
         },
-        db?: unknown,
+        db = { select },
         allowedLegacyIds?: ReadonlySet<string>,
-      ) => Promise<unknown>;
+      ) =>
+        loadCategories(
+          db as never,
+          dto as Parameters<typeof loadCategories>[1],
+          allowedLegacyIds,
+        ),
     };
   }
 
@@ -248,6 +248,7 @@ describe('PurchaseRequestsService draft deletion', () => {
     });
     const deleteWhere = vi.fn().mockResolvedValue(undefined);
     const db = {
+      execute: vi.fn(),
       select,
       delete: vi.fn(() => ({ where: deleteWhere })),
       transaction: vi.fn(
@@ -270,5 +271,29 @@ describe('PurchaseRequestsService draft deletion', () => {
     });
     expect(authorization.assertOwnRequest).toHaveBeenCalledOnce();
     expect(db.delete).toHaveBeenCalledTimes(4);
+  });
+});
+
+describe('purchase request transition locking', () => {
+  it('reads the current status only after acquiring the request lock', async () => {
+    let releaseLock!: () => void;
+    const lock = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    const current = { id: 'request-id', status: 'draft' };
+    const db = {
+      execute: vi.fn(() => lock),
+      select: vi.fn(() => ({
+        from: () => ({ where: async () => [current] }),
+      })),
+    };
+    const pending = requireRequest(db as never, current.id, ['draft']);
+    const assertion = expect(pending).rejects.toThrow(ConflictException);
+
+    expect(db.select).not.toHaveBeenCalled();
+    current.status = 'pending_department_head';
+    releaseLock();
+    await assertion;
+    expect(db.execute).toHaveBeenCalledBefore(db.select);
   });
 });
