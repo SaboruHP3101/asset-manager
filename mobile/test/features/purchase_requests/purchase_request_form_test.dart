@@ -37,30 +37,71 @@ class _FakeRepository extends PurchaseRequestsRepository {
   ];
 }
 
-PurchaseRequestDetail _draft({required List<String> allowedActions}) =>
-    PurchaseRequestDetail(
-      id: 'request-id',
-      status: 'draft',
-      revision: 1,
-      pendingAction: null,
-      allowedActions: allowedActions,
-      requestCode: 'PR-TEST',
-      neededByDate: '2026-10-20',
-      purpose: 'Trang bị làm việc',
-      items: const [
-        {
-          'assetCategoryId': 'laptop',
-          'itemName': 'MacBook Pro 14in',
-          'specifications': 'RAM 16 GB',
-          'quantity': 1,
-          'purpose': null,
-          'customCategoryDescription': null,
-        },
-      ],
-      timeline: const [],
-    );
+PurchaseRequestDetail _draft({
+  required List<String> allowedActions,
+  bool includeIncompleteItem = false,
+}) => PurchaseRequestDetail(
+  id: 'request-id',
+  status: 'draft',
+  revision: 1,
+  pendingAction: null,
+  allowedActions: allowedActions,
+  requestCode: 'PR-TEST',
+  neededByDate: '2026-10-20',
+  purpose: 'Trang bị làm việc',
+  items: [
+    const {
+      'assetCategoryId': 'laptop',
+      'itemName': 'MacBook Pro 14in',
+      'specifications': 'RAM 16 GB',
+      'quantity': 1,
+      'purpose': null,
+      'customCategoryDescription': null,
+    },
+    if (includeIncompleteItem)
+      const {
+        'assetCategoryId': 'monitor',
+        'itemName': '',
+        'specifications': '27 in',
+        'quantity': 1,
+      },
+  ],
+  timeline: const [],
+);
 
 void main() {
+  testWidgets('saving expands and validates the first incomplete item', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: PurchaseRequestFormScreen(
+          initial: _draft(allowedActions: [], includeIncompleteItem: true),
+          repository: _FakeRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Vui lòng nhập thông tin này.'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('Hạng mục 2'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    await tester.tap(find.text('Lưu nháp'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Vui lòng nhập thông tin này.'),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('Vui lòng nhập thông tin này.'), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
   testWidgets('form cho phép thêm nhiều hạng mục', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

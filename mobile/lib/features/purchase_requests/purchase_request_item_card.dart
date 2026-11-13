@@ -238,3 +238,53 @@ class _QuantityField extends StatelessWidget {
     );
   }
 }
+
+class _ItemControllers {
+  _ItemControllers({
+    this.categoryId,
+    String? name,
+    String? customTypeDescription,
+    String? specifications,
+    String? quantity,
+    String? purpose,
+  }) : name = TextEditingController(text: name),
+       customTypeDescription = TextEditingController(
+         text: customTypeDescription,
+       ),
+       specifications = TextEditingController(text: specifications),
+       quantity = TextEditingController(text: quantity ?? '1'),
+       purpose = TextEditingController(text: purpose);
+  String? rootId;
+  String? categoryId;
+  bool requiresCustomType = false;
+  final TextEditingController name;
+  final TextEditingController customTypeDescription;
+  final TextEditingController specifications;
+  final TextEditingController quantity;
+  final TextEditingController purpose;
+  bool get complete =>
+      rootId != null &&
+      categoryId != null &&
+      (!requiresCustomType || customTypeDescription.text.trim().isNotEmpty) &&
+      name.text.trim().isNotEmpty &&
+      specifications.text.trim().isNotEmpty &&
+      (int.tryParse(quantity.text) ?? 0) > 0;
+  PurchaseRequestItemDraft toDraft() => PurchaseRequestItemDraft(
+    assetCategoryId: categoryId!,
+    itemName: name.text.trim(),
+    customCategoryDescription: requiresCustomType
+        ? customTypeDescription.text.trim()
+        : null,
+    specifications: specifications.text.trim(),
+    quantity: int.parse(quantity.text),
+    purpose: purpose.text.trim(),
+  );
+
+  void dispose() {
+    name.dispose();
+    customTypeDescription.dispose();
+    specifications.dispose();
+    quantity.dispose();
+    purpose.dispose();
+  }
+}
