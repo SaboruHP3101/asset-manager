@@ -88,7 +88,13 @@ export class RepairCostsService {
   }
 
   /** Cập nhật chi phí và lưu lý do trong cùng một giao dịch. */
-  async updateCost(id: string, dto: UpdateRepairCostDto, employeeId: string) {
+  async updateCost(
+    id: string,
+    dto: UpdateRepairCostDto,
+    actor: AuthenticatedEmployee,
+  ) {
+    this.assertItDepartment(actor);
+    const employeeId = actor.id;
     const { repairRequests, changeHistory } = schema;
     const cost = BigInt(dto.cost).toString();
 

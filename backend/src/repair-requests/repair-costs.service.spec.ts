@@ -28,6 +28,13 @@ describe('RepairCostsService', () => {
     await expect(service.listCosts('2026-11', actor)).rejects.toThrow(
       ForbiddenException,
     );
+    await expect(
+      service.updateCost(
+        'repair',
+        { cost: '1', previousCost: null, reason: 'test' },
+        actor,
+      ),
+    ).rejects.toThrow(ForbiddenException);
     await expect(service.listCostHistory('asset', actor)).rejects.toThrow(
       ForbiddenException,
     );
@@ -36,6 +43,15 @@ describe('RepairCostsService', () => {
   describe('updateCost', () => {
     const requestId = 'repair';
     const actorId = 'employee';
+    const actor: AuthenticatedEmployee = {
+      id: actorId,
+      email: 'it@example.test',
+      roleId: 'role',
+      roleName: 'EMPLOYEE',
+      departmentId: 'it',
+      departmentName: 'IT',
+      isDepartmentHead: false,
+    };
     const dto = {
       previousCost: '4900000',
       cost: '4500000',
@@ -71,7 +87,7 @@ describe('RepairCostsService', () => {
     });
 
     it('lưu chi phí và lý do sau khi khóa phiếu', async () => {
-      await service.updateCost(requestId, dto, actorId);
+      await service.updateCost(requestId, dto, actor);
 
       expect(lock).toHaveBeenCalledWith('update');
       expect(lock).toHaveBeenCalledBefore(tx.update);
@@ -93,7 +109,7 @@ describe('RepairCostsService', () => {
     it('từ chối nếu số tiền trước đã thay đổi', async () => {
       lock.mockResolvedValue([{ cost: '4800000' }]);
 
-      await expect(service.updateCost(requestId, dto, actorId)).rejects.toThrow(
+      await expect(service.updateCost(requestId, dto, actor)).rejects.toThrow(
         ConflictException,
       );
       expect(tx.update).not.toHaveBeenCalled();
@@ -103,7 +119,7 @@ describe('RepairCostsService', () => {
     it('từ chối khi không có phiếu đã nghiệm thu', async () => {
       lock.mockResolvedValue([]);
 
-      await expect(service.updateCost(requestId, dto, actorId)).rejects.toThrow(
+      await expect(service.updateCost(requestId, dto, actor)).rejects.toThrow(
         NotFoundException,
       );
       expect(tx.update).not.toHaveBeenCalled();
@@ -112,7 +128,7 @@ describe('RepairCostsService', () => {
     it('không ghi thêm lịch sử khi gửi lại cùng số tiền', async () => {
       lock.mockResolvedValue([{ cost: dto.cost }]);
 
-      await service.updateCost(requestId, dto, actorId);
+      await service.updateCost(requestId, dto, actor);
 
       expect(tx.update).not.toHaveBeenCalled();
       expect(tx.insert).not.toHaveBeenCalled();

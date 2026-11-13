@@ -29,7 +29,13 @@ export class AssetsController {
   ) {}
 
   @Post()
-  create(@Body() dto: CreateAssetDto) {
+  @UseGuards(JwtAuthGuard)
+  create(
+    @Body() dto: CreateAssetDto,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    this.assertItDepartment(actor);
+
     return this.assetsService.create(dto);
   }
 
@@ -81,7 +87,13 @@ export class AssetsController {
   }
 
   @Get(':id/history')
-  findHistory(@Param('id', ParseUUIDPipe) id: string) {
+  @UseGuards(JwtAuthGuard)
+  findHistory(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    this.assertItDepartment(actor);
+
     return this.assetsService.findHistory(id);
   }
 
@@ -101,7 +113,19 @@ export class AssetsController {
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseUUIDPipe) id: string) {
+  @UseGuards(JwtAuthGuard)
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+  ) {
+    this.assertItDepartment(actor);
+
     return this.assetsService.remove(id);
+  }
+  private assertItDepartment(actor: AuthenticatedEmployee) {
+    if (actor.departmentName !== 'IT')
+      throw new ForbiddenException(
+        'Chỉ phòng IT được thực hiện thao tác tài sản này.',
+      );
   }
 }

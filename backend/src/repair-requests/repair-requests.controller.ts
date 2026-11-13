@@ -123,7 +123,7 @@ export class RepairRequestsController {
     @Body() dto: UpdateRepairCostDto,
     @CurrentEmployee() actor: AuthenticatedEmployee,
   ) {
-    return this.repairCostsService.updateCost(requestId, dto, actor.id);
+    return this.repairCostsService.updateCost(requestId, dto, actor);
   }
 
   @Get('it-assignees')

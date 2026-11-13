@@ -7,6 +7,7 @@ import { UpdateAssetDto } from './dto/update-asset.dto.js';
 import { GUARDS_METADATA } from '@nestjs/common/constants.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
+import type { CreateAssetDto } from './dto/create-asset.dto.js';
 
 describe('AssetsController', () => {
   let controller: AssetsController;
@@ -14,6 +15,8 @@ describe('AssetsController', () => {
   const findMine = vi.fn();
   const findHistory = vi.fn();
   const update = vi.fn();
+  const createAsset = vi.fn();
+  const removeAsset = vi.fn();
   const getEmployeeId = vi.fn();
   const actor: AuthenticatedEmployee = {
     id: 'employee-id',
@@ -30,7 +33,14 @@ describe('AssetsController', () => {
       providers: [
         {
           provide: AssetsService,
-          useValue: { findAll, findMine, findHistory, update },
+          useValue: {
+            findAll,
+            findMine,
+            findHistory,
+            update,
+            create: createAsset,
+            remove: removeAsset,
+          },
         },
         { provide: AuthService, useValue: { getEmployeeId } },
       ],
@@ -44,6 +54,15 @@ describe('AssetsController', () => {
   });
 
   it('guards the listing and update, leaving personal routes unchanged', () => {
+    for (const method of ['create', 'remove', 'findHistory'] as const) {
+      expect(
+        Reflect.getMetadata(
+          GUARDS_METADATA,
+          AssetsController.prototype[method],
+        ),
+      ).toContain(JwtAuthGuard);
+    }
+
     expect(
       Reflect.getMetadata(GUARDS_METADATA, AssetsController.prototype.findAll),
     ).toContain(JwtAuthGuard);
@@ -65,6 +84,48 @@ describe('AssetsController', () => {
           AssetsController.prototype[method],
         ),
       ).toBeUndefined();
+    }
+  });
+
+  it('rejects non-IT asset creation, deletion, and history reads', () => {
+    const outsider = { ...actor, departmentName: 'ACCOUNTING' };
+
+    expect(() => controller.create({} as CreateAssetDto, outsider)).toThrow(
+      ForbiddenException,
+    );
+    expect(() => controller.remove('asset-id', outsider)).toThrow(
+      ForbiddenException,
+    );
+    expect(() => controller.findHistory('asset-id', outsider)).toThrow(
+      ForbiddenException,
+    );
+    expect(findHistory).not.toHaveBeenCalled();
+    expect(createAsset).not.toHaveBeenCalled();
+    expect(removeAsset).not.toHaveBeenCalled();
+  });
+
+  it('allows IT staff and heads to create and delete assets', async () => {
+    const dto: CreateAssetDto = {
+      assetCode: 'A1',
+      qrCode: 'QR1',
+      assetCategoryId: 'category',
+      supplierId: 'supplier',
+      status: 'available',
+      initialValue: '100',
+      purchaseDate: '2026-11-01',
+      inServiceDate: '2026-11-01',
+    };
+
+    createAsset.mockResolvedValue({ id: 'asset' });
+    removeAsset.mockResolvedValue({ deleted: true });
+
+    for (const isDepartmentHead of [false, true]) {
+      await expect(
+        controller.create(dto, { ...actor, isDepartmentHead }),
+      ).resolves.toEqual({ id: 'asset' });
+      await expect(
+        controller.remove('asset', { ...actor, isDepartmentHead }),
+      ).resolves.toEqual({ deleted: true });
     }
   });
 
@@ -127,7 +188,9 @@ describe('AssetsController', () => {
     const history = { changes: [], handovers: [] };
 
     findHistory.mockResolvedValue(history);
-    await expect(controller.findHistory('asset-id')).resolves.toEqual(history);
+    await expect(controller.findHistory('asset-id', actor)).resolves.toEqual(
+      history,
+    );
     expect(findHistory).toHaveBeenCalledWith('asset-id');
   });
 

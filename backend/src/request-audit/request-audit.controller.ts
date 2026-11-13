@@ -40,6 +40,14 @@ export class RequestAuditController {
       await this.purchaseAuthorization.assertCanViewRequest(requestId, actor);
     }
 
+    if (requestType === 'repair' || requestType === 'transfer') {
+      await this.audit.assertCanViewWorkflowTrail(
+        requestType,
+        requestId,
+        actor,
+      );
+    }
+
     return this.audit.findTrail(requestType, requestId);
   }
 }

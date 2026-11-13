@@ -1,4 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema.js';
@@ -46,6 +51,67 @@ export class RequestAuditService {
     @Inject(DRIZZLE)
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
+
+  /** Checks request participation before exposing a repair or transfer timeline. */
+  async assertCanViewWorkflowTrail(
+    requestType: 'repair' | 'transfer',
+    requestId: string,
+    actor: AuthenticatedEmployee,
+  ) {
+    let participants: Array<string | null>;
+    let departments: Array<string | null>;
+
+    if (requestType === 'repair') {
+      const [request] = await this.db
+        .select()
+        .from(schema.repairRequests)
+        .where(eq(schema.repairRequests.id, requestId));
+
+      if (!request)
+        throw new NotFoundException('Không tìm thấy phiếu sửa chữa.');
+
+      participants = [
+        request.reporterId,
+        request.assignedTo,
+        request.assessedBy,
+        request.departmentHeadDecidedBy,
+        request.itHeadDecidedBy,
+        request.itHandoverDecidedBy,
+        request.approvedBy,
+        request.confirmedBy,
+      ];
+      departments = [request.departmentId];
+    } else {
+      const [request] = await this.db
+        .select()
+        .from(schema.transferRequests)
+        .where(eq(schema.transferRequests.id, requestId));
+
+      if (!request)
+        throw new NotFoundException('Không tìm thấy phiếu điều chuyển.');
+
+      participants = [
+        request.initiatedBy,
+        request.toUserId,
+        request.senderConfirmedBy,
+        request.receiverConfirmedBy,
+        request.deptHeadApprovedBy,
+        request.assetTeamVerifiedBy,
+      ];
+      departments = [request.fromDepartmentId, request.toDepartmentId];
+    }
+
+    if (
+      actor.departmentName === 'IT' ||
+      participants.includes(actor.id) ||
+      (actor.isDepartmentHead && departments.includes(actor.departmentId))
+    )
+      return;
+
+    throw new ForbiddenException(
+      'Bạn không được xem lịch sử xử lý của phiếu này.',
+    );
+  }
 
   async log(
     db: NodePgDatabase<typeof schema>,
