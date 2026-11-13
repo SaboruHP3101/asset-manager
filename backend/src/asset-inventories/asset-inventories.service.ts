@@ -1,3 +1,4 @@
+import { isConstraintViolation } from '../db/query-errors.js';
 import {
   ConflictException,
   Inject,
@@ -29,13 +30,15 @@ export class AssetInventoriesService {
 
       return new AssetInventory(newRecord);
     } catch (error: unknown) {
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu kiểm kê tài sản đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
 
-      throw new InternalServerErrorException('Không thể tạo kiểm kê tài sản');
+      throw new InternalServerErrorException('Không thể tạo kiểm kê tài sản', {
+        cause: error,
+      });
     }
   }
 
@@ -79,7 +82,7 @@ export class AssetInventoriesService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu kiểm kê tài sản đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
@@ -87,6 +90,7 @@ export class AssetInventoriesService {
 
       throw new InternalServerErrorException(
         'Không thể cập nhật kiểm kê tài sản',
+        { cause: error },
       );
     }
   }
@@ -108,13 +112,15 @@ export class AssetInventoriesService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Không thể xóa kiểm kê tài sản vì dữ liệu đang được tham chiếu',
         );
       }
 
-      throw new InternalServerErrorException('Không thể xóa kiểm kê tài sản');
+      throw new InternalServerErrorException('Không thể xóa kiểm kê tài sản', {
+        cause: error,
+      });
     }
   }
 }

@@ -1,3 +1,4 @@
+import { isConstraintViolation } from '../db/query-errors.js';
 import {
   ConflictException,
   Inject,
@@ -69,13 +70,15 @@ export class AssetsService {
 
       return new Asset(newRecord);
     } catch (error: unknown) {
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu tài sản đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
 
-      throw new InternalServerErrorException('Không thể tạo tài sản');
+      throw new InternalServerErrorException('Không thể tạo tài sản', {
+        cause: error,
+      });
     }
   }
 
@@ -226,13 +229,15 @@ export class AssetsService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu tài sản đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
 
-      throw new InternalServerErrorException('Không thể cập nhật tài sản');
+      throw new InternalServerErrorException('Không thể cập nhật tài sản', {
+        cause: error,
+      });
     }
   }
 
@@ -251,13 +256,15 @@ export class AssetsService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Không thể xóa tài sản vì dữ liệu đang được tham chiếu',
         );
       }
 
-      throw new InternalServerErrorException('Không thể xóa tài sản');
+      throw new InternalServerErrorException('Không thể xóa tài sản', {
+        cause: error,
+      });
     }
   }
 }

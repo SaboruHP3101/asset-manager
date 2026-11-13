@@ -11,7 +11,7 @@ import { EmployeesService } from '../employees/employees.service.js';
 import { AuthDto } from './dto/auth.dto.js';
 import { SetupPasswordDto } from './dto/setup-password.dto.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
-import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { getAllowedWorkflowActions } from './workflow-actions.config.js';
@@ -27,7 +27,7 @@ export class AuthService {
   constructor(
     private employeesService: EmployeesService,
     private jwtService: JwtService,
-    @Inject(DRIZZLE) private readonly db: PostgresJsDatabase<typeof schema>,
+    @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
   async login(authDto: AuthDto) {
@@ -74,35 +74,36 @@ export class AuthService {
   }
 
   async setupFirstTimePassword(token: string, dto: SetupPasswordDto) {
+    let payload: TokenPayload;
+
     try {
-      // 1. Xác thực activation token gửi từ client lên
-      const payload = await this.jwtService.verifyAsync<TokenPayload>(token);
-
-      if (payload.purpose !== 'activation') {
-        throw new BadRequestException('Invalid token for this operation.');
-      }
-
-      // 2. Băm mật khẩu mới
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(dto.password, salt);
-
-      // 3. Cập nhật vào DB
-      await this.db
-        .update(schema.employees)
-        .set({ password: hashedPassword })
-        .where(eq(schema.employees.id, payload.sub));
-
-      // 4. Trả về luôn Access Token chính thức để người dùng vào thẳng hệ thống
-      return {
-        message: 'Account activation successful.',
-        access_token: await this.jwtService.signAsync({
-          sub: payload.sub,
-          email: payload.email,
-        }),
-      };
-    } catch (error) {
+      payload = await this.jwtService.verifyAsync<TokenPayload>(token);
+    } catch {
       throw new BadRequestException('The token has expired or is incorrect.');
     }
+
+    if (payload.purpose !== 'activation') {
+      throw new BadRequestException('Invalid token for this operation.');
+    }
+
+    // 2. Băm mật khẩu mới
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(dto.password, salt);
+
+    // 3. Cập nhật vào DB
+    await this.db
+      .update(schema.employees)
+      .set({ password: hashedPassword })
+      .where(eq(schema.employees.id, payload.sub));
+
+    // 4. Trả về luôn Access Token chính thức để người dùng vào thẳng hệ thống
+    return {
+      message: 'Account activation successful.',
+      access_token: await this.jwtService.signAsync({
+        sub: payload.sub,
+        email: payload.email,
+      }),
+    };
   }
 
   async checkEmail(email: string) {
@@ -139,39 +140,35 @@ export class AuthService {
 
   // Xác thực token và lấy thông tin nhân viên cùng phòng ban, vai trò
   async getProfile(authHeader?: string) {
-    try {
-      const employeeId = await this.getEmployeeId(authHeader);
-      const [profile] = await this.db
-        .select({
-          employeeCode: schema.employees.employeeCode,
-          fullName: schema.employees.fullName,
-          email: schema.employees.email,
-          phoneNumber: schema.employees.phoneNumber,
-          department: schema.departments.name,
-          role: schema.roles.name,
-          isDepartmentHead: schema.employees.isDepartmentHead,
-        })
-        .from(schema.employees)
-        .innerJoin(
-          schema.departments,
-          eq(schema.employees.departmentId, schema.departments.id),
-        )
-        .innerJoin(schema.roles, eq(schema.employees.roleId, schema.roles.id))
-        .where(eq(schema.employees.id, employeeId));
+    const employeeId = await this.getEmployeeId(authHeader);
+    const [profile] = await this.db
+      .select({
+        employeeCode: schema.employees.employeeCode,
+        fullName: schema.employees.fullName,
+        email: schema.employees.email,
+        phoneNumber: schema.employees.phoneNumber,
+        department: schema.departments.name,
+        role: schema.roles.name,
+        isDepartmentHead: schema.employees.isDepartmentHead,
+      })
+      .from(schema.employees)
+      .innerJoin(
+        schema.departments,
+        eq(schema.employees.departmentId, schema.departments.id),
+      )
+      .innerJoin(schema.roles, eq(schema.employees.roleId, schema.roles.id))
+      .where(eq(schema.employees.id, employeeId));
 
-      if (!profile) throw new UnauthorizedException('Account not found.');
+    if (!profile) throw new UnauthorizedException('Account not found.');
 
-      return {
-        ...profile,
-        allowedActions: getAllowedWorkflowActions(
-          profile.role,
-          profile.isDepartmentHead,
-          profile.department,
-        ),
-      };
-    } catch {
-      throw new UnauthorizedException('Access token is invalid or expired.');
-    }
+    return {
+      ...profile,
+      allowedActions: getAllowedWorkflowActions(
+        profile.role,
+        profile.isDepartmentHead,
+        profile.department,
+      ),
+    };
   }
 
   // Lấy mã nhân viên từ access token để dùng cho các API cá nhân

@@ -1,3 +1,4 @@
+import { isConstraintViolation } from '../db/query-errors.js';
 import {
   Injectable,
   Inject,
@@ -8,7 +9,7 @@ import {
 import { CreateEmployeeDto } from './dto/create-employee.dto.js';
 import { UpdateEmployeeDto } from './dto/update-employee.dto.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
-import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../db/schema.js';
 import { Employee } from './entities/employee.entity.js';
 import { DrizzleQueryError, eq } from 'drizzle-orm';
@@ -28,7 +29,7 @@ const employeeFields = {
 @Injectable()
 export class EmployeesService {
   constructor(
-    @Inject(DRIZZLE) private readonly db: PostgresJsDatabase<typeof schema>,
+    @Inject(DRIZZLE) private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
   async create(createEmployeeDto: CreateEmployeeDto) {
@@ -40,7 +41,7 @@ export class EmployeesService {
 
       return newEmployee;
     } catch (error: unknown) {
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Mã nhân viên hoặc email đã tồn tại, hoặc phòng ban/vai trò không hợp lệ.',
         );
@@ -94,13 +95,15 @@ export class EmployeesService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Mã nhân viên hoặc email đã tồn tại, hoặc phòng ban/vai trò không hợp lệ.',
         );
       }
 
-      throw new InternalServerErrorException('Không thể cập nhật nhân viên.');
+      throw new InternalServerErrorException('Không thể cập nhật nhân viên.', {
+        cause: error,
+      });
     }
   }
 

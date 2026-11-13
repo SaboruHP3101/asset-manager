@@ -1,3 +1,4 @@
+import { isConstraintViolation } from '../db/query-errors.js';
 import {
   ConflictException,
   Inject,
@@ -29,13 +30,16 @@ export class ApprovalHistoryService {
 
       return new ApprovalHistory(newRecord);
     } catch (error: unknown) {
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu lịch sử phê duyệt đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
 
-      throw new InternalServerErrorException('Không thể tạo lịch sử phê duyệt');
+      throw new InternalServerErrorException(
+        'Không thể tạo lịch sử phê duyệt',
+        { cause: error },
+      );
     }
   }
 
@@ -81,7 +85,7 @@ export class ApprovalHistoryService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu lịch sử phê duyệt đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
@@ -89,6 +93,7 @@ export class ApprovalHistoryService {
 
       throw new InternalServerErrorException(
         'Không thể cập nhật lịch sử phê duyệt',
+        { cause: error },
       );
     }
   }
@@ -110,13 +115,16 @@ export class ApprovalHistoryService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Không thể xóa lịch sử phê duyệt vì dữ liệu đang được tham chiếu',
         );
       }
 
-      throw new InternalServerErrorException('Không thể xóa lịch sử phê duyệt');
+      throw new InternalServerErrorException(
+        'Không thể xóa lịch sử phê duyệt',
+        { cause: error },
+      );
     }
   }
 }

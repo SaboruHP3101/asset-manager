@@ -1,3 +1,4 @@
+import { isConstraintViolation } from '../db/query-errors.js';
 import {
   ConflictException,
   Inject,
@@ -29,7 +30,7 @@ export class SupplierAddressesService {
 
       return new SupplierAddress(newRecord);
     } catch (error: unknown) {
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu địa chỉ nhà cung cấp đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
@@ -37,6 +38,7 @@ export class SupplierAddressesService {
 
       throw new InternalServerErrorException(
         'Không thể tạo địa chỉ nhà cung cấp',
+        { cause: error },
       );
     }
   }
@@ -82,7 +84,7 @@ export class SupplierAddressesService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu địa chỉ nhà cung cấp đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
@@ -90,6 +92,7 @@ export class SupplierAddressesService {
 
       throw new InternalServerErrorException(
         'Không thể cập nhật địa chỉ nhà cung cấp',
+        { cause: error },
       );
     }
   }
@@ -111,7 +114,7 @@ export class SupplierAddressesService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Không thể xóa địa chỉ nhà cung cấp vì dữ liệu đang được tham chiếu',
         );
@@ -119,6 +122,7 @@ export class SupplierAddressesService {
 
       throw new InternalServerErrorException(
         'Không thể xóa địa chỉ nhà cung cấp',
+        { cause: error },
       );
     }
   }

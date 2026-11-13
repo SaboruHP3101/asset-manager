@@ -1,3 +1,4 @@
+import { isConstraintViolation } from '../db/query-errors.js';
 import {
   ConflictException,
   Inject,
@@ -29,7 +30,7 @@ export class AssetLiquidationItemsService {
 
       return new AssetLiquidationItem(newRecord);
     } catch (error: unknown) {
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu hạng mục thanh lý tài sản đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
@@ -37,6 +38,7 @@ export class AssetLiquidationItemsService {
 
       throw new InternalServerErrorException(
         'Không thể tạo hạng mục thanh lý tài sản',
+        { cause: error },
       );
     }
   }
@@ -86,7 +88,7 @@ export class AssetLiquidationItemsService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu hạng mục thanh lý tài sản đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
@@ -94,6 +96,7 @@ export class AssetLiquidationItemsService {
 
       throw new InternalServerErrorException(
         'Không thể cập nhật hạng mục thanh lý tài sản',
+        { cause: error },
       );
     }
   }
@@ -115,7 +118,7 @@ export class AssetLiquidationItemsService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Không thể xóa hạng mục thanh lý tài sản vì dữ liệu đang được tham chiếu',
         );
@@ -123,6 +126,7 @@ export class AssetLiquidationItemsService {
 
       throw new InternalServerErrorException(
         'Không thể xóa hạng mục thanh lý tài sản',
+        { cause: error },
       );
     }
   }

@@ -103,7 +103,11 @@ describe('EmployeesService', () => {
 
   it('reports conflicts on create and update', async () => {
     returning.mockRejectedValue(
-      new DrizzleQueryError('query', [], new Error('duplicate')),
+      new DrizzleQueryError(
+        'query',
+        [],
+        Object.assign(new Error('duplicate'), { code: '23505' }),
+      ),
     );
 
     await expect(service.create(employee)).rejects.toThrow(ConflictException);

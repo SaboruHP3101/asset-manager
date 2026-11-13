@@ -1,3 +1,4 @@
+import { isConstraintViolation } from '../db/query-errors.js';
 import {
   ConflictException,
   Inject,
@@ -29,13 +30,15 @@ export class ChangeHistoryService {
 
       return new ChangeHistory(newRecord);
     } catch (error: unknown) {
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu lịch sử thay đổi đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
 
-      throw new InternalServerErrorException('Không thể tạo lịch sử thay đổi');
+      throw new InternalServerErrorException('Không thể tạo lịch sử thay đổi', {
+        cause: error,
+      });
     }
   }
 
@@ -80,7 +83,7 @@ export class ChangeHistoryService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu lịch sử thay đổi đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
@@ -88,6 +91,7 @@ export class ChangeHistoryService {
 
       throw new InternalServerErrorException(
         'Không thể cập nhật lịch sử thay đổi',
+        { cause: error },
       );
     }
   }
@@ -109,13 +113,15 @@ export class ChangeHistoryService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Không thể xóa lịch sử thay đổi vì dữ liệu đang được tham chiếu',
         );
       }
 
-      throw new InternalServerErrorException('Không thể xóa lịch sử thay đổi');
+      throw new InternalServerErrorException('Không thể xóa lịch sử thay đổi', {
+        cause: error,
+      });
     }
   }
 }

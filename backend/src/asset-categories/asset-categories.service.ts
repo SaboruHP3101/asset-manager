@@ -1,3 +1,4 @@
+import { isConstraintViolation } from '../db/query-errors.js';
 import {
   ConflictException,
   BadRequestException,
@@ -30,13 +31,15 @@ export class AssetCategoriesService {
 
       return new AssetCategory(newAssetCategory);
     } catch (error: unknown) {
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Mã danh mục tài sản đã tồn tại. Vui lòng chọn mã khác.',
         );
       }
 
-      throw new InternalServerErrorException('Không thể tạo danh mục tài sản');
+      throw new InternalServerErrorException('Không thể tạo danh mục tài sản', {
+        cause: error,
+      });
     }
   }
 
@@ -105,7 +108,7 @@ export class AssetCategoriesService {
         throw error;
       }
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Mã danh mục tài sản đã tồn tại. Vui lòng chọn mã khác.',
         );
@@ -113,6 +116,7 @@ export class AssetCategoriesService {
 
       throw new InternalServerErrorException(
         'Không thể cập nhật danh mục tài sản',
+        { cause: error },
       );
     }
   }
@@ -199,6 +203,7 @@ export class AssetCategoriesService {
 
       throw new InternalServerErrorException(
         'Không thể xóa danh mục tài sản. Vui lòng thử lại.',
+        { cause: error },
       );
     }
 

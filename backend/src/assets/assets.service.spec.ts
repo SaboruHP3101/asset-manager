@@ -2,7 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
 import { AssetsService } from './assets.service.js';
 import * as schema from '../db/schema.js';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { DrizzleQueryError } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { findMyParentCategories } from './asset-personal-queries.js';
@@ -239,11 +243,30 @@ describe('AssetsService', () => {
     expect(update).not.toHaveBeenCalled();
 
     returning.mockRejectedValue(
-      new DrizzleQueryError('query', [], new Error('duplicate')),
+      new DrizzleQueryError(
+        'query',
+        [],
+        Object.assign(new Error('duplicate'), { code: '23505' }),
+      ),
     );
     await expect(
       service.update('second', { assetCode: 'TS-01' }, 'employee-id'),
     ).rejects.toThrow(ConflictException);
     expect(insert).not.toHaveBeenCalled();
+  });
+
+  it('keeps unexpected database failures as server errors with their cause', async () => {
+    const failure = new DrizzleQueryError(
+      'query',
+      [],
+      Object.assign(new Error('offline'), { code: '08006' }),
+    );
+
+    returning.mockRejectedValue(failure);
+
+    const result = service.update('second', { name: 'Laptop' }, 'employee-id');
+
+    await expect(result).rejects.toBeInstanceOf(InternalServerErrorException);
+    await expect(result).rejects.toHaveProperty('cause', failure);
   });
 });

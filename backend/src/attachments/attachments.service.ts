@@ -1,3 +1,4 @@
+import { isConstraintViolation } from '../db/query-errors.js';
 import {
   ConflictException,
   Inject,
@@ -29,13 +30,15 @@ export class AttachmentsService {
 
       return new Attachment(newRecord);
     } catch (error: unknown) {
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu tệp đính kèm đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
 
-      throw new InternalServerErrorException('Không thể tạo tệp đính kèm');
+      throw new InternalServerErrorException('Không thể tạo tệp đính kèm', {
+        cause: error,
+      });
     }
   }
 
@@ -77,13 +80,16 @@ export class AttachmentsService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu tệp đính kèm đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
 
-      throw new InternalServerErrorException('Không thể cập nhật tệp đính kèm');
+      throw new InternalServerErrorException(
+        'Không thể cập nhật tệp đính kèm',
+        { cause: error },
+      );
     }
   }
 
@@ -102,13 +108,15 @@ export class AttachmentsService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Không thể xóa tệp đính kèm vì dữ liệu đang được tham chiếu',
         );
       }
 
-      throw new InternalServerErrorException('Không thể xóa tệp đính kèm');
+      throw new InternalServerErrorException('Không thể xóa tệp đính kèm', {
+        cause: error,
+      });
     }
   }
 }

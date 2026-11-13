@@ -1,3 +1,4 @@
+import { isConstraintViolation } from '../db/query-errors.js';
 import {
   ConflictException,
   Inject,
@@ -29,13 +30,15 @@ export class PurchaseContractsService {
 
       return new PurchaseContract(newRecord);
     } catch (error: unknown) {
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu hợp đồng mua sắm đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
       }
 
-      throw new InternalServerErrorException('Không thể tạo hợp đồng mua sắm');
+      throw new InternalServerErrorException('Không thể tạo hợp đồng mua sắm', {
+        cause: error,
+      });
     }
   }
 
@@ -84,7 +87,7 @@ export class PurchaseContractsService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu hợp đồng mua sắm đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
@@ -92,6 +95,7 @@ export class PurchaseContractsService {
 
       throw new InternalServerErrorException(
         'Không thể cập nhật hợp đồng mua sắm',
+        { cause: error },
       );
     }
   }
@@ -113,13 +117,15 @@ export class PurchaseContractsService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Không thể xóa hợp đồng mua sắm vì dữ liệu đang được tham chiếu',
         );
       }
 
-      throw new InternalServerErrorException('Không thể xóa hợp đồng mua sắm');
+      throw new InternalServerErrorException('Không thể xóa hợp đồng mua sắm', {
+        cause: error,
+      });
     }
   }
 }

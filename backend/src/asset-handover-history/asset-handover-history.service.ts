@@ -1,3 +1,4 @@
+import { isConstraintViolation } from '../db/query-errors.js';
 import {
   ConflictException,
   Inject,
@@ -29,7 +30,7 @@ export class AssetHandoverHistoryService {
 
       return new AssetHandoverHistory(newRecord);
     } catch (error: unknown) {
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu lịch sử bàn giao tài sản đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
@@ -37,6 +38,7 @@ export class AssetHandoverHistoryService {
 
       throw new InternalServerErrorException(
         'Không thể tạo lịch sử bàn giao tài sản',
+        { cause: error },
       );
     }
   }
@@ -86,7 +88,7 @@ export class AssetHandoverHistoryService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Dữ liệu lịch sử bàn giao tài sản đã tồn tại hoặc chứa tham chiếu không hợp lệ',
         );
@@ -94,6 +96,7 @@ export class AssetHandoverHistoryService {
 
       throw new InternalServerErrorException(
         'Không thể cập nhật lịch sử bàn giao tài sản',
+        { cause: error },
       );
     }
   }
@@ -115,7 +118,7 @@ export class AssetHandoverHistoryService {
     } catch (error: unknown) {
       if (error instanceof NotFoundException) throw error;
 
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException(
           'Không thể xóa lịch sử bàn giao tài sản vì dữ liệu đang được tham chiếu',
         );
@@ -123,6 +126,7 @@ export class AssetHandoverHistoryService {
 
       throw new InternalServerErrorException(
         'Không thể xóa lịch sử bàn giao tài sản',
+        { cause: error },
       );
     }
   }

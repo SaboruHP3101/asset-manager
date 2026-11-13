@@ -1,3 +1,4 @@
+import { isConstraintViolation } from '../db/query-errors.js';
 import {
   ConflictException,
   Inject,
@@ -29,11 +30,13 @@ export class RolesService {
 
       return new Role(newRole);
     } catch (error: unknown) {
-      if (error instanceof DrizzleQueryError) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException('A role with this name already exists');
       }
 
-      throw new InternalServerErrorException('Unable to create role');
+      throw new InternalServerErrorException('Unable to create role', {
+        cause: error,
+      });
     }
   }
 

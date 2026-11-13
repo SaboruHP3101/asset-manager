@@ -1,3 +1,4 @@
+import { isConstraintViolation } from '../db/query-errors.js';
 import {
   Injectable,
   Inject,
@@ -28,8 +29,8 @@ export class DepartmentsService {
         .returning();
 
       return new Department(newDepartment);
-    } catch (error: any) {
-      if (error instanceof DrizzleQueryError) {
+    } catch (error: unknown) {
+      if (isConstraintViolation(error)) {
         throw new ConflictException();
       }
 
