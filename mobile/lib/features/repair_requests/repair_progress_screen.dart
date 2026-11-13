@@ -2,9 +2,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
-import '../../core/theme/textarea_decoration.dart';
 import '../../core/widgets/required_reason_dialog.dart';
 import '../../core/widgets/vertical_timeline.dart';
+import 'repair_completion_dialog.dart';
 import 'repair_request_form.dart';
 import 'repair_status_labels.dart';
 
@@ -21,7 +21,8 @@ class RepairProgressScreen extends StatefulWidget {
 
 class _RepairProgressScreenState extends State<RepairProgressScreen> {
   final _dio = ApiClient.instance.dio;
-  Map<String, dynamic>? _data;
+  ({Map<String, dynamic>? request, List<Map<String, dynamic>> events})?
+  _progress;
   String? _error;
   bool _acting = false;
 
@@ -40,11 +41,14 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
           : '/repair-requests/mine/asset/${widget.assetId}';
       final response = await _dio.get<Map<String, dynamic>>(endpoint);
       if (!mounted) return;
-      final value = response.data;
+      final data = response.data;
+      final request = widget.requestId != null
+          ? data
+          : data?['request'] as Map<String, dynamic>?;
+      final events = (data?['timeline'] as List<dynamic>? ?? const [])
+          .cast<Map<String, dynamic>>();
       setState(() {
-        _data = widget.requestId == null || value == null
-            ? value
-            : {'request': value, 'timeline': value['timeline'] ?? const []};
+        _progress = data == null ? null : (request: request, events: events);
       });
     } on DioException {
       if (mounted) {
@@ -91,10 +95,10 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
         '${two(date.hour)}:${two(date.minute)}';
   }
 
-  List<TimelineStep> _steps(Map<String, dynamic> data) {
-    final request = data['request'] as Map<String, dynamic>;
-    final events = (data['timeline'] as List<dynamic>? ?? [])
-        .cast<Map<String, dynamic>>();
+  List<TimelineStep> _steps(
+    Map<String, dynamic> request,
+    List<Map<String, dynamic>> events,
+  ) {
     final terminal =
         request['status'] == 'closed' || request['status'] == 'cancelled';
 
@@ -131,85 +135,6 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
     } finally {
       if (mounted) setState(() => _acting = false);
     }
-  }
-
-  Future<Map<String, String>?> _completionDialog() {
-    final events = (_data?['timeline'] as List<dynamic>? ?? const [])
-        .cast<Map<String, dynamic>>();
-    var cost = '';
-    for (final event in events.reversed) {
-      if (event['actionType'] != 'completed') continue;
-      final metadata = event['metadata'] as Map<String, dynamic>?;
-      cost = metadata?['actualCost']?.toString() ?? '';
-      break;
-    }
-
-    final formKey = GlobalKey<FormState>();
-    var notes = '';
-    final validCost = RegExp(r'^\d{1,15}$');
-
-    return showDialog<Map<String, String>>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hoàn tất sửa chữa'),
-        scrollable: true,
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                minLines: 3,
-                maxLines: 6,
-                maxLength: 2000,
-                onChanged: (value) => notes = value.trim(),
-                validator: (_) => notes.isEmpty
-                    ? 'Nhập kết quả sửa chữa.'
-                    : null,
-                decoration: textareaDecoration(
-                  context,
-                  const InputDecoration(
-                    labelText: 'Kết quả sửa chữa',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                initialValue: cost,
-                keyboardType: TextInputType.number,
-                onChanged: (value) => cost = value.trim(),
-                validator: (_) => validCost.hasMatch(cost)
-                    ? null
-                    : 'Nhập số nguyên từ 0, tối đa 15 chữ số.',
-                decoration: const InputDecoration(
-                  labelText: 'Tổng chi phí sửa chữa (VND)',
-                  helperText: 'Nhập 0 nếu không phát sinh chi phí.',
-                  helperMaxLines: 2,
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(context, {
-                  'resultNotes': notes,
-                  'actualCost': cost,
-                });
-              }
-            },
-            child: const Text('Xác nhận'),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _decision(String endpoint, bool approved) async {
@@ -388,7 +313,17 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
             width: double.infinity,
             child: FilledButton(
               onPressed: () async {
-                final result = await _completionDialog();
+                var previousCost = '';
+                for (final event in _progress!.events.reversed) {
+                  if (event['actionType'] != 'completed') continue;
+                  final metadata = event['metadata'] as Map<String, dynamic>?;
+                  previousCost = metadata?['actualCost']?.toString() ?? '';
+                  break;
+                }
+                final result = await showRepairCompletionDialog(
+                  context,
+                  previousCost: previousCost,
+                );
                 if (mounted && result != null) {
                   await _run(
                     () => _dio.post<void>(
@@ -437,12 +372,12 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final data = _data;
-    final request = data?['request'] as Map<String, dynamic>?;
+    final progress = _progress;
+    final request = progress?.request;
     final actionArea = request == null ? null : _actions(request);
     return Scaffold(
       appBar: AppBar(title: const Text('Tiến trình sửa chữa')),
-      body: data == null
+      body: progress == null
           ? Center(
               child: _error == null
                   ? const CircularProgressIndicator()
@@ -460,12 +395,12 @@ class _RepairProgressScreenState extends State<RepairProgressScreen> {
                   Card(
                     child: ListTile(
                       leading: const Icon(Icons.build_circle_outlined),
-                      title: Text(_statusText(data['request']['status'])),
-                      subtitle: Text(data['request']['issueDescription'] ?? ''),
+                      title: Text(_statusText(request!['status'])),
+                      subtitle: Text(request['issueDescription'] ?? ''),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  VerticalTimeline(steps: _steps(data)),
+                  VerticalTimeline(steps: _steps(request, progress.events)),
                   if (actionArea != null) ...[
                     const SizedBox(height: 24),
                     actionArea,

@@ -1,13 +1,11 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme/textarea_decoration.dart';
 import '../../core/widgets/code_scanner_screen.dart';
+import 'repair_media_preview_screen.dart';
 
 class RepairRequestForm extends StatefulWidget {
   const RepairRequestForm({
@@ -188,36 +186,14 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
     setState(() => _submitting = true);
 
     try {
-      String requestId;
-
-      if (widget.requestId == null) {
-        final files = <MultipartFile>[];
-        for (final file in _media) {
-          files.add(
-            await MultipartFile.fromFile(file.path, filename: file.name),
-          );
-        }
-        final form = FormData.fromMap({
-          'assetId': _assetId,
-          'issueDescription': _descriptionController.text.trim(),
-          'files': files,
-        });
-        final response = await _dio.post<Map<String, dynamic>>(
-          '/repair-requests/mine',
-          data: form,
-        );
-        requestId = response.data!['id'] as String;
-      } else {
-        requestId = widget.requestId!;
-        await _dio.patch<void>(
-          '/repair-requests/$requestId',
-          data: {'issueDescription': _descriptionController.text.trim()},
-        );
-      }
+      final requestId = widget.requestId;
+      final savedId = requestId == null
+          ? await _createDraft()
+          : await _updateDraft(requestId);
 
       if (submit) {
         final action = widget.revisionRequired ? 'resubmit' : 'submit';
-        await _dio.post<void>('/repair-requests/$requestId/$action');
+        await _dio.post<void>('/repair-requests/$savedId/$action');
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -243,6 +219,30 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  Future<String> _createDraft() async {
+    final files = <MultipartFile>[];
+    for (final file in _media) {
+      files.add(await MultipartFile.fromFile(file.path, filename: file.name));
+    }
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/repair-requests/mine',
+      data: FormData.fromMap({
+        'assetId': _assetId,
+        'issueDescription': _descriptionController.text.trim(),
+        'files': files,
+      }),
+    );
+    return response.data!['id'] as String;
+  }
+
+  Future<String> _updateDraft(String requestId) async {
+    await _dio.patch<void>(
+      '/repair-requests/$requestId',
+      data: {'issueDescription': _descriptionController.text.trim()},
+    );
+    return requestId;
   }
 
   Future<bool> _review() async {
@@ -317,7 +317,7 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) =>
-            _MediaPreviewScreen(file: file, isVideo: _isVideo(file)),
+            RepairMediaPreviewScreen(file: file, isVideo: _isVideo(file)),
       ),
     );
   }
@@ -487,96 +487,6 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
                 ),
               ),
             ),
-    );
-  }
-}
-
-class _MediaPreviewScreen extends StatefulWidget {
-  const _MediaPreviewScreen({required this.file, required this.isVideo});
-
-  final XFile file;
-  final bool isVideo;
-
-  @override
-  State<_MediaPreviewScreen> createState() => _MediaPreviewScreenState();
-}
-
-class _MediaPreviewScreenState extends State<_MediaPreviewScreen> {
-  VideoPlayerController? _videoController;
-
-  @override
-  void initState() {
-    super.initState();
-    // Chuẩn bị bộ phát khi tệp được chọn là video
-    if (widget.isVideo) _loadVideo();
-  }
-
-  // Mở video cục bộ và cập nhật giao diện khi sẵn sàng
-  Future<void> _loadVideo() async {
-    final controller = VideoPlayerController.file(File(widget.file.path));
-    await controller.initialize();
-    if (!mounted) {
-      controller.dispose();
-      return;
-    }
-    await controller.play();
-    setState(() => _videoController = controller);
-  }
-
-  @override
-  void dispose() {
-    _videoController?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = _videoController;
-
-    // Xem ảnh hoặc video toàn màn hình với nút phát cơ bản
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        foregroundColor: Colors.white,
-        backgroundColor: Colors.black,
-        title: Text(widget.file.name, maxLines: 1),
-      ),
-      body: Center(
-        child: widget.isVideo
-            ? controller == null
-                  ? const CircularProgressIndicator()
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        AspectRatio(
-                          aspectRatio: controller.value.aspectRatio,
-                          child: VideoPlayer(controller),
-                        ),
-                        VideoProgressIndicator(
-                          controller,
-                          allowScrubbing: true,
-                          padding: const EdgeInsets.all(16),
-                        ),
-                        IconButton.filled(
-                          onPressed: () {
-                            setState(() {
-                              controller.value.isPlaying
-                                  ? controller.pause()
-                                  : controller.play();
-                            });
-                          },
-                          icon: Icon(
-                            controller.value.isPlaying
-                                ? Icons.pause
-                                : Icons.play_arrow,
-                          ),
-                        ),
-                      ],
-                    )
-            : InteractiveViewer(
-                child: Image.file(File(widget.file.path), fit: BoxFit.contain),
-              ),
-      ),
     );
   }
 }
