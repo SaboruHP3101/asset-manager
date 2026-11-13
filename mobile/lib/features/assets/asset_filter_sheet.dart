@@ -4,6 +4,7 @@ import 'asset_status_chip.dart';
 
 class AssetFilterSheet extends StatefulWidget {
   const AssetFilterSheet({
+    super.key,
     required this.categories,
     required this.assets,
     required this.initialCategoryId,

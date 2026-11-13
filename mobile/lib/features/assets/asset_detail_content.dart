@@ -139,6 +139,7 @@ class AssetQrCodeView extends StatelessWidget {
 
 class AssetHero extends StatelessWidget {
   const AssetHero({
+    super.key,
     required this.asset,
     required this.assetId,
     required this.imageUrl,
@@ -286,7 +287,7 @@ class _InfoRow extends StatelessWidget {
 }
 
 class AssetDetailSkeleton extends StatelessWidget {
-  const AssetDetailSkeleton();
+  const AssetDetailSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -315,7 +316,7 @@ class AssetDetailSkeleton extends StatelessWidget {
 }
 
 class AssetInfoSkeleton extends StatelessWidget {
-  const AssetInfoSkeleton();
+  const AssetInfoSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -338,7 +339,7 @@ class AssetInfoSkeleton extends StatelessWidget {
 }
 
 class AssetInfoError extends StatelessWidget {
-  const AssetInfoError({required this.onRetry});
+  const AssetInfoError({required this.onRetry, super.key});
 
   final VoidCallback onRetry;
 
@@ -361,7 +362,7 @@ class AssetInfoError extends StatelessWidget {
 }
 
 class AssetDetailError extends StatelessWidget {
-  const AssetDetailError({required this.onRetry});
+  const AssetDetailError({required this.onRetry, super.key});
 
   final VoidCallback onRetry;
 

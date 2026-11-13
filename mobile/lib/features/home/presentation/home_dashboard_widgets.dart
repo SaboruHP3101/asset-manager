@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
 class HomeWelcomeHeader extends StatelessWidget {
-  const HomeWelcomeHeader({required this.fullName, required this.subtitle});
+  const HomeWelcomeHeader({
+    required this.fullName,
+    required this.subtitle,
+    super.key,
+  });
 
   final String fullName;
   final String subtitle;
@@ -44,7 +48,7 @@ class HomeWelcomeHeader extends StatelessWidget {
 }
 
 class HomeSectionTitle extends StatelessWidget {
-  const HomeSectionTitle({required this.title});
+  const HomeSectionTitle({required this.title, super.key});
 
   final String title;
 
@@ -73,7 +77,7 @@ class HomeTask {
 }
 
 class HomeTaskCard extends StatelessWidget {
-  const HomeTaskCard({required this.task});
+  const HomeTaskCard({required this.task, super.key});
 
   final HomeTask task;
 
@@ -101,7 +105,7 @@ class HomeTaskCard extends StatelessWidget {
 }
 
 class HomeEmptyTasks extends StatelessWidget {
-  const HomeEmptyTasks();
+  const HomeEmptyTasks({super.key});
 
   @override
   Widget build(BuildContext context) => Card(
@@ -133,7 +137,7 @@ class HomeQuickAction {
 }
 
 class HomeQuickActionGrid extends StatelessWidget {
-  const HomeQuickActionGrid({required this.actions});
+  const HomeQuickActionGrid({required this.actions, super.key});
 
   final List<HomeQuickAction> actions;
 
@@ -187,7 +191,11 @@ class HomeQuickActionGrid extends StatelessWidget {
 }
 
 class HomeErrorCard extends StatelessWidget {
-  const HomeErrorCard({required this.message, required this.onRetry});
+  const HomeErrorCard({
+    required this.message,
+    required this.onRetry,
+    super.key,
+  });
 
   final String message;
   final VoidCallback onRetry;
@@ -210,7 +218,7 @@ class HomeErrorCard extends StatelessWidget {
 }
 
 class HomeSummarySkeleton extends StatelessWidget {
-  const HomeSummarySkeleton();
+  const HomeSummarySkeleton({super.key});
 
   @override
   Widget build(BuildContext context) => Row(
@@ -224,7 +232,7 @@ class HomeSummarySkeleton extends StatelessWidget {
 }
 
 class HomeTaskSkeleton extends StatelessWidget {
-  const HomeTaskSkeleton();
+  const HomeTaskSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) => const Column(
