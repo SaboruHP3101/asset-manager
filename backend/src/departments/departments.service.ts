@@ -1,18 +1,18 @@
-import { isConstraintViolation } from '../db/query-errors.js';
 import {
-  Injectable,
-  Inject,
-  NotFoundException,
   ConflictException,
+  Inject,
+  Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { DrizzleQueryError, eq } from 'drizzle-orm';
+import { isConstraintViolation } from '../db/query-errors.js';
 import * as schema from '../db/schema.js';
+import { DRIZZLE } from '../drizzle/drizzle.module.js';
 import { CreateDepartmentDto } from './dto/create-department.dto.js';
 import { UpdateDepartmentDto } from './dto/update-department.dto.js';
 import { Department } from './entities/department.entity.js';
-import { DRIZZLE } from '../drizzle/drizzle.module.js';
 
 @Injectable()
 export class DepartmentsService {

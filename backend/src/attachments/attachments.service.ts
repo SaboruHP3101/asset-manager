@@ -1,4 +1,3 @@
-import { isConstraintViolation } from '../db/query-errors.js';
 import {
   ConflictException,
   Inject,
@@ -6,8 +5,9 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { DrizzleQueryError, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { isConstraintViolation } from '../db/query-errors.js';
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
 import { CreateAttachmentDto } from './dto/create-attachment.dto.js';

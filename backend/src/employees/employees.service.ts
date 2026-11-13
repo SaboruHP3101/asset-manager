@@ -1,18 +1,18 @@
-import { isConstraintViolation } from '../db/query-errors.js';
 import {
-  Injectable,
-  Inject,
-  NotFoundException,
   ConflictException,
+  Inject,
+  Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { isConstraintViolation } from '../db/query-errors.js';
+import * as schema from '../db/schema.js';
+import { DRIZZLE } from '../drizzle/drizzle.module.js';
 import { CreateEmployeeDto } from './dto/create-employee.dto.js';
 import { UpdateEmployeeDto } from './dto/update-employee.dto.js';
-import { DRIZZLE } from '../drizzle/drizzle.module.js';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import * as schema from '../db/schema.js';
 import { Employee } from './entities/employee.entity.js';
-import { DrizzleQueryError, eq } from 'drizzle-orm';
 
 const employeeFields = {
   id: schema.employees.id,
