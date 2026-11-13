@@ -85,6 +85,81 @@ class _DisposalRepository extends AssetRecallsRepository {
 }
 
 void main() {
+  testWidgets('department approval takes precedence over IT approval', (
+    tester,
+  ) async {
+    final request = await _FakeRepository().findOne('recall-id');
+    request['allowedActions'] = [
+      'asset.recall.approve_it',
+      'asset.recall.approve_department',
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AssetRecallDetailScreen(
+          requestId: 'recall-id',
+          repository: _StaticRepository(request),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Duyệt & gửi IT'), findsOneWidget);
+    expect(find.text('Chọn tài sản & duyệt'), findsNothing);
+  });
+
+  testWidgets('exchange approval requires a selected replacement', (
+    tester,
+  ) async {
+    final request = await _FakeRepository().findOne('recall-id');
+    request['allowedActions'] = ['asset.recall.approve_it'];
+    final repository = _StaticRepository(request);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AssetRecallDetailScreen(
+          requestId: 'recall-id',
+          repository: repository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Chọn tài sản & duyệt'));
+    await tester.pumpAndSettle();
+    final confirm = find.widgetWithText(FilledButton, 'Chọn & duyệt');
+    expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+    expect(repository.approvedReplacement, isNull);
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('TS003 · Laptop kho').last);
+    await tester.pumpAndSettle();
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+
+    expect(repository.approvedReplacement, 'warehouse-asset');
+  });
+
+  testWidgets('upgrade return confirms the loaded request', (tester) async {
+    final request = await _FakeRepository().findOne('upgrade-id');
+    request['type'] = 'upgrade';
+    request['status'] = 'ready_for_return';
+    request['allowedActions'] = ['asset.recall.confirm_upgrade_return'];
+    final repository = _StaticRepository(request);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AssetRecallDetailScreen(
+          requestId: 'upgrade-id',
+          repository: repository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Xác nhận nhận tài sản'));
+    await tester.pumpAndSettle();
+
+    expect(repository.confirmedReturn, 'upgrade-id');
+    expect(find.text('Xác nhận nhận tài sản'), findsNothing);
+  });
+
   testWidgets('hiển thị trạng thái, approval và so sánh tài sản', (
     tester,
   ) async {
@@ -172,7 +247,37 @@ class _StaticRepository extends AssetRecallsRepository {
   _StaticRepository(this.request) : super(dio: Dio());
 
   final Map<String, dynamic> request;
+  String? approvedReplacement;
+  String? confirmedReturn;
 
   @override
   Future<Map<String, dynamic>> findOne(String id) async => request;
+
+  @override
+  Future<List<Map<String, dynamic>>> findExchangeCandidates() async => [
+    {'id': 'warehouse-asset', 'assetCode': 'TS003', 'name': 'Laptop kho'},
+  ];
+
+  @override
+  Future<void> decideIt(
+    String id, {
+    required bool approved,
+    String? reason,
+    String? replacementAssetId,
+  }) async {
+    if (approved) approvedReplacement = replacementAssetId;
+  }
+
+  @override
+  Future<void> decideUpgradeReturn(
+    String id, {
+    required bool confirmed,
+    String? reason,
+  }) async {
+    if (confirmed) {
+      confirmedReturn = id;
+      request['status'] = 'completed';
+      request['allowedActions'] = <String>[];
+    }
+  }
 }
