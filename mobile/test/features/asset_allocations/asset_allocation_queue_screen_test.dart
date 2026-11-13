@@ -10,12 +10,71 @@ class _QueueRepository extends AssetAllocationsRepository {
   _QueueRepository(this.tasks) : super(dio: Dio());
 
   final List<AssetAllocationTask> tasks;
+  int queueLoads = 0;
+  int decisions = 0;
+  bool failDecision = true;
 
   @override
-  Future<List<AssetAllocationTask>> findQueue() async => tasks;
+  Future<List<AssetAllocationTask>> findQueue() async {
+    queueLoads++;
+    return tasks;
+  }
+
+  @override
+  Future<void> decideBatch({
+    required List<AssetAllocationTask> tasks,
+    required bool confirmed,
+    String? reason,
+  }) async {
+    decisions++;
+    if (failDecision) throw StateError('test failure');
+    expect(tasks.single.assetId, 'asset-1');
+    expect(confirmed, isTrue);
+  }
 }
 
 void main() {
+  testWidgets(
+    'confirmation keeps selection on failure and reloads once on success',
+    (tester) async {
+      final repository = _QueueRepository(const [
+        AssetAllocationTask(
+          queueType: 'confirmation',
+          requestId: 'request-1',
+          requestCode: 'PR-1',
+          assetId: 'asset-1',
+          assetCode: 'TS-001',
+          assetName: 'Bàn họp',
+          allocationId: 'allocation-1',
+          decisionParty: 'recipient',
+          totalAssets: 1,
+          pendingAssets: 1,
+        ),
+      ]);
+      await tester.pumpWidget(
+        MaterialApp(home: AssetAllocationQueueScreen(repository: repository)),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('PR-1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bàn họp'));
+      await tester.pumpAndSettle();
+
+      final confirm = find.text('Xác nhận (1)');
+      await tester.tap(confirm);
+      await tester.pumpAndSettle();
+      expect(confirm, findsOneWidget);
+      expect(repository.queueLoads, 1);
+
+      repository.failDecision = false;
+      await tester.tap(confirm);
+      await tester.pumpAndSettle();
+      expect(repository.decisions, 2);
+      expect(repository.queueLoads, 2);
+      expect(find.text('PR-1'), findsOneWidget);
+    },
+  );
+
   testWidgets('shows one purchase request card for multiple allocation tasks', (
     tester,
   ) async {
