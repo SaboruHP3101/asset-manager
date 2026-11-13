@@ -10,6 +10,9 @@ import '../purchase_receipts/purchase_receipt_form.dart';
 import '../purchase_receipts/purchase_receipt_models.dart';
 import '../purchase_receipts/purchase_receipts_repository.dart';
 
+part 'purchase_order_detail_dialogs.dart';
+part 'purchase_order_detail_content.dart';
+
 class PurchaseOrderDetailScreen extends StatefulWidget {
   const PurchaseOrderDetailScreen({
     required this.orderId,
@@ -247,14 +250,14 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
   }
 
   Future<void> _closeShort() async {
-    final reason = await _showReasonDialog('Xác nhận đóng thiếu');
+    final reason = await _showReasonDialog(context, 'Xác nhận đóng thiếu');
     if (reason == null) return;
     await _run(() => _receiptsRepository.closeShort(widget.orderId, reason));
   }
 
   /// Hỏi duyệt/từ chối, bắt buộc lý do khi từ chối rồi gọi API
   Future<void> _decide() async {
-    final decision = await _showDecisionSheet();
+    final decision = await _showDecisionSheet(context);
     if (decision == null) return;
     await _run(
       () => _repository.decide(
@@ -267,7 +270,7 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
 
   /// Yêu cầu lý do bắt buộc trước khi gọi API hủy đơn mua
   Future<void> _cancel() async {
-    final reason = await _showReasonDialog('Hủy đơn đặt mua');
+    final reason = await _showReasonDialog(context, 'Hủy đơn đặt mua');
     if (reason == null) return;
     await _run(() => _repository.cancel(_detail!.id, reason));
   }
@@ -306,129 +309,6 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
         _acting = false;
       });
     }
-  }
-
-  Future<_OrderDecision?> _showDecisionSheet() async {
-    var returning = false;
-    var reason = '';
-
-    return showModalBottomSheet<_OrderDecision>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              20,
-              0,
-              20,
-              20 + MediaQuery.viewInsetsOf(context).bottom,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  returning ? 'Trả về chỉnh sửa' : 'Xử lý đơn đặt mua',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  returning
-                      ? 'Nhập lý do để người lập đơn biết nội dung cần chỉnh sửa.'
-                      : 'Duyệt để phát hành hoặc trả về để chỉnh sửa.',
-                ),
-                const SizedBox(height: 20),
-                if (returning) ...[
-                  TextField(
-                    autofocus: true,
-                    maxLines: 3,
-                    onChanged: (value) {
-                      reason = value;
-                      setSheetState(() {});
-                    },
-                    decoration: textareaDecoration(
-                      context,
-                      const InputDecoration(labelText: 'Lý do bắt buộc'),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: reason.trim().isEmpty
-                        ? null
-                        : () => Navigator.pop(
-                            context,
-                            _OrderDecision(
-                              approved: false,
-                              reason: reason.trim(),
-                            ),
-                          ),
-                    child: const Text('Xác nhận trả về'),
-                  ),
-                  TextButton(
-                    onPressed: () => setSheetState(() => returning = false),
-                    child: const Text('Quay lại'),
-                  ),
-                ] else ...[
-                  FilledButton.icon(
-                    onPressed: () => Navigator.pop(
-                      context,
-                      const _OrderDecision(approved: true),
-                    ),
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Duyệt và phát hành'),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: () => setSheetState(() => returning = true),
-                    icon: const Icon(Icons.undo_outlined),
-                    label: const Text('Trả về chỉnh sửa'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Đóng'),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<String?> _showReasonDialog(String title) async {
-    var reason = '';
-
-    return showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          autofocus: true,
-          maxLines: 3,
-          onChanged: (value) => reason = value,
-          decoration: textareaDecoration(
-            context,
-            const InputDecoration(labelText: 'Lý do bắt buộc'),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Đóng'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final value = reason.trim();
-              if (value.isNotEmpty) Navigator.pop(context, value);
-            },
-            child: const Text('Xác nhận'),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -543,137 +423,4 @@ class _OrderActionBar extends StatelessWidget {
   }
 }
 
-class _SubmitReviewSheet extends StatelessWidget {
-  const _SubmitReviewSheet({required this.detail});
-
-  final PurchaseOrderDetail detail;
-
-  @override
-  Widget build(BuildContext context) => SafeArea(
-    child: SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Kiểm tra trước khi trình duyệt',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 6),
-          const Text('Sau khi trình, đơn sẽ bị khóa cho đến khi được trả về.'),
-          const SizedBox(height: 16),
-          Text('Đơn mua: ${detail.purchaseOrderCode}'),
-          Text('Đề nghị: ${detail.requestCode}'),
-          Text('Nhà cung cấp: ${detail.supplierName}'),
-          Text('Ngày đặt: ${detail.orderDate}'),
-          Text('Giao dự kiến: ${detail.expectedDeliveryDate}'),
-          const Divider(height: 28),
-          Text('Hạng mục', style: Theme.of(context).textTheme.titleMedium),
-          for (final item in detail.items)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(item['itemNameSnapshot'] as String),
-              trailing: Text('×${item['quantity']}'),
-            ),
-          const Divider(height: 20),
-          Text(
-            'Tổng cộng: ${_money(detail.totals['totalInclVat'])} VND',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () => Navigator.pop(context, true),
-              icon: const Icon(Icons.send_outlined),
-              label: const Text('Xác nhận trình duyệt'),
-            ),
-          ),
-          SizedBox(
-            width: double.infinity,
-            child: TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Quay lại kiểm tra'),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-enum _OrderOverflowAction { cancel, closeShort }
-
-class _OrderHeader extends StatelessWidget {
-  const _OrderHeader({required this.detail});
-  final PurchaseOrderDetail detail;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            purchaseOrderStatusLabel(detail.status),
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          Text('Đề nghị: ${detail.requestCode}'),
-          Text('Nhà cung cấp: ${detail.supplierName}'),
-          Text('Ngày đặt: ${detail.orderDate}'),
-          Text('Giao dự kiến: ${detail.expectedDeliveryDate}'),
-        ],
-      ),
-    ),
-  );
-}
-
-class _OrderItem extends StatelessWidget {
-  const _OrderItem({required this.item});
-  final Map<String, dynamic> item;
-
-  /// Hiển thị danh sách đơn mua
-  @override
-  Widget build(BuildContext context) => Card(
-    child: ListTile(
-      title: Text(item['itemNameSnapshot'] as String),
-      subtitle: Text(
-        'SL: ${item['quantity']} • Đơn giá: ${_money(item['unitPriceExclVat'])} VND\n'
-        'VAT: ${item['vatRate']}% • Thành tiền: ${_money(item['totalInclVat'])} VND',
-      ),
-    ),
-  );
-}
-
-class _Totals extends StatelessWidget {
-  const _Totals({required this.totals});
-  final Map<String, dynamic> totals;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Trước VAT: ${_money(totals['subtotalExclVat'])} VND'),
-          Text('Tiền VAT: ${_money(totals['vatAmount'])} VND'),
-          Text(
-            'Tổng cộng: ${_money(totals['totalInclVat'])} VND',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _OrderDecision {
-  const _OrderDecision({required this.approved, this.reason});
-  final bool approved;
-  final String? reason;
-}
-
-/// Format chuỗi số VND
 String _money(Object? value) => groupDisplayDigits(value.toString());

@@ -26,12 +26,17 @@ class _ActionRepository extends PurchaseOrdersRepository {
   final PurchaseOrderDetail initial;
   final Completer<PurchaseOrderDetail> refresh;
   int findOneCalls = 0;
+  int decisionCalls = 0;
+  PurchaseOrderDetail? retryDetail;
   bool? decisionApproved;
   String? decisionReason;
 
   @override
   Future<PurchaseOrderDetail> findOne(String id) {
     findOneCalls += 1;
+    if (findOneCalls > 2 && retryDetail != null) {
+      return Future.value(retryDetail!);
+    }
     return findOneCalls == 1 ? Future.value(initial) : refresh.future;
   }
 
@@ -41,6 +46,7 @@ class _ActionRepository extends PurchaseOrdersRepository {
     required bool approved,
     String? reason,
   }) async {
+    decisionCalls += 1;
     decisionApproved = approved;
     decisionReason = reason;
   }
@@ -131,6 +137,41 @@ PurchaseOrderDetail _detail(
 );
 
 void main() {
+  testWidgets('retry after successful approval only reloads detail', (
+    tester,
+  ) async {
+    final refresh = Completer<PurchaseOrderDetail>();
+    final repository = _ActionRepository(
+      initial: _detail([
+        'purchase.order.approve',
+      ], status: 'pending_procurement_head'),
+      refresh: refresh,
+    )..retryDetail = _detail([], status: 'issued');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PurchaseOrderDetailScreen(
+          orderId: 'order-id',
+          repository: repository,
+          receiptsRepository: _ReceiptsRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Xử lý đơn mua'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Duyệt và phát hành'));
+    await tester.pump();
+    refresh.completeError(StateError('refresh failed'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Thao tác đã hoàn tất'), findsOneWidget);
+
+    await tester.tap(find.text('Thử lại'));
+    await tester.pumpAndSettle();
+    expect(repository.findOneCalls, 3);
+    expect(repository.decisionCalls, 1);
+    expect(find.text('Xử lý đơn mua'), findsNothing);
+  });
+
   testWidgets('chi tiết PO chỉ hiện action API cho phép', (tester) async {
     final detail = _detail(const [
       'purchase.order.create',
