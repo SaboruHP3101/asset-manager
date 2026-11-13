@@ -1,7 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/requests/my_requests_screen.dart';
+import 'package:mobile/features/requests/my_requests_repository.dart';
 
 final _items = [
   MyRequestItem(
@@ -50,6 +52,53 @@ Widget _screen() => MaterialApp(
 );
 
 void main() {
+  test(
+    'maps the six endpoints to the correct request types and tabs',
+    () async {
+      final dio = Dio();
+      addTearDown(dio.close);
+      final fixtures = <String, Map<String, Object?>>{
+        '/repair-requests/mine': {'id': 'my-repair', 'assetName': 'Laptop'},
+        '/repair-requests/queue': {'id': 'queued-repair'},
+        '/asset-recall-requests/mine': {'id': 'my-upgrade', 'type': 'upgrade'},
+        '/asset-recall-requests/queue': {
+          'id': 'queued-disposal',
+          'type': 'disposal',
+        },
+        '/purchase-requests/mine': {'id': 'my-purchase', 'requestCode': 'PR-1'},
+        '/purchase-requests/queue': {
+          'id': 'queued-purchase',
+          'requestCode': 'PR-2',
+        },
+      };
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) => handler.resolve(
+            Response<List<dynamic>>(
+              requestOptions: options,
+              data: [fixtures[options.path]!],
+            ),
+          ),
+        ),
+      );
+
+      final data = await MyRequestsRepository(dio: dio).load();
+
+      expect(data.mine.map((item) => (item.id, item.type)), [
+        ('my-repair', MyRequestType.repair),
+        ('my-upgrade', MyRequestType.upgrade),
+        ('my-purchase', MyRequestType.purchase),
+      ]);
+      expect(data.queue.map((item) => (item.id, item.type)), [
+        ('queued-repair', MyRequestType.repair),
+        ('queued-disposal', MyRequestType.disposal),
+        ('queued-purchase', MyRequestType.purchase),
+      ]);
+      expect(data.mine.first.title, 'Laptop');
+      expect(data.queue.last.reference, 'PR-2');
+    },
+  );
+
   testWidgets('hiển thị các loại đơn yêu cầu trong một danh sách', (
     tester,
   ) async {

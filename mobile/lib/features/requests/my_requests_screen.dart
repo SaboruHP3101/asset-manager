@@ -1,52 +1,17 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/network/api_client.dart';
 import '../../core/utils/display_date.dart';
 import '../../core/widgets/status_chip.dart';
 import '../asset_recalls/asset_recall_detail_screen.dart';
 import '../purchase_requests/purchase_request_detail_screen.dart';
 import '../repair_requests/repair_progress_screen.dart';
 
-typedef MyRequestsLoader = Future<MyRequestsData> Function();
+import 'my_requests_data.dart';
+import 'my_requests_repository.dart';
+import 'request_filter_sheet.dart';
 
-enum MyRequestType {
-  repair('Sửa chữa', Icons.build_outlined),
-  exchange('Đổi tài sản', Icons.swap_horiz),
-  upgrade('Nâng cấp', Icons.upgrade),
-  disposal('Báo phế', Icons.delete_outline),
-  purchase('Đề nghị mua', Icons.shopping_cart_outlined);
-
-  const MyRequestType(this.label, this.icon);
-
-  final String label;
-  final IconData icon;
-}
-
-class MyRequestItem {
-  const MyRequestItem({
-    required this.id,
-    required this.type,
-    required this.title,
-    required this.reference,
-    required this.status,
-    required this.updatedAt,
-  });
-
-  final String id;
-  final MyRequestType type;
-  final String title;
-  final String reference;
-  final String status;
-  final DateTime updatedAt;
-}
-
-class MyRequestsData {
-  const MyRequestsData({required this.mine, required this.queue});
-
-  final List<MyRequestItem> mine;
-  final List<MyRequestItem> queue;
-}
+export 'my_requests_data.dart';
 
 class MyRequestsScreen extends StatefulWidget {
   const MyRequestsScreen({super.key, this.loader});
@@ -110,34 +75,6 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
     super.dispose();
   }
 
-  Future<MyRequestsData> _loadFromApi() async {
-    final responses = await Future.wait([
-      ApiClient.instance.dio.get<List<dynamic>>('/repair-requests/mine'),
-      ApiClient.instance.dio.get<List<dynamic>>('/asset-recall-requests/mine'),
-      ApiClient.instance.dio.get<List<dynamic>>('/purchase-requests/mine'),
-      ApiClient.instance.dio.get<List<dynamic>>('/repair-requests/queue'),
-      ApiClient.instance.dio.get<List<dynamic>>('/asset-recall-requests/queue'),
-      ApiClient.instance.dio.get<List<dynamic>>('/purchase-requests/queue'),
-    ]);
-
-    return MyRequestsData(
-      mine: _mapResponses(responses, 0),
-      queue: _mapResponses(responses, 3),
-    );
-  }
-
-  List<MyRequestItem> _mapResponses(
-    List<Response<List<dynamic>>> responses,
-    int offset,
-  ) => [
-    for (final raw in responses[offset].data ?? const [])
-      _repairItem(Map<String, dynamic>.from(raw as Map)),
-    for (final raw in responses[offset + 1].data ?? const [])
-      _recallItem(Map<String, dynamic>.from(raw as Map)),
-    for (final raw in responses[offset + 2].data ?? const [])
-      _purchaseItem(Map<String, dynamic>.from(raw as Map)),
-  ];
-
   Future<void> _load() async {
     setState(() {
       _mine = null;
@@ -145,7 +82,8 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
       _error = null;
     });
     try {
-      final data = await (widget.loader?.call() ?? _loadFromApi());
+      final data =
+          await (widget.loader?.call() ?? MyRequestsRepository().load());
       if (mounted) {
         setState(() {
           _mine = data.mine;
@@ -179,11 +117,11 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
 
   Future<void> _openFilters() async {
     final items = [...?_mine, ...?_queue];
-    final result = await showModalBottomSheet<_RequestFilters>(
+    final result = await showModalBottomSheet<RequestFilters>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (context) => _RequestFilterSheet(
+      builder: (context) => RequestFilterSheet(
         availableTypes: items.map((item) => item.type).toSet(),
         availableStatuses: {
           for (final item in _mine ?? const <MyRequestItem>[])
@@ -466,138 +404,6 @@ class _RequestStatusChip extends StatelessWidget {
   }
 }
 
-class _RequestFilters {
-  const _RequestFilters({
-    required this.types,
-    required this.statuses,
-    required this.newestFirst,
-  });
-
-  final Set<MyRequestType> types;
-  final Set<String> statuses;
-  final bool newestFirst;
-}
-
-class _RequestFilterSheet extends StatefulWidget {
-  const _RequestFilterSheet({
-    required this.availableTypes,
-    required this.availableStatuses,
-    required this.initialTypes,
-    required this.initialStatuses,
-    required this.newestFirst,
-  });
-
-  final Set<MyRequestType> availableTypes;
-  final Set<String> availableStatuses;
-  final Set<MyRequestType> initialTypes;
-  final Set<String> initialStatuses;
-  final bool newestFirst;
-
-  @override
-  State<_RequestFilterSheet> createState() => _RequestFilterSheetState();
-}
-
-class _RequestFilterSheetState extends State<_RequestFilterSheet> {
-  late Set<MyRequestType> _types;
-  late Set<String> _statuses;
-  late bool _newestFirst;
-
-  @override
-  void initState() {
-    super.initState();
-    _types = {...widget.initialTypes};
-    _statuses = {...widget.initialStatuses};
-    _newestFirst = widget.newestFirst;
-  }
-
-  @override
-  Widget build(BuildContext context) => SafeArea(
-    child: SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Bộ lọc', style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 16),
-          Text('Loại yêu cầu', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: [
-              for (final type in MyRequestType.values)
-                if (widget.availableTypes.contains(type))
-                  FilterChip(
-                    label: Text(type.label),
-                    selected: _types.contains(type),
-                    onSelected: (selected) => setState(
-                      () => selected ? _types.add(type) : _types.remove(type),
-                    ),
-                  ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text('Trạng thái', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: [
-              for (final status in widget.availableStatuses)
-                FilterChip(
-                  label: Text(status),
-                  selected: _statuses.contains(status),
-                  onSelected: (selected) => setState(
-                    () => selected
-                        ? _statuses.add(status)
-                        : _statuses.remove(status),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: true, label: Text('Mới nhất')),
-              ButtonSegment(value: false, label: Text('Cũ nhất')),
-            ],
-            selected: {_newestFirst},
-            onSelectionChanged: (value) =>
-                setState(() => _newestFirst = value.first),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => setState(() {
-                    _types.clear();
-                    _statuses.clear();
-                    _newestFirst = true;
-                  }),
-                  child: const Text('Đặt lại'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(
-                    context,
-                    _RequestFilters(
-                      types: _types,
-                      statuses: _statuses,
-                      newestFirst: _newestFirst,
-                    ),
-                  ),
-                  child: const Text('Áp dụng'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
 class _RequestMessage extends StatelessWidget {
   const _RequestMessage({
     required this.icon,
@@ -632,40 +438,6 @@ class _RequestMessage extends StatelessWidget {
     ),
   );
 }
-
-MyRequestItem _repairItem(Map<String, dynamic> json) => MyRequestItem(
-  id: json['id'] as String,
-  type: MyRequestType.repair,
-  title: json['assetName'] as String? ?? 'Tài sản cần sửa chữa',
-  reference: json['assetCode'] as String? ?? 'Chưa có mã tài sản',
-  status: json['status'] as String? ?? '',
-  updatedAt: _parseDate(json['createdAt'] ?? json['reportDate']),
-);
-
-MyRequestItem _recallItem(Map<String, dynamic> json) => MyRequestItem(
-  id: json['id'] as String,
-  type: switch (json['type']) {
-    'upgrade' => MyRequestType.upgrade,
-    'disposal' => MyRequestType.disposal,
-    _ => MyRequestType.exchange,
-  },
-  title: json['assetName'] as String? ?? 'Tài sản',
-  reference: json['assetCode'] as String? ?? 'Chưa có mã tài sản',
-  status: json['status'] as String? ?? '',
-  updatedAt: _parseDate(json['updatedAt'] ?? json['createdAt']),
-);
-
-MyRequestItem _purchaseItem(Map<String, dynamic> json) => MyRequestItem(
-  id: json['id'] as String,
-  type: MyRequestType.purchase,
-  title: 'Đề nghị mua',
-  reference: json['requestCode'] as String? ?? 'Chưa có mã phiếu',
-  status: json['status'] as String? ?? '',
-  updatedAt: _parseDate(json['updatedAt']),
-);
-
-DateTime _parseDate(Object? value) =>
-    DateTime.tryParse(value?.toString() ?? '') ?? DateTime(1970);
 
 String _statusLabel(MyRequestItem item, {required bool employeeView}) {
   if (employeeView &&
