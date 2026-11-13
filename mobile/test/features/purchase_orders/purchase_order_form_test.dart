@@ -9,6 +9,24 @@ import 'package:mobile/features/purchase_orders/purchase_orders_repository.dart'
 class _FakeRepository extends PurchaseOrdersRepository {
   _FakeRepository() : super(dio: Dio());
 
+  Map<String, int>? savedQuantities;
+  String? savedId;
+
+  @override
+  Future<PurchaseOrderDetail> save({
+    String? id,
+    required String purchaseRequestId,
+    required String supplierId,
+    required String orderDate,
+    required String expectedDeliveryDate,
+    String? contractId,
+    required Map<String, int> quantities,
+  }) async {
+    savedId = id;
+    savedQuantities = quantities;
+    return _draft;
+  }
+
   @override
   Future<List<EligiblePurchaseOrderItem>> findEligibleRequests() async => [
     const EligiblePurchaseOrderItem(
@@ -32,7 +50,64 @@ class _FakeRepository extends PurchaseOrdersRepository {
   ];
 }
 
+const _draft = PurchaseOrderDetail(
+  id: 'draft-id',
+  status: 'draft',
+  allowedActions: [],
+  purchaseOrderCode: 'PO-1',
+  purchaseRequestId: 'request-id',
+  requestCode: 'PR-2026-002',
+  supplierId: 'supplier-id',
+  supplierName: 'Nhà cung cấp An Khang',
+  orderDate: '2026-10-02',
+  expectedDeliveryDate: '2026-10-15',
+  items: [
+    {'purchaseRequestItemId': 'laptop-id', 'quantity': 2},
+    {
+      'purchaseRequestItemId': 'old-item',
+      'quantity': 4,
+      'itemNameSnapshot': 'Hạng mục đã giữ',
+    },
+  ],
+  totals: {},
+  timeline: [],
+);
+
 void main() {
+  testWidgets('editing restores eligibility for existing and reserved items', (
+    tester,
+  ) async {
+    final repository = _FakeRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PurchaseOrderFormScreen(repository: repository, initial: _draft),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final list = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.text('Còn có thể đặt: 7'),
+      200,
+      scrollable: list,
+    );
+    expect(find.text('Còn có thể đặt: 7'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Còn có thể đặt: 4'),
+      200,
+      scrollable: list,
+    );
+    expect(find.text('Còn có thể đặt: 4'), findsOneWidget);
+    await tester.tap(find.text('Lưu nháp'));
+    await tester.pumpAndSettle();
+
+    expect(repository.savedId, 'draft-id');
+    expect(repository.savedQuantities, {
+      'laptop-id': 2,
+      'monitor-id': 0,
+      'old-item': 4,
+    });
+  });
+
   testWidgets('hướng dẫn chọn nhà cung cấp trước khi hiển thị hạng mục', (
     tester,
   ) async {

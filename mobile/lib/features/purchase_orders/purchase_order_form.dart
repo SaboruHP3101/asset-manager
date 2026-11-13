@@ -7,6 +7,8 @@ import '../../core/widgets/retry_message.dart';
 import 'purchase_order_models.dart';
 import 'purchase_orders_repository.dart';
 
+part 'purchase_order_form_content.dart';
+
 class PurchaseOrderFormScreen extends StatefulWidget {
   const PurchaseOrderFormScreen({
     super.key,
@@ -61,39 +63,10 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
       final eligible = await _repository.findEligibleRequests();
       final initial = widget.initial;
       if (initial != null) {
+        _restoreDraftEligibility(eligible, initial);
         for (final item in initial.items) {
-          final itemId = item['purchaseRequestItemId'] as String;
-          final existingIndex = eligible.indexWhere(
-            (candidate) => candidate.itemId == itemId,
-          );
-          final currentQuantity = item['quantity'] as int;
-          if (existingIndex >= 0) {
-            final current = eligible[existingIndex];
-            eligible[existingIndex] = EligiblePurchaseOrderItem(
-              requestId: current.requestId,
-              requestCode: current.requestCode,
-              itemId: current.itemId,
-              itemName: current.itemName,
-              remainingQuantity: current.remainingQuantity + currentQuantity,
-              supplierId: current.supplierId,
-              supplierName: current.supplierName,
-            );
-          } else {
-            eligible.add(
-              EligiblePurchaseOrderItem(
-                requestId: initial.purchaseRequestId,
-                requestCode: initial.requestCode,
-                itemId: itemId,
-                itemName: item['itemNameSnapshot'] as String,
-                remainingQuantity: currentQuantity,
-                supplierId: initial.supplierId,
-                supplierName: initial.supplierName,
-              ),
-            );
-          }
-          _quantities[itemId] = TextEditingController(
-            text: currentQuantity.toString(),
-          );
+          _quantities[item['purchaseRequestItemId'] as String] =
+              TextEditingController(text: (item['quantity'] as int).toString());
         }
       }
       if (_requestId != null &&
@@ -106,6 +79,43 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = purchaseOrderApiError(error));
+    }
+  }
+
+  void _restoreDraftEligibility(
+    List<EligiblePurchaseOrderItem> eligible,
+    PurchaseOrderDetail initial,
+  ) {
+    for (final item in initial.items) {
+      final itemId = item['purchaseRequestItemId'] as String;
+      final existingIndex = eligible.indexWhere(
+        (candidate) => candidate.itemId == itemId,
+      );
+      final currentQuantity = item['quantity'] as int;
+      if (existingIndex >= 0) {
+        final current = eligible[existingIndex];
+        eligible[existingIndex] = EligiblePurchaseOrderItem(
+          requestId: current.requestId,
+          requestCode: current.requestCode,
+          itemId: current.itemId,
+          itemName: current.itemName,
+          remainingQuantity: current.remainingQuantity + currentQuantity,
+          supplierId: current.supplierId,
+          supplierName: current.supplierName,
+        );
+      } else {
+        eligible.add(
+          EligiblePurchaseOrderItem(
+            requestId: initial.purchaseRequestId,
+            requestCode: initial.requestCode,
+            itemId: itemId,
+            itemName: item['itemNameSnapshot'] as String,
+            remainingQuantity: currentQuantity,
+            supplierId: initial.supplierId,
+            supplierName: initial.supplierName,
+          ),
+        );
+      }
     }
   }
 
@@ -334,87 +344,12 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
       item.itemId,
       () => TextEditingController(text: '0'),
     );
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Checkbox(
-                  value: (_quantityFor(item) ?? 0) > 0,
-                  onChanged: (selected) =>
-                      _setQuantity(item, selected == true ? 1 : 0),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.itemName,
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Còn có thể đặt: ${item.remainingQuantity}',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                IconButton.filledTonal(
-                  tooltip: 'Giảm số lượng ${item.itemName}',
-                  onPressed: (_quantityFor(item) ?? 0) <= 0
-                      ? null
-                      : () => _setQuantity(item, (_quantityFor(item) ?? 0) - 1),
-                  icon: const Icon(Icons.remove),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextFormField(
-                    controller: controller,
-                    textAlign: TextAlign.center,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Số lượng'),
-                    onChanged: (_) => setState(() {}),
-                    validator: (value) {
-                      final quantity = int.tryParse(value ?? '');
-                      if (quantity == null || quantity < 0) {
-                        return 'Không hợp lệ';
-                      }
-                      if (quantity > item.remainingQuantity) {
-                        return 'Tối đa ${item.remainingQuantity}';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                IconButton.filledTonal(
-                  tooltip: 'Tăng số lượng ${item.itemName}',
-                  onPressed: (_quantityFor(item) ?? 0) >= item.remainingQuantity
-                      ? null
-                      : () => _setQuantity(item, (_quantityFor(item) ?? 0) + 1),
-                  icon: const Icon(Icons.add),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+    return _OrderQuantityCard(
+      item: item,
+      controller: controller,
+      quantity: _quantityFor(item) ?? 0,
+      onChanged: () => setState(() {}),
+      onSetQuantity: (quantity) => _setQuantity(item, quantity),
     );
   }
 
@@ -519,144 +454,4 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
       '${date.year.toString().padLeft(4, '0')}-'
       '${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.icon, required this.title});
-
-  final IconData icon;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Icon(icon, color: Theme.of(context).colorScheme.primary),
-      const SizedBox(width: 8),
-      Text(title, style: Theme.of(context).textTheme.titleMedium),
-    ],
-  );
-}
-
-class _RequestCard extends StatelessWidget {
-  const _RequestCard({required this.requestCode});
-
-  final String requestCode;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    elevation: 0,
-    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-    child: ListTile(
-      leading: const Icon(Icons.assignment_turned_in_outlined),
-      title: const Text('Đề nghị'),
-      subtitle: Text(requestCode),
-      trailing: const Icon(Icons.lock_outline, size: 20),
-    ),
-  );
-}
-
-class _ItemsEmptyState extends StatelessWidget {
-  const _ItemsEmptyState({required this.icon, required this.message});
-
-  final IconData icon;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Column(
-      children: [
-        Icon(icon, color: Theme.of(context).colorScheme.onSurfaceVariant),
-        const SizedBox(height: 10),
-        Text(
-          message,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-      ],
-    ),
-  );
-}
-
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.itemCount, required this.quantity});
-
-  final int itemCount;
-  final int quantity;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    elevation: 0,
-    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          const Icon(Icons.summarize_outlined),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '$itemCount hạng mục · Tổng số lượng: $quantity',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _PurchaseOrderActionBar extends StatelessWidget {
-  const _PurchaseOrderActionBar({
-    required this.saving,
-    required this.enabled,
-    required this.hint,
-    required this.onSave,
-  });
-
-  final bool saving;
-  final bool enabled;
-  final String? hint;
-  final VoidCallback onSave;
-
-  @override
-  Widget build(BuildContext context) => Material(
-    elevation: 12,
-    child: SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (hint != null) ...[
-              Text(
-                hint!,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 6),
-            ],
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: enabled ? onSave : null,
-                icon: saving
-                    ? const ButtonSpinner()
-                    : const Icon(Icons.save_outlined),
-                label: Text(saving ? 'Đang lưu...' : 'Lưu nháp'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
 }
