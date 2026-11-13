@@ -16,43 +16,12 @@ import '../../purchase_requests/purchase_requests_screen.dart';
 import '../../repair_requests/repair_request_form.dart';
 import '../../warehouses/it_warehouse_screen.dart';
 
+import 'home_dashboard_data.dart';
+import 'home_dashboard_widgets.dart';
+
+export 'home_dashboard_data.dart';
+
 typedef HomeDashboardLoader = Future<HomeDashboardData> Function();
-
-class HomeDashboardData {
-  const HomeDashboardData({
-    required this.assignedAssets,
-    required this.activeRequests,
-    required this.purchaseRequestTasks,
-    required this.purchaseOrderTasks,
-    required this.inspectionTasks,
-    required this.allocationTasks,
-    this.recallTasks = 0,
-  });
-
-  factory HomeDashboardData.fromJson(Map<String, dynamic> json) {
-    final tasks = Map<String, dynamic>.from(
-      json['pendingTasks'] as Map? ?? const {},
-    );
-
-    return HomeDashboardData(
-      assignedAssets: json['assignedAssets'] as int? ?? 0,
-      activeRequests: json['activeRequests'] as int? ?? 0,
-      purchaseRequestTasks: tasks['purchaseRequests'] as int? ?? 0,
-      purchaseOrderTasks: tasks['purchaseOrders'] as int? ?? 0,
-      inspectionTasks: tasks['inspections'] as int? ?? 0,
-      allocationTasks: tasks['allocations'] as int? ?? 0,
-      recallTasks: tasks['recalls'] as int? ?? 0,
-    );
-  }
-
-  final int assignedAssets;
-  final int activeRequests;
-  final int purchaseRequestTasks;
-  final int purchaseOrderTasks;
-  final int inspectionTasks;
-  final int allocationTasks;
-  final int recallTasks;
-}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -191,13 +160,13 @@ class _HomeScreenState extends State<HomeScreen> {
     if (screen != null && mounted) await _open(screen);
   }
 
-  List<_HomeTask> get _visibleTasks {
+  List<HomeTask> get _visibleTasks {
     final dashboard = _dashboard;
     if (dashboard == null) return const [];
 
     return [
       if (_canProcessPurchaseRequests && dashboard.purchaseRequestTasks > 0)
-        _HomeTask(
+        HomeTask(
           title: 'Đề nghị mua chờ xử lý',
           subtitle: 'Duyệt hoặc bổ sung thông tin đề nghị',
           count: dashboard.purchaseRequestTasks,
@@ -210,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       if (_canAccessPurchaseOrders && dashboard.purchaseOrderTasks > 0)
-        _HomeTask(
+        HomeTask(
           title: 'Đơn đặt mua cần xử lý',
           subtitle: 'Tạo, duyệt hoặc theo dõi giao hàng',
           count: dashboard.purchaseOrderTasks,
@@ -218,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () => _open(PurchaseOrdersScreen(allowedActions: _actions)),
         ),
       if (_canInspect && dashboard.inspectionTasks > 0)
-        _HomeTask(
+        HomeTask(
           title: 'Hàng giao cần kiểm tra',
           subtitle: 'Xác nhận chất lượng tài sản đã nhận',
           count: dashboard.inspectionTasks,
@@ -226,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () => _open(const PurchaseInspectionQueueScreen()),
         ),
       if (_canAccessAllocationTasks && dashboard.allocationTasks > 0)
-        _HomeTask(
+        HomeTask(
           title: 'Cấp phát tài sản',
           subtitle: 'Cấp phát, xác nhận hoặc phân bổ lại',
           count: dashboard.allocationTasks,
@@ -234,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () => _open(const AssetAllocationQueueScreen()),
         ),
       if (dashboard.recallTasks > 0)
-        _HomeTask(
+        HomeTask(
           title: 'Thu hồi tài sản cần xử lý',
           subtitle: 'Duyệt hoặc xác nhận bàn giao',
           count: dashboard.recallTasks,
@@ -244,26 +213,26 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
   }
 
-  List<_QuickAction> get _quickActions => [
-    _QuickAction(
+  List<HomeQuickAction> get _quickActions => [
+    HomeQuickAction(
       title: 'Trợ lý AI',
       icon: Icons.chat_bubble_outline,
       onTap: () => _open(const ChatScreen()),
     ),
     if (_actions.contains('depreciation.view'))
-      _QuickAction(
+      HomeQuickAction(
         title: 'Khấu hao',
         icon: Icons.trending_down,
         onTap: () => _open(DepreciationPeriodsScreen(profile: widget.profile)),
       ),
     if (widget.onScanAssets != null || widget.onOpenAssets != null)
-      _QuickAction(
+      HomeQuickAction(
         title: 'Quét mã QR',
         icon: Icons.qr_code_scanner,
         onTap: widget.onScanAssets ?? widget.onOpenAssets!,
       ),
     if (_actions.contains('purchase.request.create'))
-      _QuickAction(
+      HomeQuickAction(
         title: 'Đề nghị mua',
         icon: Icons.add_shopping_cart_outlined,
         onTap: () => _open(
@@ -274,31 +243,31 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     if (_actions.contains('purchase.order.create'))
-      _QuickAction(
+      HomeQuickAction(
         title: 'Đơn đặt mua',
         icon: Icons.shopping_cart_checkout_outlined,
         onTap: () => _open(PurchaseOrdersScreen(allowedActions: _actions)),
       ),
     if (_actions.contains('asset.recall.create'))
-      _QuickAction(
+      HomeQuickAction(
         title: 'Đổi / báo phế',
         icon: Icons.swap_horiz,
         onTap: () => _open(const AssetRecallRequestsScreen()),
       ),
     if (_actions.contains('asset.recall.create'))
-      _QuickAction(
+      HomeQuickAction(
         title: 'Nâng cấp',
         icon: Icons.upgrade,
         onTap: () => _open(const AssetUpgradeRequestsScreen()),
       ),
     if (_actions.contains('warehouse.it.view'))
-      _QuickAction(
+      HomeQuickAction(
         title: 'Kho IT',
         icon: Icons.warehouse_outlined,
         onTap: () => _open(const ItWarehouseScreen()),
       ),
     if (_actions.contains('repair.report'))
-      _QuickAction(
+      HomeQuickAction(
         title: 'Báo hỏng',
         icon: Icons.build_circle_outlined,
         onTap: () => _open(const RepairRequestForm()),
@@ -320,17 +289,17 @@ class _HomeScreenState extends State<HomeScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-            _WelcomeHeader(
+            HomeWelcomeHeader(
               fullName: widget.profile.fullName,
               subtitle: [department, role].whereType<String>().join(' · '),
             ),
             const SizedBox(height: 24),
-            const _SectionTitle(title: 'Tổng quan'),
+            const HomeSectionTitle(title: 'Tổng quan'),
             const SizedBox(height: 10),
             if (dashboard == null && _error == null)
-              const _SummarySkeleton()
+              const HomeSummarySkeleton()
             else if (_error != null)
-              _ErrorCard(message: _error!, onRetry: _loadSummary)
+              HomeErrorCard(message: _error!, onRetry: _loadSummary)
             else
               Row(
                 children: [
@@ -354,274 +323,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             const SizedBox(height: 24),
-            const _SectionTitle(title: 'Cần bạn xử lý'),
+            const HomeSectionTitle(title: 'Cần bạn xử lý'),
             const SizedBox(height: 10),
             if (dashboard == null && _error == null)
-              const _TaskSkeleton()
+              const HomeTaskSkeleton()
             else if (dashboard != null && tasks.isEmpty)
-              const _EmptyTasks()
+              const HomeEmptyTasks()
             else
-              ...tasks.map((task) => _TaskCard(task: task)),
+              ...tasks.map((task) => HomeTaskCard(task: task)),
             const SizedBox(height: 24),
-            const _SectionTitle(title: 'Thao tác nhanh'),
+            const HomeSectionTitle(title: 'Thao tác nhanh'),
             const SizedBox(height: 10),
-            _QuickActionGrid(actions: _quickActions),
+            HomeQuickActionGrid(actions: _quickActions),
           ],
         ),
       ),
     );
   }
-}
-
-class _WelcomeHeader extends StatelessWidget {
-  const _WelcomeHeader({required this.fullName, required this.subtitle});
-
-  final String fullName;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    header: true,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.secondaryContainer,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Icon(
-            Icons.waving_hand_outlined,
-            color: Theme.of(context).colorScheme.onSecondaryContainer,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          fullName.isEmpty ? 'Xin chào!' : 'Xin chào, $fullName',
-          style: Theme.of(context).textTheme.headlineSmall
-              ?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        if (subtitle.isNotEmpty) ...[
-          const SizedBox(height: 5),
-          Text(
-            subtitle,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ],
-    ),
-  );
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) => Text(
-    title,
-    style: Theme.of(context).textTheme.titleLarge
-        ?.copyWith(fontWeight: FontWeight.w700),
-  );
-}
-
-class _HomeTask {
-  const _HomeTask({
-    required this.title,
-    required this.subtitle,
-    required this.count,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String title;
-  final String subtitle;
-  final int count;
-  final IconData icon;
-  final VoidCallback onTap;
-}
-
-class _TaskCard extends StatelessWidget {
-  const _TaskCard({required this.task});
-
-  final _HomeTask task;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 10),
-    elevation: 0,
-    clipBehavior: Clip.antiAlias,
-    child: ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      leading: CircleAvatar(child: Icon(task.icon)),
-      title: Text(task.title),
-      subtitle: Text(task.subtitle),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Badge(label: Text('${task.count}')),
-          const SizedBox(width: 6),
-          const Icon(Icons.chevron_right),
-        ],
-      ),
-      onTap: task.onTap,
-    ),
-  );
-}
-
-class _EmptyTasks extends StatelessWidget {
-  const _EmptyTasks();
-
-  @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    elevation: 0,
-    child: const Padding(
-      padding: EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Icon(Icons.check_circle_outline),
-          SizedBox(width: 12),
-          Expanded(child: Text('Bạn không có công việc cần xử lý.')),
-        ],
-      ),
-    ),
-  );
-}
-
-class _QuickAction {
-  const _QuickAction({
-    required this.title,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String title;
-  final IconData icon;
-  final VoidCallback onTap;
-}
-
-class _QuickActionGrid extends StatelessWidget {
-  const _QuickActionGrid({required this.actions});
-
-  final List<_QuickAction> actions;
-
-  @override
-  Widget build(BuildContext context) => GridView.builder(
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    itemCount: actions.length,
-    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 2,
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      mainAxisExtent:
-          61 +
-          MediaQuery.textScalerOf(
-                context,
-              ).scale(Theme.of(context).textTheme.titleSmall?.fontSize ?? 14) *
-              (Theme.of(context).textTheme.titleSmall?.height ?? 1.43) *
-              2,
-    ),
-    itemBuilder: (context, index) {
-      final action = actions[index];
-
-      return Card(
-        margin: EdgeInsets.zero,
-        elevation: 0,
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: action.onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(action.icon, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(height: 9),
-                Text(
-                  action.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    },
-  );
-}
-
-class _ErrorCard extends StatelessWidget {
-  const _ErrorCard({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          const Icon(Icons.cloud_off_outlined),
-          const SizedBox(width: 12),
-          Expanded(child: Text(message)),
-          TextButton(onPressed: onRetry, child: const Text('Thử lại')),
-        ],
-      ),
-    ),
-  );
-}
-
-class _SummarySkeleton extends StatelessWidget {
-  const _SummarySkeleton();
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      for (var index = 0; index < 2; index++) ...[
-        if (index > 0) const SizedBox(width: 10),
-        const Expanded(child: _SkeletonBlock(height: 118)),
-      ],
-    ],
-  );
-}
-
-class _TaskSkeleton extends StatelessWidget {
-  const _TaskSkeleton();
-
-  @override
-  Widget build(BuildContext context) => const Column(
-    children: [
-      _SkeletonBlock(height: 76),
-      SizedBox(height: 10),
-      _SkeletonBlock(height: 76),
-    ],
-  );
-}
-
-class _SkeletonBlock extends StatelessWidget {
-  const _SkeletonBlock({required this.height});
-
-  final double height;
-
-  @override
-  Widget build(BuildContext context) => ExcludeSemantics(
-    child: Container(
-      height: height,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(20),
-      ),
-    ),
-  );
 }
