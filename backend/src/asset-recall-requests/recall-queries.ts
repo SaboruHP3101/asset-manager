@@ -22,7 +22,7 @@ export async function findMine(db: Database, actor: AuthenticatedEmployee) {
   );
 }
 
-export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
+function recallQueueScope(actor: AuthenticatedEmployee) {
   const conditions = [];
 
   if (actor.isDepartmentHead) {
@@ -74,7 +74,11 @@ export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
     )!,
   );
 
-  return findSummaries(db, or(...conditions)!);
+  return or(...conditions)!;
+}
+
+export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
+  return findSummaries(db, recallQueueScope(actor));
 }
 
 export async function findOne(
@@ -148,10 +152,7 @@ export async function findExchangeCandidates(
     .orderBy(asc(schema.assets.assetCode));
 }
 
-export async function findSummaries(
-  db: Database,
-  condition: ReturnType<typeof eq>,
-) {
+export function findSummaries(db: Database, condition: ReturnType<typeof eq>) {
   return db
     .select({
       id: schema.assetRecallRequests.id,
@@ -186,4 +187,8 @@ export async function findSummaries(
     )
     .where(condition)
     .orderBy(asc(schema.assetRecallRequests.createdAt));
+}
+
+export async function countQueue(db: Database, actor: AuthenticatedEmployee) {
+  return db.$count(findSummaries(db, recallQueueScope(actor)).as('queue'));
 }

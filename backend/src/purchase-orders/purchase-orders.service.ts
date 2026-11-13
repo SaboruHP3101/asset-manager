@@ -1,3 +1,6 @@
+import { countOrderTasks } from './purchase-order-queries.js';
+import { countApprovalQueue } from './purchase-order-queries.js';
+import { countEligibleRequests } from './purchase-order-queries.js';
 import {
   BadRequestException,
   ConflictException,
@@ -44,6 +47,18 @@ type PurchaseOrderStatus =
   (typeof schema.purchaseOrderStatusEnum.enumValues)[number];
 @Injectable()
 export class PurchaseOrdersService {
+  countEligibleRequests(actor: AuthenticatedEmployee) {
+    return countEligibleRequests(this.authorization, this.db, actor);
+  }
+
+  countApprovalQueue(actor: AuthenticatedEmployee) {
+    return countApprovalQueue(this.authorization, this.db, actor);
+  }
+
+  countOrderTasks(actor: AuthenticatedEmployee) {
+    return countOrderTasks(this.db, actor);
+  }
+
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly authorization: PurchaseAuthorizationService,

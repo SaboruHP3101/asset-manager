@@ -1,3 +1,4 @@
+import { countQueue } from './recall-queries.js';
 import {
   BadRequestException,
   ForbiddenException,
@@ -46,6 +47,10 @@ import {
 type Database = NodePgDatabase<typeof schema>;
 @Injectable()
 export class AssetRecallRequestsService {
+  countQueue(actor: AuthenticatedEmployee) {
+    return countQueue(this.db, actor);
+  }
+
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: RequestAuditService,

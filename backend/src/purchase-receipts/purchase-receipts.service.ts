@@ -1,3 +1,4 @@
+import { countInspectionQueue } from './purchase-receipt-queries.js';
 import {
   BadRequestException,
   ConflictException,
@@ -40,6 +41,10 @@ type ReceiptFiles = Partial<
 >;
 @Injectable()
 export class PurchaseReceiptsService {
+  countInspectionQueue(actor: AuthenticatedEmployee) {
+    return countInspectionQueue(this.authorization, this.db, actor);
+  }
+
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly authorization: PurchaseAuthorizationService,

@@ -1,3 +1,4 @@
+import { countQueue } from './allocation-queue.js';
 import {
   BadRequestException,
   ConflictException,
@@ -33,6 +34,10 @@ type Database = NodePgDatabase<typeof schema>;
 type DecisionParty = 'department' | 'recipient';
 @Injectable()
 export class AssetAllocationsService {
+  countQueue(actor: AuthenticatedEmployee) {
+    return countQueue(this.db, actor);
+  }
+
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly audit: RequestAuditService,

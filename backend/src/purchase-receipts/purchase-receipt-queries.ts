@@ -21,7 +21,7 @@ type Database = NodePgDatabase<typeof schema>;
 type ManagementOwner =
   (typeof schema.assetManagementOwnerEnum.enumValues)[number];
 
-export async function findInspectionQueue(
+function findInspectionQueueQuery(
   authorization: PurchaseAuthorizationService,
   db: Database,
   actor: AuthenticatedEmployee,
@@ -369,5 +369,23 @@ export function inspectionOwner(
 export function lockOrder(db: Database, orderId: string) {
   return db.execute(
     sql`select id from purchase_orders where id = ${orderId} for update`,
+  );
+}
+
+export async function findInspectionQueue(
+  authorization: PurchaseAuthorizationService,
+  db: Database,
+  actor: AuthenticatedEmployee,
+) {
+  return findInspectionQueueQuery(authorization, db, actor);
+}
+
+export async function countInspectionQueue(
+  authorization: PurchaseAuthorizationService,
+  db: Database,
+  actor: AuthenticatedEmployee,
+) {
+  return db.$count(
+    findInspectionQueueQuery(authorization, db, actor).as('queue'),
   );
 }

@@ -8,6 +8,11 @@ import type { PurchaseOrdersService } from '../purchase-orders/purchase-orders.s
 import type { PurchaseReceiptsService } from '../purchase-receipts/purchase-receipts.service.js';
 import type { PurchaseRequestsService } from '../purchase-requests/purchase-requests.service.js';
 import { DashboardService } from './dashboard.service.js';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import type { Pool } from 'pg';
+import { countQueue as countAllocations } from '../asset-allocations/allocation-queue.js';
+import { countQueue as countRequests } from '../purchase-requests/purchase-request-queries.js';
+import { countQueue as countRecalls } from '../asset-recall-requests/recall-queries.js';
 
 function createDatabase(counts: number[]) {
   const remaining = [...counts];
@@ -39,32 +44,42 @@ function createActor(
 function createServices() {
   return {
     requests: {
-      findQueue: vi.fn(async () => [{ id: 'request-id' }]),
+      countQueue: vi.fn(async () => 1),
     },
     orders: {
-      findEligibleRequests: vi.fn(async () => [
-        { itemId: 'item-1' },
-        { itemId: 'item-2' },
-      ]),
-      findApprovalQueue: vi.fn(async () => [{ id: 'order-approval' }]),
-      findAll: vi.fn(async () => [
-        { id: 'order-issued', status: 'issued' },
-        { id: 'order-draft', status: 'draft' },
-      ]),
+      countEligibleRequests: vi.fn(async () => 2),
+      countApprovalQueue: vi.fn(async () => 1),
+      countOrderTasks: vi.fn(async () => ({ draft: 1, ongoing: 1 })),
     },
     receipts: {
-      findInspectionQueue: vi.fn(async () => [{ unitId: 'unit-id' }]),
+      countInspectionQueue: vi.fn(async () => 1),
     },
     allocations: {
-      findQueue: vi.fn(async () => [{ assetId: 'asset-id' }]),
+      countQueue: vi.fn(async () => 1),
     },
     recalls: {
-      findQueue: vi.fn(async () => []),
+      countQueue: vi.fn(async () => 0),
     },
   };
 }
 
 describe('DashboardService', () => {
+  it('counts scoped queues in SQL without loading queue details or progress', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ count: '2' }] });
+    const db = drizzle({ client: { query } as unknown as Pool, schema });
+    const actor = createActor({ isDepartmentHead: true });
+
+    await expect(countRequests(db, actor)).resolves.toBe(2);
+    await expect(countRecalls(db, actor)).resolves.toBe(2);
+    await expect(countAllocations(db, actor)).resolves.toBe(4);
+
+    expect(query).toHaveBeenCalledTimes(4);
+
+    for (const [statement, parameters] of query.mock.calls) {
+      expect(statement.text).toMatch(/^select count\(\*\) as count from/);
+      expect(parameters).toContain(actor.departmentId);
+    }
+  });
   it('không tải hoặc trả hàng chờ nghiệp vụ khi nhân viên không có quyền', async () => {
     const services = createServices();
     const service = new DashboardService(
@@ -89,12 +104,12 @@ describe('DashboardService', () => {
         recalls: 0,
       },
     });
-    expect(services.requests.findQueue).not.toHaveBeenCalled();
-    expect(services.orders.findEligibleRequests).not.toHaveBeenCalled();
-    expect(services.orders.findApprovalQueue).not.toHaveBeenCalled();
-    expect(services.orders.findAll).not.toHaveBeenCalled();
-    expect(services.receipts.findInspectionQueue).not.toHaveBeenCalled();
-    expect(services.allocations.findQueue).toHaveBeenCalledOnce();
+    expect(services.requests.countQueue).not.toHaveBeenCalled();
+    expect(services.orders.countEligibleRequests).not.toHaveBeenCalled();
+    expect(services.orders.countApprovalQueue).not.toHaveBeenCalled();
+    expect(services.orders.countOrderTasks).not.toHaveBeenCalled();
+    expect(services.receipts.countInspectionQueue).not.toHaveBeenCalled();
+    expect(services.allocations.countQueue).toHaveBeenCalledOnce();
   });
 
   it('tính công việc đúng phạm vi của nhân viên Thu mua', async () => {
@@ -122,10 +137,10 @@ describe('DashboardService', () => {
       allocations: 1,
       recalls: 0,
     });
-    expect(services.requests.findQueue).toHaveBeenCalledOnce();
-    expect(services.orders.findEligibleRequests).toHaveBeenCalledOnce();
-    expect(services.orders.findApprovalQueue).not.toHaveBeenCalled();
-    expect(services.orders.findAll).toHaveBeenCalledOnce();
-    expect(services.receipts.findInspectionQueue).toHaveBeenCalledOnce();
+    expect(services.requests.countQueue).toHaveBeenCalledOnce();
+    expect(services.orders.countEligibleRequests).toHaveBeenCalledOnce();
+    expect(services.orders.countApprovalQueue).not.toHaveBeenCalled();
+    expect(services.orders.countOrderTasks).toHaveBeenCalledOnce();
+    expect(services.receipts.countInspectionQueue).toHaveBeenCalledOnce();
   });
 });

@@ -105,21 +105,21 @@ export class DashboardService {
           ),
         ),
       canProcessRequests
-        ? this.purchaseRequests.findQueue(actor)
-        : Promise.resolve([]),
+        ? this.purchaseRequests.countQueue(actor)
+        : Promise.resolve(0),
       canCreateOrder
-        ? this.purchaseOrders.findEligibleRequests(actor)
-        : Promise.resolve([]),
+        ? this.purchaseOrders.countEligibleRequests(actor)
+        : Promise.resolve(0),
       canApproveOrder
-        ? this.purchaseOrders.findApprovalQueue(actor)
-        : Promise.resolve([]),
+        ? this.purchaseOrders.countApprovalQueue(actor)
+        : Promise.resolve(0),
       canTrackOrders || canCreateOrder
-        ? this.purchaseOrders.findAll(actor, {})
-        : Promise.resolve([]),
+        ? this.purchaseOrders.countOrderTasks(actor)
+        : Promise.resolve({ draft: 0, ongoing: 0 }),
       canInspect
-        ? this.purchaseReceipts.findInspectionQueue(actor)
-        : Promise.resolve([]),
-      this.assetAllocations.findQueue(actor),
+        ? this.purchaseReceipts.countInspectionQueue(actor)
+        : Promise.resolve(0),
+      this.assetAllocations.countQueue(actor),
       this.db
         .select({ value: count(schema.assetRecallRequests.id) })
         .from(schema.assetRecallRequests)
@@ -129,14 +129,8 @@ export class DashboardService {
             notInArray(schema.assetRecallRequests.status, ['completed']),
           ),
         ),
-      this.assetRecalls.findQueue(actor),
+      this.assetRecalls.countQueue(actor),
     ]);
-    const ongoingOrders = visibleOrders.filter((order) =>
-      ['issued', 'partially_received'].includes(order.status),
-    );
-    const draftOrders = canCreateOrder
-      ? visibleOrders.filter((order) => order.status === 'draft')
-      : [];
 
     return {
       assignedAssets: assetsResult[0]?.value ?? 0,
@@ -146,15 +140,15 @@ export class DashboardService {
         (repairResult[0]?.value ?? 0) +
         (recallResult[0]?.value ?? 0),
       pendingTasks: {
-        purchaseRequests: requestQueue.length,
+        purchaseRequests: requestQueue,
         purchaseOrders:
-          eligibleOrderItems.length +
-          orderApprovalQueue.length +
-          draftOrders.length +
-          ongoingOrders.length,
-        inspections: inspectionQueue.length,
-        allocations: allocationQueue.length,
-        recalls: recallQueue.length,
+          eligibleOrderItems +
+          orderApprovalQueue +
+          (canCreateOrder ? visibleOrders.draft : 0) +
+          visibleOrders.ongoing,
+        inspections: inspectionQueue,
+        allocations: allocationQueue,
+        recalls: recallQueue,
       },
     };
   }

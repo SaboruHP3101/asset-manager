@@ -12,7 +12,7 @@ import {
 } from './allocation-context.js';
 
 type Database = NodePgDatabase<typeof schema>;
-export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
+function assetQueueScope(actor: AuthenticatedEmployee) {
   const actions = actionsFor(actor);
   const assetConditions: SQL[] = [];
 
@@ -39,8 +39,13 @@ export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
     }
   }
 
+  return or(...assetConditions) ?? sql`false`;
+}
+
+export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
+  const actions = actionsFor(actor);
   const [assets, allocations] = await Promise.all([
-    loadAssetQueueCandidates(db, or(...assetConditions) ?? sql`false`),
+    loadAssetQueueCandidates(db, assetQueueScope(actor)),
     loadAllocationQueueCandidates(db, actor),
   ]);
 
@@ -181,7 +186,7 @@ export async function findOne(
   return allocation;
 }
 
-export async function loadAssetQueueCandidates(db: Database, condition: SQL) {
+export function loadAssetQueueCandidates(db: Database, condition: SQL) {
   return db
     .select({
       assetId: schema.assets.id,
@@ -227,7 +232,7 @@ export async function loadAssetQueueCandidates(db: Database, condition: SQL) {
     .orderBy(asc(schema.assets.assetCode));
 }
 
-export async function loadAllocationQueueCandidates(
+export function loadAllocationQueueCandidates(
   db: Database,
   actor: AuthenticatedEmployee,
 ) {
@@ -301,4 +306,15 @@ export async function loadAllocationQueueCandidates(
       ),
     )
     .orderBy(asc(schema.assets.assetCode));
+}
+
+export async function countQueue(db: Database, actor: AuthenticatedEmployee) {
+  const [assets, allocations] = await Promise.all([
+    db.$count(
+      loadAssetQueueCandidates(db, assetQueueScope(actor)).as('asset_queue'),
+    ),
+    db.$count(loadAllocationQueueCandidates(db, actor).as('allocation_queue')),
+  ]);
+
+  return assets + allocations;
 }

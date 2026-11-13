@@ -32,43 +32,12 @@ export async function findEligibleRequests(
     WORKFLOW_ACTIONS.purchaseOrderCreate,
   );
 
-  const rows = await db.execute(sql`
-      select pr.id, pr.request_code as "requestCode", pr.status,
-             pri.id as "itemId", pri.item_name as "itemName",
-             pri.quantity,
-             (pri.quantity - coalesce(sum(poi.quantity) filter (
-               where po.status in (${sql.join(
-                 RESERVED_ORDER_STATUSES.map((status) => sql`${status}`),
-                 sql`, `,
-               )})
-             ), 0))::int as "remainingQuantity",
-             q.supplier_id as "supplierId", s.legal_name as "supplierName"
-      from purchase_requests pr
-      join purchase_request_revisions rev
-        on rev.purchase_request_id = pr.id
-       and rev.revision_number = pr.current_revision
-      join purchase_request_items pri on pri.request_revision_id = rev.id
-      join purchase_request_quotes q
-        on q.request_item_id = pri.id and q.is_selected = true
-      join suppliers s on s.id = q.supplier_id
-      left join purchase_order_items poi on poi.purchase_request_item_id = pri.id
-      left join purchase_orders po on po.id = poi.purchase_order_id
-      where pr.status in ('approved', 'ordering')
-      group by pr.id, pr.request_code, pr.status, pri.id, pri.item_name,
-               pri.quantity, q.supplier_id, s.legal_name
-      having pri.quantity > coalesce(sum(poi.quantity) filter (
-        where po.status in (${sql.join(
-          RESERVED_ORDER_STATUSES.map((status) => sql`${status}`),
-          sql`, `,
-        )})
-      ), 0)
-      order by pr.updated_at asc, pri.sort_order asc
-    `);
+  const rows = await db.execute(eligibleItemsQuery());
 
   return rows.rows;
 }
 
-export async function findAll(
+function ordersQuery(
   db: Database,
   actor: AuthenticatedEmployee,
   filters: { requestId?: string; supplierId?: string; status?: string },
@@ -333,4 +302,98 @@ export function assertProcurementAction(
 ): void {
   authorization.assertAction(actor, action);
   authorization.assertDepartment(actor, 'PROCUREMENT');
+}
+
+function eligibleItemsQuery() {
+  return sql`
+      select pr.id, pr.request_code as "requestCode", pr.status,
+             pri.id as "itemId", pri.item_name as "itemName",
+             pri.quantity,
+             (pri.quantity - coalesce(sum(poi.quantity) filter (
+               where po.status in (${sql.join(
+                 RESERVED_ORDER_STATUSES.map((status) => sql`${status}`),
+                 sql`, `,
+               )})
+             ), 0))::int as "remainingQuantity",
+             q.supplier_id as "supplierId", s.legal_name as "supplierName"
+      from purchase_requests pr
+      join purchase_request_revisions rev
+        on rev.purchase_request_id = pr.id
+       and rev.revision_number = pr.current_revision
+      join purchase_request_items pri on pri.request_revision_id = rev.id
+      join purchase_request_quotes q
+        on q.request_item_id = pri.id and q.is_selected = true
+      join suppliers s on s.id = q.supplier_id
+      left join purchase_order_items poi on poi.purchase_request_item_id = pri.id
+      left join purchase_orders po on po.id = poi.purchase_order_id
+      where pr.status in ('approved', 'ordering')
+      group by pr.id, pr.request_code, pr.status, pri.id, pri.item_name,
+               pri.quantity, q.supplier_id, s.legal_name
+      having pri.quantity > coalesce(sum(poi.quantity) filter (
+        where po.status in (${sql.join(
+          RESERVED_ORDER_STATUSES.map((status) => sql`${status}`),
+          sql`, `,
+        )})
+      ), 0)
+      order by pr.updated_at asc, pri.sort_order asc
+    `;
+}
+
+export async function countEligibleRequests(
+  authorization: PurchaseAuthorizationService,
+  db: Database,
+  actor: AuthenticatedEmployee,
+) {
+  assertProcurementAction(
+    authorization,
+    actor,
+    WORKFLOW_ACTIONS.purchaseOrderCreate,
+  );
+  const result = await db.execute<{ value: number }>(
+    sql`select count(*)::int as value from (${eligibleItemsQuery()}) as eligible`,
+  );
+
+  return result.rows[0]?.value ?? 0;
+}
+
+export async function findAll(
+  db: Database,
+  actor: AuthenticatedEmployee,
+  filters: { requestId?: string; supplierId?: string; status?: string },
+) {
+  return ordersQuery(db, actor, filters);
+}
+
+export async function countApprovalQueue(
+  authorization: PurchaseAuthorizationService,
+  db: Database,
+  actor: AuthenticatedEmployee,
+) {
+  assertProcurementAction(
+    authorization,
+    actor,
+    WORKFLOW_ACTIONS.purchaseOrderApprove,
+  );
+
+  return db.$count(
+    ordersQuery(db, actor, { status: 'pending_procurement_head' }).as(
+      'approval_queue',
+    ),
+  );
+}
+
+export async function countOrderTasks(
+  db: Database,
+  actor: AuthenticatedEmployee,
+) {
+  const orders = ordersQuery(db, actor, {}).as('visible_orders');
+  const [draft, ongoing] = await Promise.all([
+    db.$count(orders, eq(orders.status, 'draft')),
+    db.$count(
+      orders,
+      or(eq(orders.status, 'issued'), eq(orders.status, 'partially_received')),
+    ),
+  ]);
+
+  return { draft, ongoing };
 }

@@ -62,8 +62,7 @@ export function purchaseQueueScope(actor: AuthenticatedEmployee) {
   return or(...conditions) ?? sql`false`;
 }
 
-export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
-
+function findQueueQuery(db: Database, actor: AuthenticatedEmployee) {
   return db
     .select({
       id: schema.purchaseRequests.id,
@@ -342,4 +341,12 @@ export function setStatus(
     .update(schema.purchaseRequests)
     .set({ status, updatedAt: new Date(), updatedBy: actorId })
     .where(eq(schema.purchaseRequests.id, id));
+}
+
+export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
+  return findQueueQuery(db, actor);
+}
+
+export async function countQueue(db: Database, actor: AuthenticatedEmployee) {
+  return db.$count(findQueueQuery(db, actor).as('queue'));
 }

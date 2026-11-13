@@ -1,3 +1,4 @@
+import { countQueue } from './purchase-request-queries.js';
 import {
   BadRequestException,
   ConflictException,
@@ -45,6 +46,10 @@ import { addQuote, requireCommercialData } from './purchase-request-quotes.js';
 type Database = NodePgDatabase<typeof schema>;
 @Injectable()
 export class PurchaseRequestsService {
+  countQueue(actor: AuthenticatedEmployee) {
+    return countQueue(this.db, actor);
+  }
+
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly authorization: PurchaseAuthorizationService,
