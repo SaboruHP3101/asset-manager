@@ -1,14 +1,16 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/config/app_config.dart';
 import '../../core/network/api_client.dart';
 import '../../core/storage/token_storage.dart';
-import '../../core/utils/department_labels.dart';
 import '../../core/widgets/code_scanner_screen.dart';
 import '../login/login_screen.dart';
+import 'asset_card.dart';
 import 'asset_detail_screen.dart';
+import 'asset_filter_sheet.dart';
 import 'asset_status_chip.dart';
+
+export 'asset_card.dart';
 
 class AssetsScreen extends StatefulWidget {
   const AssetsScreen({super.key, this.initiallyOpenScanner = false});
@@ -99,6 +101,7 @@ class _AssetsScreenState extends State<AssetsScreen> {
     }
 
     try {
+      // Status is applied locally by _visibleAssets.
       final query = <String, dynamic>{'sort': _sort};
       if (_searchController.text.trim().isNotEmpty) {
         query['search'] = _searchController.text.trim();
@@ -124,11 +127,11 @@ class _AssetsScreenState extends State<AssetsScreen> {
   }
 
   Future<void> _openFilters() async {
-    final result = await showModalBottomSheet<_AssetFilters>(
+    final result = await showModalBottomSheet<AssetFilters>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (context) => _AssetFilterSheet(
+      builder: (context) => AssetFilterSheet(
         categories: _categories,
         assets: _assets,
         initialCategoryId: _categoryId,
@@ -383,289 +386,6 @@ class _AssetsScreenState extends State<AssetsScreen> {
       ),
     );
   }
-}
-
-class AssetCard extends StatelessWidget {
-  const AssetCard({required this.asset, required this.onTap, super.key});
-
-  final Map<String, dynamic> asset;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final rawImageUrl = asset['imageUrl'] as String?;
-    final imageUrl = rawImageUrl == null
-        ? null
-        : AppConfig.absoluteUrl(rawImageUrl);
-    final assetId = asset['id'] as String;
-
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            children: [
-              Hero(
-                tag: 'asset-image-$assetId',
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: SizedBox.square(
-                    dimension: 88,
-                    child: _AssetImage(imageUrl: imageUrl, iconSize: 34),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      asset['name'] as String? ?? 'Tài sản',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      asset['assetCode'] as String? ?? 'Chưa có mã tài sản',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 9),
-                    AssetStatusChip(
-                      status: asset['status'] as String? ?? '',
-                      compact: true,
-                    ),
-                    const SizedBox(height: 7),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.apartment_outlined,
-                          size: 16,
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: Text(
-                            departmentLabel(asset['department'] as String?) ??
-                                'Chưa có phòng ban',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AssetImage extends StatelessWidget {
-  const _AssetImage({required this.imageUrl, required this.iconSize});
-
-  final String? imageUrl;
-  final double iconSize;
-
-  @override
-  Widget build(BuildContext context) => imageUrl == null
-      ? _placeholder(context, Icons.inventory_2_outlined)
-      : Image.network(
-          imageUrl!,
-          fit: BoxFit.cover,
-          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-            if (wasSynchronouslyLoaded) return child;
-
-            return AnimatedOpacity(
-              opacity: frame == null ? 0 : 1,
-              duration: const Duration(milliseconds: 220),
-              child: child,
-            );
-          },
-          errorBuilder: (_, _, _) =>
-              _placeholder(context, Icons.broken_image_outlined),
-        );
-
-  Widget _placeholder(BuildContext context, IconData icon) => ColoredBox(
-    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-    child: Center(child: Icon(icon, size: iconSize)),
-  );
-}
-
-class _AssetFilterSheet extends StatefulWidget {
-  const _AssetFilterSheet({
-    required this.categories,
-    required this.assets,
-    required this.initialCategoryId,
-    required this.initialStatuses,
-    required this.initialSort,
-  });
-
-  final List<Map<String, dynamic>> categories;
-  final List<Map<String, dynamic>> assets;
-  final String? initialCategoryId;
-  final Set<String> initialStatuses;
-  final String initialSort;
-
-  @override
-  State<_AssetFilterSheet> createState() => _AssetFilterSheetState();
-}
-
-class _AssetFilterSheetState extends State<_AssetFilterSheet> {
-  late String? _categoryId = widget.initialCategoryId;
-  late Set<String> _statuses = {...widget.initialStatuses};
-  late String _sort = widget.initialSort;
-
-  List<String> get _availableStatuses => {
-    ...widget.assets.map(
-      (asset) => assetStatusFilterKey(asset['status'] as String? ?? ''),
-    ),
-    ..._statuses,
-  }.where((status) => status.isNotEmpty).toList();
-
-  @override
-  Widget build(BuildContext context) => SafeArea(
-    child: Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        0,
-        20,
-        16 + MediaQuery.viewInsetsOf(context).bottom,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Bộ lọc tài sản',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 18),
-            DropdownButtonFormField<String?>(
-              initialValue: _categoryId,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Danh mục',
-                border: OutlineInputBorder(),
-              ),
-              items: [
-                const DropdownMenuItem(
-                  value: null,
-                  child: Text('Tất cả danh mục'),
-                ),
-                ...widget.categories.map(
-                  (category) => DropdownMenuItem(
-                    value: category['id'] as String,
-                    child: Text(category['name'] as String),
-                  ),
-                ),
-              ],
-              onChanged: (value) => setState(() => _categoryId = value),
-            ),
-            if (_availableStatuses.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Text(
-                'Trạng thái',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final status in _availableStatuses)
-                    FilterChip(
-                      label: Text(assetStatusLabel(status)),
-                      selected: _statuses.contains(status),
-                      onSelected: (selected) => setState(() {
-                        selected
-                            ? _statuses.add(status)
-                            : _statuses.remove(status);
-                      }),
-                    ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 20),
-            Text('Sắp xếp', style: Theme.of(context).textTheme.titleMedium),
-            RadioGroup<String>(
-              groupValue: _sort,
-              onChanged: (value) => setState(() => _sort = value!),
-              child: const Column(
-                children: [
-                  RadioListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: 'name_asc',
-                    title: Text('Tên A–Z'),
-                  ),
-                  RadioListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: 'name_desc',
-                    title: Text('Tên Z–A'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => setState(() {
-                      _categoryId = null;
-                      _statuses = {};
-                      _sort = 'name_asc';
-                    }),
-                    child: const Text('Đặt lại'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 2,
-                  child: FilledButton(
-                    onPressed: () => Navigator.pop(
-                      context,
-                      _AssetFilters(
-                        categoryId: _categoryId,
-                        statuses: _statuses,
-                        sort: _sort,
-                      ),
-                    ),
-                    child: const Text('Áp dụng bộ lọc'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-class _AssetFilters {
-  const _AssetFilters({
-    required this.categoryId,
-    required this.statuses,
-    required this.sort,
-  });
-
-  final String? categoryId;
-  final Set<String> statuses;
-  final String sort;
 }
 
 class _AssetListSkeleton extends StatelessWidget {

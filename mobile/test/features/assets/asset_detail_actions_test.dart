@@ -10,6 +10,7 @@ import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/asset_recalls/asset_recall_form.dart';
 import 'package:mobile/features/assets/asset_detail_screen.dart';
+import 'package:mobile/features/assets/assets_screen.dart';
 import 'package:mobile/features/repair_requests/repair_request_form.dart';
 
 class _AssetAdapter implements HttpClientAdapter {
@@ -19,6 +20,7 @@ class _AssetAdapter implements HttpClientAdapter {
   Completer<void>? repairGate;
   bool failAsset = false;
   final methods = <String>[];
+  final assetListQueries = <Map<String, dynamic>>[];
 
   Map<String, Object?> get asset => {
     'id': 'asset-id',
@@ -48,7 +50,20 @@ class _AssetAdapter implements HttpClientAdapter {
         if (repairGate case final gate?) await gate.future;
         data = repair;
       case '/assets/mine':
-        data = [asset];
+        assetListQueries.add(Map.of(options.queryParameters));
+        data = [
+          asset,
+          {
+            ...asset,
+            'id': 'spare-id',
+            'name': 'Laptop dự phòng',
+            'status': 'available',
+          },
+        ];
+      case '/assets/mine/categories':
+        data = [
+          {'id': 'laptops', 'name': 'Máy tính'},
+        ];
       case '/repair-requests/mine':
         data = <Object>[];
       default:
@@ -91,6 +106,49 @@ void main() {
     ApiClient.instance.dio.httpClientAdapter = adapter;
   });
   tearDown(() => ApiClient.instance.dio.httpClientAdapter = originalAdapter);
+
+  testWidgets('asset search and filters persist when returning from detail', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(theme: buildAppTheme(), home: const AssetsScreen()),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '  Laptop  ');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    expect(adapter.assetListQueries.last, {
+      'search': 'Laptop',
+      'sort': 'name_asc',
+    });
+
+    await tester.tap(find.text('Bộ lọc'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tất cả danh mục'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Máy tính').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilterChip, 'Đang sử dụng'));
+    await tester.tap(find.text('Tên Z–A'));
+    await tester.tap(find.text('Áp dụng bộ lọc'));
+    await tester.pumpAndSettle();
+
+    final filteredQuery = {
+      'search': 'Laptop',
+      'sort': 'name_desc',
+      'categoryId': 'laptops',
+    };
+    expect(adapter.assetListQueries.last, filteredQuery);
+    expect(find.text('Laptop dự phòng'), findsNothing);
+    await tester.tap(find.text('Laptop văn phòng'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AssetDetailScreen), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(adapter.assetListQueries, hasLength(4));
+    expect(adapter.assetListQueries.last, filteredQuery);
+    expect(find.text('Laptop dự phòng'), findsNothing);
+  });
 
   testWidgets('one floating button opens and dismisses the three actions', (
     tester,
