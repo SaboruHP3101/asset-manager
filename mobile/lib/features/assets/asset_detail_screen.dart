@@ -1,21 +1,18 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/network/api_client.dart';
-import '../../core/utils/department_labels.dart';
-import '../../core/utils/display_date.dart';
-import '../../core/utils/group_display_digits.dart';
-import '../repair_requests/repair_progress_screen.dart';
-import '../repair_requests/repair_request_form.dart';
 import '../asset_recalls/asset_recall_detail_screen.dart';
 import '../asset_recalls/asset_recall_form.dart';
 import '../asset_recalls/asset_upgrade_form.dart';
-import 'asset_status_chip.dart';
+import '../repair_requests/repair_progress_screen.dart';
+import '../repair_requests/repair_request_form.dart';
+import 'asset_action_sheet.dart';
+import 'asset_detail_content.dart';
 
-enum _AssetAction { recall, upgrade, repair }
+export 'asset_detail_content.dart' show AssetQrCodeView;
 
 class AssetDetailScreen extends StatefulWidget {
   const AssetDetailScreen({required this.assetId, super.key});
@@ -97,12 +94,12 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     if (created == true) await _loadRepairProgress();
   }
 
-  Future<void> _openRecallAction({bool upgrade = false}) async {
+  Future<void> _openRecallAction({
+    required String? existingRequestId,
+    bool upgrade = false,
+  }) async {
     final asset = _asset!;
-    final activeRecall = asset['activeRecall'] == null
-        ? null
-        : Map<String, dynamic>.from(asset['activeRecall'] as Map);
-    String? requestId = activeRecall?['id'] as String?;
+    var requestId = existingRequestId;
 
     if (requestId == null) {
       final result = await Navigator.of(context).push<AssetRecallFormResult>(
@@ -144,85 +141,28 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
         ? null
         : Map<String, dynamic>.from(asset['activeRecall'] as Map);
     final activeRecallType = activeRecall?['type'] as String?;
-    final action = await showModalBottomSheet<_AssetAction>(
+    final action = await showModalBottomSheet<AssetAction>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (context) => SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Yêu cầu tài sản',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Đóng thao tác',
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (asset['managementOwner'] == 'it') ...[
-                ListTile(
-                  enabled: _repairProgress == null || activeRecall != null,
-                  leading: Icon(
-                    activeRecallType == 'upgrade'
-                        ? Icons.upgrade
-                        : Icons.swap_horiz,
-                  ),
-                  title: Text(
-                    activeRecall == null
-                        ? 'Đổi / báo phế tài sản'
-                        : activeRecallType == 'upgrade'
-                        ? 'Xem phiếu nâng cấp tài sản'
-                        : 'Xem phiếu thu hồi tài sản',
-                  ),
-                  onTap: () => Navigator.pop(context, _AssetAction.recall),
-                ),
-                if (activeRecall == null)
-                  ListTile(
-                    enabled: _repairProgress == null,
-                    leading: const Icon(Icons.upgrade),
-                    title: const Text('Yêu cầu nâng cấp tài sản'),
-                    onTap: () => Navigator.pop(context, _AssetAction.upgrade),
-                  ),
-              ],
-              ListTile(
-                enabled: activeRecall == null || _repairProgress != null,
-                leading: Icon(
-                  _repairProgress == null
-                      ? Icons.build_outlined
-                      : Icons.timeline_outlined,
-                ),
-                title: Text(
-                  _repairProgress == null
-                      ? 'Gửi yêu cầu sửa chữa'
-                      : 'Xem tiến trình sửa chữa',
-                ),
-                onTap: () => Navigator.pop(context, _AssetAction.repair),
-              ),
-            ],
-          ),
-        ),
+      builder: (context) => AssetActionSheet(
+        isItManaged: asset['managementOwner'] == 'it',
+        hasActiveRepair: _repairProgress != null,
+        hasActiveRecall: activeRecall != null,
+        activeRecallType: activeRecallType,
       ),
     );
     if (!mounted || action == null) return;
     switch (action) {
-      case _AssetAction.recall:
-        await _openRecallAction(upgrade: activeRecallType == 'upgrade');
-      case _AssetAction.upgrade:
-        await _openRecallAction(upgrade: true);
-      case _AssetAction.repair:
+      case AssetAction.recall:
+        await _openRecallAction(
+          existingRequestId: activeRecall?['id'] as String?,
+          upgrade: activeRecallType == 'upgrade',
+        );
+      case AssetAction.upgrade:
+        await _openRecallAction(existingRequestId: null, upgrade: true);
+      case AssetAction.repair:
         await _openRepairAction();
     }
   }
@@ -270,8 +210,8 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
       return Scaffold(
         appBar: AppBar(title: const Text('Chi tiết tài sản')),
         body: _error == null
-            ? const _AssetDetailSkeleton()
-            : _DetailError(onRetry: _loadAsset),
+            ? const AssetDetailSkeleton()
+            : AssetDetailError(onRetry: _loadAsset),
       );
     }
 
@@ -288,103 +228,20 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             104 + MediaQuery.paddingOf(context).bottom,
           ),
           children: [
-            _AssetHero(
+            AssetHero(
               asset: asset,
               assetId: widget.assetId,
               imageUrl: _imageUrl(),
             ),
             if (!_detailsLoaded)
               _error == null
-                  ? const _AssetInfoSkeleton()
-                  : _AssetInfoError(onRetry: _loadAsset)
+                  ? const AssetInfoSkeleton()
+                  : AssetInfoError(onRetry: _loadAsset)
             else ...[
-              if (_repairProgress != null) ...[
-                const SizedBox(height: 12),
-                Card(
-                  color: Theme.of(context).colorScheme.tertiaryContainer,
-                  child: const ListTile(
-                    leading: Icon(Icons.build_circle_outlined),
-                    title: Text('Đang có yêu cầu sửa chữa'),
-                    subtitle: Text(
-                      'Chọn “Xem tiến trình sửa chữa” trong nút Yêu cầu.',
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              _DetailSection(
-                title: 'Thông tin sử dụng',
-                icon: Icons.person_pin_circle_outlined,
-                children: [
-                  _InfoRow(
-                    icon: Icons.person_outline,
-                    label: 'Người sử dụng',
-                    value: _value(asset['assignedTo']),
-                  ),
-                  _InfoRow(
-                    icon: Icons.location_on_outlined,
-                    label: 'Vị trí',
-                    value: _value(asset['currentLocation']),
-                  ),
-                  _InfoRow(
-                    icon: Icons.apartment_outlined,
-                    label: 'Phòng ban',
-                    value:
-                        departmentLabel(asset['department'] as String?) ??
-                        'Chưa cập nhật',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _DetailSection(
-                title: 'Thông tin tài sản',
-                icon: Icons.inventory_2_outlined,
-                children: [
-                  _InfoRow(
-                    icon: Icons.tag,
-                    label: 'Mã tài sản',
-                    value: _value(asset['assetCode']),
-                  ),
-                  _InfoRow(
-                    icon: Icons.category_outlined,
-                    label: 'Danh mục',
-                    value: _value(asset['category']),
-                  ),
-                  _InfoRow(
-                    icon: Icons.event_available_outlined,
-                    label: 'Ngày sử dụng',
-                    value: _formatDate(asset['inServiceDate']),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.qr_code_2),
-                    title: const Text('Mã QR'),
-                    subtitle: Text(_value(asset['qrCode'])),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: _showQrInfo,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _DetailSection(
-                title: 'Thông tin mua sắm',
-                icon: Icons.receipt_long_outlined,
-                children: [
-                  _InfoRow(
-                    icon: Icons.storefront_outlined,
-                    label: 'Nhà cung cấp',
-                    value: _value(asset['supplier']),
-                  ),
-                  _InfoRow(
-                    icon: Icons.calendar_today_outlined,
-                    label: 'Ngày mua',
-                    value: _formatDate(asset['purchaseDate']),
-                  ),
-                  _InfoRow(
-                    icon: Icons.payments_outlined,
-                    label: 'Nguyên giá',
-                    value: _formatCurrency(asset['initialValue']),
-                  ),
-                ],
+              AssetInformation(
+                asset: asset,
+                hasActiveRepair: _repairProgress != null,
+                onShowQrInfo: _showQrInfo,
               ),
             ],
           ],
@@ -405,299 +262,4 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             ),
     );
   }
-}
-
-class AssetQrCodeView extends StatelessWidget {
-  const AssetQrCodeView({required this.data, super.key});
-
-  final String data;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    image: true,
-    label: 'Mã QR tài sản',
-    child: SizedBox.square(
-      dimension: 240,
-      child: PrettyQrView.data(
-        data: data,
-        decoration: PrettyQrDecoration(
-          shape: PrettyQrSmoothSymbol(
-            color: Theme.of(context).colorScheme.onSurface,
-            roundFactor: 0.45,
-          ),
-          quietZone: const PrettyQrQuietZone.modules(2),
-        ),
-      ),
-    ),
-  );
-}
-
-class _AssetHero extends StatelessWidget {
-  const _AssetHero({
-    required this.asset,
-    required this.assetId,
-    required this.imageUrl,
-  });
-
-  final Map<String, dynamic> asset;
-  final String assetId;
-  final String? imageUrl;
-
-  @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(24),
-    child: SizedBox(
-      height: 280,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Hero(
-            tag: 'asset-image-$assetId',
-            child: imageUrl == null
-                ? ColoredBox(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHighest,
-                    child: const Icon(Icons.inventory_2_outlined, size: 72),
-                  )
-                : Image.network(
-                    imageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => ColoredBox(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest,
-                      child: const Icon(Icons.broken_image_outlined, size: 72),
-                    ),
-                  ),
-          ),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Color(0xCC101319)],
-                stops: [0.35, 1],
-              ),
-            ),
-          ),
-          Positioned(
-            left: 18,
-            right: 18,
-            bottom: 18,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AssetStatusChip(status: asset['status'] as String? ?? ''),
-                const SizedBox(height: 10),
-                Text(
-                  asset['name'] as String? ?? 'Tài sản',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  asset['assetCode'] as String? ?? 'Chưa có mã tài sản',
-                  style: Theme.of(context).textTheme.bodyMedium
-                      ?.copyWith(color: Colors.white70),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _DetailSection extends StatelessWidget {
-  const _DetailSection({
-    required this.title,
-    required this.icon,
-    required this.children,
-  });
-
-  final String title;
-  final IconData icon;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(8, 14, 8, 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                Icon(icon, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 20),
-          ...children,
-        ],
-      ),
-    ),
-  );
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => ListTile(
-    dense: true,
-    leading: Icon(icon),
-    title: Text(label),
-    subtitle: Text(
-      value,
-      style: Theme.of(context).textTheme.bodyLarge
-          ?.copyWith(fontWeight: FontWeight.w500),
-    ),
-  );
-}
-
-class _AssetDetailSkeleton extends StatelessWidget {
-  const _AssetDetailSkeleton();
-
-  @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(16),
-    children: [
-      Container(
-        height: 280,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      const SizedBox(height: 16),
-      for (var index = 0; index < 3; index++) ...[
-        Container(
-          height: 160,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        const SizedBox(height: 12),
-      ],
-    ],
-  );
-}
-
-class _AssetInfoSkeleton extends StatelessWidget {
-  const _AssetInfoSkeleton();
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 16),
-    child: Column(
-      children: [
-        for (var index = 0; index < 3; index++) ...[
-          Container(
-            height: 154,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          if (index < 2) const SizedBox(height: 12),
-        ],
-      ],
-    ),
-  );
-}
-
-class _AssetInfoError extends StatelessWidget {
-  const _AssetInfoError({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 16),
-    child: Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const Text('Không thể tải đầy đủ thông tin tài sản.'),
-            const SizedBox(height: 10),
-            OutlinedButton(onPressed: onRetry, child: const Text('Thử lại')),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-class _DetailError extends StatelessWidget {
-  const _DetailError({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.cloud_off_outlined,
-          size: 52,
-          color: Theme.of(context).colorScheme.outline,
-        ),
-        const SizedBox(height: 12),
-        const Text('Không thể tải chi tiết tài sản.'),
-        const SizedBox(height: 12),
-        FilledButton.tonal(onPressed: onRetry, child: const Text('Thử lại')),
-      ],
-    ),
-  );
-}
-
-String _value(Object? value) {
-  final text = value?.toString().trim();
-  return text?.isNotEmpty == true ? text! : 'Chưa cập nhật';
-}
-
-String _formatDate(Object? value) {
-  final raw = value?.toString();
-  if (raw == null || raw.isEmpty) return 'Chưa cập nhật';
-  final parsed = DateTime.tryParse(raw);
-  if (parsed == null) return raw;
-
-  return formatDisplayDate(parsed);
-}
-
-String _formatCurrency(Object? value) {
-  if (value == null) return 'Chưa cập nhật';
-  final number = num.tryParse(value.toString());
-  if (number == null) return value.toString();
-  final formatted = groupDisplayDigits(number.round().toString());
-
-  return '$formatted ₫';
 }
