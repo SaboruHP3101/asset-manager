@@ -145,20 +145,58 @@ export class ChatService {
     actor: AuthenticatedEmployee,
   ): Promise<ChatReply> {
     const records = await this.queries.read(query, actor);
-    const scope =
-      query.domain === 'depreciation'
-        ? `Theo quyền khấu hao; ${query.status === 'draft' || query.status === 'pending_approval' ? 'số liệu dự kiến, chưa ghi nhận' : 'số liệu đã ghi nhận'}`
-        : query.domain === 'inventory'
-          ? 'Tài sản đang giao cho bạn hoặc bản ghi do bạn kiểm kê'
-          : query.domain === 'handovers'
-            ? 'Tài sản đang giao cho bạn'
-            : query.scope === 'queue'
-              ? 'Công việc chờ bạn xử lý, giống tab Chờ xử lý hiện tại'
-              : query.scope === 'mine' && query.domain !== 'warehouse'
-                ? 'Dữ liệu của bạn'
-                : 'Trong phạm vi quyền hiện tại của bạn';
+    const scope = this.describeScope(query);
 
     return buildChatReply(query, records, sources[query.domain], scope);
+  }
+
+  private describeScope(query: ChatQueryDto): string {
+    if (query.domain === 'depreciation') {
+      const provisional = ['draft', 'pending_approval'].includes(query.status);
+
+      return provisional
+        ? 'Theo quyền khấu hao; số liệu dự kiến, chưa ghi nhận'
+        : 'Theo quyền khấu hao; số liệu đã ghi nhận';
+    }
+
+    if (query.domain === 'inventory')
+      return 'Tài sản đang giao cho bạn hoặc bản ghi do bạn kiểm kê';
+
+    if (query.domain === 'handovers') return 'Tài sản đang giao cho bạn';
+
+    if (query.scope === 'queue')
+      return 'Công việc chờ bạn xử lý, giống tab Chờ xử lý hiện tại';
+
+    if (query.scope === 'mine' && query.domain !== 'warehouse')
+      return 'Dữ liệu của bạn';
+
+    return 'Trong phạm vi quyền hiện tại của bạn';
+  }
+
+  private async refreshContext(
+    existing: Conversation | undefined,
+    actor: AuthenticatedEmployee,
+  ) {
+    const context = [];
+
+    // Refresh saved query plans so historical results respect current permissions.
+    for (const turn of existing?.turns ?? []) {
+      const results = [];
+
+      for (const query of turn.queries) {
+        try {
+          results.push(toolResult(await this.read(query, actor)));
+        } catch (error) {
+          if (!(error instanceof ForbiddenException)) throw error;
+
+          results.push({ error: 'Dữ liệu trước không còn được phép xem.' });
+        }
+      }
+
+      context.push({ question: turn.question, results });
+    }
+
+    return context;
   }
 
   async ask(
@@ -191,24 +229,7 @@ export class ChatService {
     try {
       const conversationId = dto.conversationId ?? randomUUID();
       const signal = AbortSignal.timeout(75_000);
-      const context = [];
-
-      // Retain only questions and query plans; refresh historical data with today's actor permissions.
-      for (const turn of existing?.turns ?? []) {
-        const results = [];
-
-        for (const query of turn.queries) {
-          try {
-            results.push(toolResult(await this.read(query, actor)));
-          } catch (error) {
-            if (!(error instanceof ForbiddenException)) throw error;
-
-            results.push({ error: 'Dữ liệu trước không còn được phép xem.' });
-          }
-        }
-
-        context.push({ question: turn.question, results });
-      }
+      const context = await this.refreshContext(existing, actor);
 
       const contents: GeminiContent[] = [
         {

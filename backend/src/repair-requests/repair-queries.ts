@@ -1,5 +1,5 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, or, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 import * as schema from '../db/schema.js';
@@ -16,7 +16,7 @@ import {
 } from './repair-context.js';
 
 type Database = NodePgDatabase<typeof schema>;
-export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
+export function repairQueueScope(actor: AuthenticatedEmployee) {
   const conditions = [];
 
   // Trưởng bộ phận chỉ duyệt ở bước đầu và trong bộ phận mình.
@@ -62,7 +62,11 @@ export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
     )!,
   );
 
-  return findSummaries(db, or(...conditions)!);
+  return or(...conditions) ?? sql`false`;
+}
+
+export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
+  return findSummaries(db, repairQueueScope(actor));
 }
 
 export async function findItAssignees(

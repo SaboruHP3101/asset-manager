@@ -5,7 +5,6 @@ import { validate } from 'class-validator';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
-import type { PurchaseRequestsService } from '../purchase-requests/purchase-requests.service.js';
 import { RepairRequestsService } from '../repair-requests/repair-requests.service.js';
 import type { RequestAuditService } from '../request-audit/request-audit.service.js';
 import * as schema from '../db/schema.js';
@@ -63,27 +62,22 @@ function database(rows: unknown[] = []) {
     update: vi.fn(),
     delete: vi.fn(),
   };
-  const requests = { findQueue: vi.fn().mockResolvedValue([]) };
-  const repairs = { findQueue: vi.fn().mockResolvedValue([]) };
   const service = new ChatQueryService(
     db as unknown as NodePgDatabase<typeof schema>,
-    requests as unknown as PurchaseRequestsService,
-    repairs as unknown as RepairRequestsService,
   );
 
-  return { db, chain, requests, repairs, service };
+  return { db, chain, service };
 }
 
 describe('chat input and scope', () => {
   it.each([false, true])(
-    'uses the existing repair queue for the current IT actor (head=%s)',
+    'uses the shared repair queue predicate for the current IT actor (head=%s)',
     async (isDepartmentHead) => {
       const principal = { ...actor, departmentName: 'IT', isDepartmentHead };
-      const { service, repairs, chain, db } = database([
+      const { service, chain, db } = database([
         { id: 'queued-repair', assetCode: 'A1' },
       ]);
 
-      repairs.findQueue.mockResolvedValue([{ id: 'queued-repair' }]);
       await service.read(
         query({ domain: 'repairs', scope: 'queue' }),
         principal,
@@ -91,9 +85,12 @@ describe('chat input and scope', () => {
 
       const compiled = new PgDialect().sqlToQuery(chain.where.mock.calls[0][0]);
 
-      expect(repairs.findQueue).toHaveBeenCalledWith(principal);
-      expect(compiled.sql).toContain('"repair_requests"."id" in');
-      expect(compiled.params).toContain('queued-repair');
+      expect(compiled.params).toContain('in_progress');
+      expect(compiled.params).toContain(principal.id);
+      expect(db.select).toHaveBeenCalledOnce();
+
+      if (!isDepartmentHead) expect(compiled.sql).toContain('assigned_to');
+
       expect(db.insert).not.toHaveBeenCalled();
       expect(db.update).not.toHaveBeenCalled();
       expect(db.delete).not.toHaveBeenCalled();
@@ -111,7 +108,7 @@ describe('chat input and scope', () => {
     ).toEqual([]);
     expect(
       new PgDialect().sqlToQuery(chain.where.mock.calls[0][0]).sql,
-    ).toContain('false');
+    ).toContain('"repair_requests"."assigned_to"');
   });
 
   it.each([false, true])(

@@ -31,7 +31,7 @@ export async function findMine(db: Database, actor: AuthenticatedEmployee) {
 }
 
 /** Lists requests awaiting an action in the current employee’s scope. */
-export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
+export function purchaseQueueScope(actor: AuthenticatedEmployee) {
   const conditions = [];
 
   if (actor.isDepartmentHead) {
@@ -59,7 +59,10 @@ export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
     conditions.push(eq(schema.purchaseRequests.status, 'pending_it_head'));
   }
 
-  if (conditions.length === 0) return [];
+  return or(...conditions) ?? sql`false`;
+}
+
+export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
 
   return db
     .select({
@@ -75,7 +78,7 @@ export async function findQueue(db: Database, actor: AuthenticatedEmployee) {
       schema.employees,
       eq(schema.purchaseRequests.requesterId, schema.employees.id),
     )
-    .where(or(...conditions))
+    .where(purchaseQueueScope(actor))
     .orderBy(asc(schema.purchaseRequests.updatedAt));
 }
 
