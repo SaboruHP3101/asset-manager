@@ -112,57 +112,63 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
       _error = null;
     });
     try {
-      final results = await Future.wait<List<Object>>([
+      var mine = 0;
+      var requestQueue = 0;
+      var eligibleRequests = 0;
+      var approvalQueue = 0;
+      var orders = <PurchaseOrderSummary>[];
+      var inspectionQueue = 0;
+      var allocationQueue = 0;
+      await Future.wait<void>([
         if (_canViewMine)
-          _requestsRepository.findMine()
-        else
-          Future.value(const <Object>[]),
+          _requestsRepository.findMine().then((items) {
+            mine = items.length;
+          }),
         if (_canProcessRequests)
-          _requestsRepository.findQueue()
-        else
-          Future.value(const <Object>[]),
+          _requestsRepository.findQueue().then((items) {
+            requestQueue = items.length;
+          }),
         if (_canCreateOrder)
-          _ordersRepository.findEligibleRequests()
-        else
-          Future.value(const <Object>[]),
+          _ordersRepository.findEligibleRequests().then((items) {
+            eligibleRequests = items.length;
+          }),
         if (_canApproveOrder)
-          _ordersRepository.findApprovalQueue()
-        else
-          Future.value(const <Object>[]),
+          _ordersRepository.findApprovalQueue().then((items) {
+            approvalQueue = items.length;
+          }),
         if (_canTrackOrders || _canCreateOrder)
-          _ordersRepository.findAll()
-        else
-          Future.value(const <Object>[]),
+          _ordersRepository.findAll().then((items) {
+            orders = items;
+          }),
         if (_canInspect)
-          _receiptsRepository.findInspectionQueue()
-        else
-          Future.value(const <Object>[]),
-        _allocationsRepository.findQueue(),
+          _receiptsRepository.findInspectionQueue().then((items) {
+            inspectionQueue = items.length;
+          }),
+        _allocationsRepository.findQueue().then((items) {
+          allocationQueue = items.length;
+        }),
       ]);
       if (!mounted) return;
-      final ongoingOrderCount = results[4]
-          .cast<PurchaseOrderSummary>()
+
+      final ongoingOrderCount = orders
           .where(
             (order) => ['issued', 'partially_received'].contains(order.status),
           )
           .length;
       final draftOrderCount = _canCreateOrder
-          ? results[4]
-                .cast<PurchaseOrderSummary>()
-                .where((order) => order.status == 'draft')
-                .length
+          ? orders.where((order) => order.status == 'draft').length
           : 0;
       setState(() {
         _counts = _HubCounts(
-          mine: results[0].length,
-          requestQueue: results[1].length,
+          mine: mine,
+          requestQueue: requestQueue,
           orderQueue:
-              results[2].length +
-              results[3].length +
+              eligibleRequests +
+              approvalQueue +
               draftOrderCount +
               ongoingOrderCount,
-          inspectionQueue: results[5].length,
-          allocationQueue: results[6].length,
+          inspectionQueue: inspectionQueue,
+          allocationQueue: allocationQueue,
         );
       });
     } catch (error) {
