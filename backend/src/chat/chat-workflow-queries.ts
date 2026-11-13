@@ -1,43 +1,20 @@
 import { purchaseQueueScope } from '../purchase-requests/purchase-request-queries.js';
-
 import { repairQueueScope } from '../repair-requests/repair-queries.js';
-
-import {
-  BadRequestException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-} from '@nestjs/common';
-
-import {
-  and,
-  desc,
-  eq,
-  inArray,
-  notInArray,
-  or,
-  sql,
-  type SQL,
-  type SQLWrapper,
-} from 'drizzle-orm';
-
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { and, desc, eq, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
-
 import {
   getAllowedWorkflowActions,
   WORKFLOW_ACTIONS,
 } from '../auth/workflow-actions.config.js';
-
-import { PurchaseRequestsService } from '../purchase-requests/purchase-requests.service.js';
-
-import { RepairRequestsService } from '../repair-requests/repair-requests.service.js';
-
 import * as s from '../db/schema.js';
-
-import { DRIZZLE } from '../drizzle/drizzle.module.js';
-
+import {
+  CHAT_RECORD_LIMIT,
+  filters,
+  purchaseReadScope,
+  repairReadScope,
+} from './chat-query-scope.js';
 import { ChatQueryDto, type ChatRecord } from './chat.dto.js';
 
 type Database = NodePgDatabase<typeof s>;
@@ -279,12 +256,3 @@ export async function depreciation(
       })),
   );
 }
-import {
-  CHAT_RECORD_LIMIT,
-  actionModules,
-  actionVerbs,
-  assetReadScope,
-  repairReadScope,
-  purchaseReadScope,
-  filters,
-} from './chat-query-scope.js';

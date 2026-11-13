@@ -1,14 +1,5 @@
-import { purchaseQueueScope } from '../purchase-requests/purchase-request-queries.js';
-import { repairQueueScope } from '../repair-requests/repair-queries.js';
-import {
-  BadRequestException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-} from '@nestjs/common';
 import {
   and,
-  desc,
   eq,
   inArray,
   notInArray,
@@ -17,24 +8,10 @@ import {
   type SQL,
   type SQLWrapper,
 } from 'drizzle-orm';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
-import {
-  getAllowedWorkflowActions,
-  WORKFLOW_ACTIONS,
-} from '../auth/workflow-actions.config.js';
-import { PurchaseRequestsService } from '../purchase-requests/purchase-requests.service.js';
-import { RepairRequestsService } from '../repair-requests/repair-requests.service.js';
 import * as s from '../db/schema.js';
-import { DRIZZLE } from '../drizzle/drizzle.module.js';
-import { ChatQueryDto, type ChatRecord } from './chat.dto.js';
-import { assets, inventory, handovers } from './chat-asset-queries.js';
-import {
-  repairs,
-  requests,
-  orders,
-  depreciation,
-} from './chat-workflow-queries.js';
+import { ChatQueryDto } from './chat.dto.js';
+
 export const CHAT_RECORD_LIMIT = 2000;
 
 export const actionModules: Record<string, string> = {

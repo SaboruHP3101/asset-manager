@@ -1,54 +1,17 @@
-import { purchaseQueueScope } from '../purchase-requests/purchase-request-queries.js';
-
-import { repairQueueScope } from '../repair-requests/repair-queries.js';
-
-import {
-  BadRequestException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-} from '@nestjs/common';
-
-import {
-  and,
-  desc,
-  eq,
-  inArray,
-  notInArray,
-  or,
-  sql,
-  type SQL,
-  type SQLWrapper,
-} from 'drizzle-orm';
-
+import { Inject, Injectable } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-
 import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
-
-import {
-  getAllowedWorkflowActions,
-  WORKFLOW_ACTIONS,
-} from '../auth/workflow-actions.config.js';
-
-import { PurchaseRequestsService } from '../purchase-requests/purchase-requests.service.js';
-
-import { RepairRequestsService } from '../repair-requests/repair-requests.service.js';
-
+import { getAllowedWorkflowActions } from '../auth/workflow-actions.config.js';
 import * as s from '../db/schema.js';
-
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
-
 import { ChatQueryDto, type ChatRecord } from './chat.dto.js';
-
-type Database = NodePgDatabase<typeof s>;
-
-import { assets, inventory, handovers } from './chat-asset-queries.js';
-
+import { assets, handovers, inventory } from './chat-asset-queries.js';
+import { actionModules, actionVerbs } from './chat-query-scope.js';
 import {
+  depreciation,
+  orders,
   repairs,
   requests,
-  orders,
-  depreciation,
 } from './chat-workflow-queries.js';
 
 @Injectable()
@@ -97,17 +60,9 @@ export class ChatQueryService {
     }
   }
 }
-import {
-  CHAT_RECORD_LIMIT,
-  actionModules,
-  actionVerbs,
-  assetReadScope,
-  repairReadScope,
-  purchaseReadScope,
-  filters,
-} from './chat-query-scope.js';
+
 export {
   assetReadScope,
-  repairReadScope,
   purchaseReadScope,
+  repairReadScope,
 } from './chat-query-scope.js';
