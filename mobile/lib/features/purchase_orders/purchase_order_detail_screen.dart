@@ -87,6 +87,8 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final detail = _detail;
+    final hasRemaining = _progress.any((line) => line.remaining > 0);
+    final pending = _progress.fold(0, (total, line) => total + line.pending);
     return Scaffold(
       appBar: AppBar(
         title: Text(detail?.purchaseOrderCode ?? 'Chi tiết đơn mua'),
@@ -132,6 +134,12 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
                             'Tiến độ giao và kiểm tra',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
+                          if (!hasRemaining)
+                            Text(
+                              pending > 0
+                                  ? 'Đã giao đủ · Chờ kiểm tra $pending'
+                                  : 'Đã giao đủ',
+                            ),
                           for (final line in _progress)
                             Card(
                               child: ListTile(
@@ -199,6 +207,16 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
           ? null
           : _OrderActionBar(
               detail: detail,
+              canRecordReceipt:
+                  detail.allows('purchase.receipt.record') && hasRemaining,
+              canCancel:
+                  detail.allows('purchase.order.cancel') &&
+                  pending == 0 &&
+                  _progress.every((line) => line.accepted == 0),
+              canCloseShort:
+                  detail.allows('purchase.receipt.close_short') &&
+                  pending == 0 &&
+                  hasRemaining,
               disabled: _acting,
               onEdit: _edit,
               onSubmit: _submit,
@@ -315,6 +333,9 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
 class _OrderActionBar extends StatelessWidget {
   const _OrderActionBar({
     required this.detail,
+    required this.canRecordReceipt,
+    required this.canCancel,
+    required this.canCloseShort,
     required this.disabled,
     required this.onEdit,
     required this.onSubmit,
@@ -325,6 +346,9 @@ class _OrderActionBar extends StatelessWidget {
   });
 
   final PurchaseOrderDetail detail;
+  final bool canRecordReceipt;
+  final bool canCancel;
+  final bool canCloseShort;
   final bool disabled;
   final VoidCallback onEdit;
   final VoidCallback onSubmit;
@@ -348,7 +372,7 @@ class _OrderActionBar extends StatelessWidget {
         child: const Text('Xử lý đơn mua'),
       );
     }
-    if (detail.allows('purchase.receipt.record')) {
+    if (canRecordReceipt) {
       primary = FilledButton.icon(
         onPressed: disabled ? null : onRecordReceipt,
         icon: const Icon(Icons.local_shipping_outlined),
@@ -357,8 +381,6 @@ class _OrderActionBar extends StatelessWidget {
     }
 
     final canEdit = detail.allows('purchase.order.create');
-    final canCancel = detail.allows('purchase.order.cancel');
-    final canCloseShort = detail.allows('purchase.receipt.close_short');
     if (primary == null && !canEdit && !canCancel && !canCloseShort) {
       return const SizedBox.shrink();
     }

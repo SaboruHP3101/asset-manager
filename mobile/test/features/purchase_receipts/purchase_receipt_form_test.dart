@@ -7,28 +7,85 @@ import 'package:mobile/features/purchase_receipts/purchase_receipt_models.dart';
 import 'package:mobile/features/purchase_receipts/purchase_receipts_repository.dart';
 
 class _FakeRepository extends PurchaseReceiptsRepository {
-  _FakeRepository() : super(dio: Dio());
+  _FakeRepository({this.onlyCompleted = false}) : super(dio: Dio());
+
+  final bool onlyCompleted;
 
   @override
   Future<List<PurchaseReceiptProgress>> findOrderProgress(
     String orderId,
-  ) async => const [
-    PurchaseReceiptProgress(
-      purchaseOrderItemId: 'item-id',
-      itemName: 'Laptop Dell',
+  ) async => [
+    if (!onlyCompleted)
+      const PurchaseReceiptProgress(
+        purchaseOrderItemId: 'item-id',
+        itemName: 'Laptop Dell',
+        trackingMode: 'individual_asset',
+        managementOwner: 'it',
+        ordered: 2,
+        delivered: 0,
+        accepted: 0,
+        rejected: 0,
+        pending: 0,
+        remaining: 2,
+      ),
+    const PurchaseReceiptProgress(
+      purchaseOrderItemId: 'completed-id',
+      itemName: 'HP PC',
       trackingMode: 'individual_asset',
       managementOwner: 'it',
-      ordered: 2,
-      delivered: 0,
+      ordered: 1,
+      delivered: 1,
       accepted: 0,
       rejected: 0,
-      pending: 0,
-      remaining: 2,
+      pending: 1,
+      remaining: 0,
     ),
   ];
 }
 
 void main() {
+  testWidgets('chỉ nhập số lượng cho hạng mục còn có thể giao', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PurchaseReceiptFormScreen(
+          orderId: 'order-id',
+          repository: _FakeRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('HP PC'), findsNothing);
+    final quantity = find.byKey(const ValueKey('receipt-quantity-item-id'));
+    final submit = find.widgetWithText(FilledButton, 'Ghi nhận đợt giao');
+    expect(tester.widget<FilledButton>(submit).onPressed, isNull);
+    await tester.enterText(quantity, '1');
+    await tester.pump();
+    expect(tester.widget<FilledButton>(submit).onPressed, isNotNull);
+    await tester.enterText(quantity, '0');
+    await tester.pump();
+    expect(tester.widget<FilledButton>(submit).onPressed, isNull);
+  });
+
+  testWidgets('hiện thông báo nếu đơn đã được giao đủ khi mở form', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PurchaseReceiptFormScreen(
+          orderId: 'order-id',
+          repository: _FakeRepository(onlyCompleted: true),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Không còn số lượng có thể giao.'), findsOneWidget);
+    expect(find.byType(FilledButton), findsNothing);
+  });
+
   testWidgets('quét số phiếu giao hàng', (tester) async {
     String? scannerTitle;
     var scannedTargetCount = 0;

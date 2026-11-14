@@ -93,15 +93,30 @@ class _OverflowActionRepository extends PurchaseOrdersRepository {
 }
 
 class _ReceiptsRepository extends PurchaseReceiptsRepository {
-  _ReceiptsRepository() : super(dio: Dio());
+  _ReceiptsRepository({this.pending = 0, this.ordered = 1}) : super(dio: Dio());
 
+  final int pending;
+  final int ordered;
   String? closeShortReason;
 
   @override
   Future<List<PurchaseReceiptProgress>> findOrderProgress(
     String orderId,
   ) async {
-    return const [];
+    return [
+      PurchaseReceiptProgress(
+        purchaseOrderItemId: 'item-id',
+        itemName: 'HP PC',
+        trackingMode: 'individual_asset',
+        managementOwner: 'it',
+        ordered: ordered,
+        delivered: pending,
+        accepted: 0,
+        rejected: 0,
+        pending: pending,
+        remaining: ordered - pending,
+      ),
+    ];
   }
 
   @override
@@ -137,6 +152,55 @@ PurchaseOrderDetail _detail(
 );
 
 void main() {
+  testWidgets('chờ kiểm tra vẫn cho giao phần còn lại và ẩn menu', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PurchaseOrderDetailScreen(
+          orderId: 'order-id',
+          repository: _FakeRepository(
+            _detail(const [
+              'purchase.receipt.record',
+              'purchase.receipt.close_short',
+              'purchase.order.cancel',
+            ], status: 'issued'),
+          ),
+          receiptsRepository: _ReceiptsRepository(ordered: 2, pending: 1),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ghi nhận giao hàng'), findsOneWidget);
+    expect(find.byTooltip('Thêm hành động'), findsNothing);
+  });
+
+  testWidgets('ẩn ghi nhận giao hàng khi đã giao đủ và đang chờ kiểm tra', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PurchaseOrderDetailScreen(
+          orderId: 'order-id',
+          repository: _FakeRepository(
+            _detail(const [
+              'purchase.receipt.record',
+              'purchase.receipt.close_short',
+              'purchase.order.cancel',
+            ], status: 'issued'),
+          ),
+          receiptsRepository: _ReceiptsRepository(pending: 1),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ghi nhận giao hàng'), findsNothing);
+    expect(find.byTooltip('Thêm hành động'), findsNothing);
+    expect(find.text('Đã giao đủ · Chờ kiểm tra 1'), findsOneWidget);
+  });
+
   testWidgets('retry after successful approval only reloads detail', (
     tester,
   ) async {
@@ -326,6 +390,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('Duyệt và phát hành'),
+      150,
+      scrollable: find.byType(Scrollable),
+    );
     expect(find.text('Duyệt và phát hành'), findsOneWidget);
     expect(find.text('Xử lý đơn mua'), findsNothing);
     final receiptButton = tester.widget<FilledButton>(

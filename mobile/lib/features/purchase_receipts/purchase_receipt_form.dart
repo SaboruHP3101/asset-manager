@@ -53,14 +53,17 @@ class _PurchaseReceiptFormScreenState extends State<PurchaseReceiptFormScreen> {
 
   Future<void> _load() async {
     try {
-      final items = await _repository.findOrderProgress(widget.orderId);
+      final progress = await _repository.findOrderProgress(widget.orderId);
+      if (!mounted) return;
+
+      final items = progress.where((item) => item.remaining > 0).toList();
       for (final item in items) {
         _quantities[item.purchaseOrderItemId] = TextEditingController(
           text: '0',
         );
         _serials[item.purchaseOrderItemId] = TextEditingController();
       }
-      if (mounted) setState(() => _items = items);
+      setState(() => _items = items);
     } catch (error) {
       if (mounted) setState(() => _error = purchaseReceiptApiError(error));
     }
@@ -83,6 +86,8 @@ class _PurchaseReceiptFormScreenState extends State<PurchaseReceiptFormScreen> {
         ? Center(child: Text(_error!, textAlign: TextAlign.center))
         : _items == null
         ? const Center(child: CircularProgressIndicator())
+        : _items!.isEmpty
+        ? const Center(child: Text('Không còn số lượng có thể giao.'))
         : Form(
             key: _formKey,
             child: ListView(
@@ -137,7 +142,13 @@ class _PurchaseReceiptFormScreenState extends State<PurchaseReceiptFormScreen> {
                 ),
                 const SizedBox(height: 20),
                 FilledButton.icon(
-                  onPressed: _saving ? null : _submit,
+                  onPressed:
+                      _saving ||
+                          !_quantities.values.any(
+                            (field) => (int.tryParse(field.text) ?? 0) > 0,
+                          )
+                      ? null
+                      : _submit,
                   icon: _saving
                       ? const ButtonSpinner()
                       : const Icon(Icons.local_shipping_outlined),

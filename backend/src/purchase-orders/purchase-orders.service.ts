@@ -18,6 +18,11 @@ import type { AuthenticatedEmployee } from '../auth/workflow-auth.types.js';
 import * as schema from '../db/schema.js';
 import { DRIZZLE } from '../drizzle/drizzle.module.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import {
+  loadOrderItems,
+  loadOrderProgress,
+  lockOrder,
+} from '../purchase-receipts/purchase-receipt-queries.js';
 import { RequestAuditService } from '../request-audit/request-audit.service.js';
 import {
   CancelPurchaseOrderDto,
@@ -325,23 +330,19 @@ export class PurchaseOrdersService {
       const candidate = await requireOrder(tx, id);
 
       await this.lockRequest(tx, candidate.purchaseRequestId);
+      await lockOrder(tx, id);
       const order = await requireOrder(tx, id, ['issued']);
 
-      const [receipt] = await tx
-        .select({
-          acceptedQuantity: sql<number>`coalesce(sum(${schema.purchaseReceiptItems.acceptedQuantity}), 0)::int`,
-        })
-        .from(schema.purchaseReceiptItems)
-        .innerJoin(
-          schema.purchaseOrderItems,
-          eq(
-            schema.purchaseReceiptItems.purchaseOrderItemId,
-            schema.purchaseOrderItems.id,
-          ),
-        )
-        .where(eq(schema.purchaseOrderItems.purchaseOrderId, id));
+      const items = await loadOrderItems(tx, id);
+      const progress = await loadOrderProgress(tx, items);
 
-      if ((receipt?.acceptedQuantity ?? 0) > 0) {
+      if ([...progress.values()].some((line) => line.pending > 0)) {
+        throw new ConflictException(
+          'Không thể hủy đơn mua khi vẫn còn hàng chờ kiểm tra.',
+        );
+      }
+
+      if ([...progress.values()].some((line) => line.accepted > 0)) {
         throw new ConflictException(
           'PO đã có hàng đạt; hãy dùng thao tác đóng thiếu thay vì hủy.',
         );
