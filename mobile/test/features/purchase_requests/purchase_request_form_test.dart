@@ -37,6 +37,31 @@ class _FakeRepository extends PurchaseRequestsRepository {
   ];
 }
 
+class _RetryRepository extends _FakeRepository {
+  final saves = <String?>[];
+  final submits = <String>[];
+
+  @override
+  Future<PurchaseRequestDetail> save({
+    String? id,
+    required String neededByDate,
+    required String purpose,
+    String? note,
+    required List<PurchaseRequestItemDraft> items,
+  }) async {
+    saves.add(id);
+    return _draft(allowedActions: []);
+  }
+
+  @override
+  Future<void> submit(String id) async {
+    submits.add(id);
+    if (submits.length == 1) {
+      throw DioException(requestOptions: RequestOptions());
+    }
+  }
+}
+
 PurchaseRequestDetail _draft({
   required List<String> allowedActions,
   bool includeIncompleteItem = false,
@@ -70,6 +95,48 @@ PurchaseRequestDetail _draft({
 );
 
 void main() {
+  testWidgets('new purchase request retries submit with the saved draft ID', (
+    tester,
+  ) async {
+    final repository = _RetryRepository();
+    await tester.pumpWidget(
+      MaterialApp(home: PurchaseRequestFormScreen(repository: repository)),
+    );
+    await tester.pumpAndSettle();
+    final list = find.byType(Scrollable).first;
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.first, 'Trang bị làm việc');
+    await tester.scrollUntilVisible(
+      find.text('Chọn nhóm tài sản'),
+      250,
+      scrollable: list,
+    );
+    await tester.tap(find.text('Chọn nhóm tài sản'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Thiết bị điện tử & CNTT'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Chọn loại tài sản'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Máy tính xách tay'));
+    await tester.pumpAndSettle();
+
+    final name = find.widgetWithText(TextFormField, 'Tên tài sản *');
+    final specs = find.widgetWithText(TextFormField, 'Mô tả / thông số *');
+    await tester.scrollUntilVisible(name, 160, scrollable: list);
+    await tester.enterText(name, 'Laptop');
+    await tester.scrollUntilVisible(specs, 150, scrollable: list);
+    await tester.enterText(specs, 'RAM 16 GB');
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      await tester.tap(find.text('Kiểm tra & gửi'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Xác nhận gửi'));
+      await tester.pumpAndSettle();
+    }
+    expect(repository.saves, [null, 'request-id']);
+    expect(repository.submits, ['request-id', 'request-id']);
+  });
+
   testWidgets('saving expands and validates the first incomplete item', (
     tester,
   ) async {

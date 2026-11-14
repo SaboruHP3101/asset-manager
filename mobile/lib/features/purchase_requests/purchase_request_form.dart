@@ -33,6 +33,7 @@ class _PurchaseRequestFormState extends State<PurchaseRequestFormScreen> {
   int _expanded = 0;
   bool _loading = true;
   bool _saving = false;
+  String? _savedDraftId;
   bool _deleting = false;
   bool _dirty = false;
   String? _error;
@@ -117,12 +118,13 @@ class _PurchaseRequestFormState extends State<PurchaseRequestFormScreen> {
     setState(() => _saving = true);
     try {
       final detail = await _repository.save(
-        id: widget.initial?.id,
+        id: _savedDraftId ?? widget.initial?.id,
         neededByDate: _isoDate(_neededBy),
         purpose: _purpose.text.trim(),
         note: _note.text.trim(),
         items: [for (final item in _items) item.toDraft()],
       );
+      _savedDraftId = detail.id;
       if (submit) await _repository.submit(detail.id);
       if (!mounted) return;
       _dirty = false;

@@ -202,12 +202,14 @@ class _PurchaseOrderActionBar extends StatelessWidget {
     required this.enabled,
     required this.hint,
     required this.onSave,
+    required this.onSubmit,
   });
 
   final bool saving;
   final bool enabled;
   final String? hint;
   final VoidCallback onSave;
+  final VoidCallback? onSubmit;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -229,18 +231,87 @@ class _PurchaseOrderActionBar extends StatelessWidget {
               ),
               const SizedBox(height: 6),
             ],
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: enabled ? onSave : null,
-                icon: saving
-                    ? const ButtonSpinner()
-                    : const Icon(Icons.save_outlined),
-                label: Text(saving ? 'Đang lưu...' : 'Lưu nháp'),
-              ),
+            Wrap(
+              spacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                FilledButton.icon(
+                  onPressed: enabled ? onSave : null,
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('Lưu nháp'),
+                ),
+                if (onSubmit != null)
+                  FilledButton.icon(
+                    onPressed: enabled ? onSubmit : null,
+                    icon: const Icon(Icons.send_outlined),
+                    label: const Text('Gửi duyệt'),
+                  ),
+              ],
             ),
+            if (saving) const LinearProgressIndicator(),
           ],
         ),
+      ),
+    ),
+  );
+}
+
+class _NewOrderReviewSheet extends StatelessWidget {
+  const _NewOrderReviewSheet({
+    required this.requestCode,
+    required this.supplierName,
+    required this.orderDate,
+    required this.deliveryDate,
+    required this.items,
+  });
+
+  final String requestCode;
+  final String supplierName;
+  final DateTime orderDate;
+  final DateTime deliveryDate;
+  final Map<EligiblePurchaseOrderItem, int> items;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Kiểm tra trước khi gửi duyệt',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          const Text('Sau khi gửi, đơn sẽ bị khóa cho đến khi được trả về.'),
+          const SizedBox(height: 16),
+          Text('Đề nghị: $requestCode'),
+          Text('Nhà cung cấp: $supplierName'),
+          Text('Ngày đặt: ${formatDisplayDate(orderDate)}'),
+          Text('Giao dự kiến: ${formatDisplayDate(deliveryDate)}'),
+          const Divider(),
+          for (final entry in items.entries)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(entry.key.itemName),
+              trailing: Text('×${entry.value}'),
+            ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Xác nhận gửi duyệt'),
+            ),
+          ),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Quay lại kiểm tra'),
+            ),
+          ),
+        ],
       ),
     ),
   );

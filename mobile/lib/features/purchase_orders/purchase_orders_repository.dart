@@ -50,6 +50,7 @@ class PurchaseOrdersRepository {
     required String expectedDeliveryDate,
     String? contractId,
     required Map<String, int> quantities,
+    bool submitForApproval = false,
   }) async {
     final payload = {
       'purchaseRequestId': purchaseRequestId,
@@ -70,7 +71,10 @@ class PurchaseOrdersRepository {
     final response = id == null
         ? await _dio.post<Map<String, dynamic>>(
             '/purchase-orders',
-            data: payload,
+            data: {
+              ...payload,
+              if (submitForApproval) 'submitForApproval': true,
+            },
           )
         : await _dio.patch<Map<String, dynamic>>(
             '/purchase-orders/$id',

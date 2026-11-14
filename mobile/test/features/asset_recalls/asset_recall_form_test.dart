@@ -12,6 +12,10 @@ class _FakeRepository extends AssetRecallsRepository {
   String? createdReason;
   String? submittedId;
   String? createdType;
+  int creates = 0;
+  int submitAttempts = 0;
+  bool failFirstSubmit = false;
+  String? updatedReason;
 
   @override
   Future<Map<String, dynamic>> create({
@@ -19,6 +23,7 @@ class _FakeRepository extends AssetRecallsRepository {
     required String reason,
     String type = 'exchange',
   }) async {
+    creates++;
     createdReason = reason;
     createdType = type;
 
@@ -26,10 +31,24 @@ class _FakeRepository extends AssetRecallsRepository {
   }
 
   @override
+  Future<Map<String, dynamic>> update({
+    required String id,
+    required String reason,
+  }) async {
+    expect(id, 'recall-id');
+    updatedReason = reason;
+    return {'id': id};
+  }
+
+  @override
   Future<Map<String, dynamic>> submit(
     String id, {
     bool resubmit = false,
   }) async {
+    submitAttempts++;
+    if (failFirstSubmit && submitAttempts == 1) {
+      throw DioException(requestOptions: RequestOptions());
+    }
     submittedId = id;
 
     return {'id': id, 'status': 'pending_department_head'};
@@ -49,6 +68,24 @@ Widget _form(_FakeRepository repository) => MaterialApp(
 );
 
 void main() {
+  testWidgets('submit retry updates the draft already created', (tester) async {
+    final repository = _FakeRepository()..failFirstSubmit = true;
+    await tester.pumpWidget(_form(repository));
+
+    for (final reason in ['Cần đổi thiết bị', 'Cần đổi thiết bị tương đương']) {
+      await tester.enterText(find.byType(TextFormField), reason);
+      await tester.tap(find.text('Kiểm tra & gửi'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Xác nhận gửi'));
+      await tester.pumpAndSettle();
+    }
+
+    expect(repository.creates, 1);
+    expect(repository.submitAttempts, 2);
+    expect(repository.updatedReason, 'Cần đổi thiết bị tương đương');
+    expect(repository.submittedId, 'recall-id');
+  });
+
   testWidgets('cho phép lưu draft khi lý do chưa hoàn tất', (tester) async {
     final repository = _FakeRepository();
 

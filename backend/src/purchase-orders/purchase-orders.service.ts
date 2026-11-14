@@ -26,6 +26,7 @@ import {
 import { RequestAuditService } from '../request-audit/request-audit.service.js';
 import {
   CancelPurchaseOrderDto,
+  CreatePurchaseOrderDto,
   PurchaseOrderDecisionDto,
   SavePurchaseOrderDto,
 } from './dto/purchase-order.dto.js';
@@ -88,7 +89,7 @@ export class PurchaseOrdersService {
   findOne(id: string, actor: AuthenticatedEmployee) {
     return findOne(this.audit, this.authorization, this.db, id, actor);
   }
-  async create(dto: SavePurchaseOrderDto, actor: AuthenticatedEmployee) {
+  async create(dto: CreatePurchaseOrderDto, actor: AuthenticatedEmployee) {
     // Kiểm tra xem người tạo có phải là người thuộc phòng Thu mua
     // và có quyền tạo đơn mua hay không
     assertProcurementAction(
@@ -96,6 +97,15 @@ export class PurchaseOrdersService {
       actor,
       WORKFLOW_ACTIONS.purchaseOrderCreate,
     );
+
+    if (dto.submitForApproval) {
+      assertProcurementAction(
+        this.authorization,
+        actor,
+        WORKFLOW_ACTIONS.purchaseOrderSubmit,
+      );
+    }
+
     // Kiểm tra xem ngày giao dự kiến không đứng trước ngày đặt hàng
     validateDates(dto);
 
@@ -135,6 +145,10 @@ export class PurchaseOrdersService {
         entityType: 'order',
         entityId: order.id,
       });
+
+      if (dto.submitForApproval) {
+        await this.submitDraft(tx, order, actor);
+      }
 
       return order.id;
     });
@@ -214,40 +228,49 @@ export class PurchaseOrdersService {
       const order = await requireOrder(tx, id, ['draft']);
 
       this.assertOrderCreator(order, actor);
-      const now = new Date();
-
-      await tx
-        .update(schema.purchaseOrders)
-        .set({
-          status: 'pending_procurement_head',
-          submittedAt: now,
-          submittedBy: actor.id,
-          updatedAt: now,
-          updatedBy: actor.id,
-        })
-        .where(eq(schema.purchaseOrders.id, id));
-      const request = await requireRequest(tx, order.purchaseRequestId);
-
-      await this.audit.logPurchase(tx, {
-        requestId: request.id,
-        revision: request.currentRevision,
-        actionType: 'purchase.order.submit',
-        actor,
-        result: 'pending',
-        previousStatus: order.status,
-        newStatus: 'pending_procurement_head',
-        entityType: 'order',
-        entityId: id,
-      });
-      await notifyProcurementHeads(this.notifications, tx, {
-        recipientEvent: 'purchase_order_pending_approval',
-        order,
-        title: 'Đơn đặt mua chờ duyệt',
-        body: `${order.purchaseOrderCode} đang chờ Trưởng Thu mua xử lý.`,
-      });
+      await this.submitDraft(tx, order, actor);
     });
 
     return this.findOne(id, actor);
+  }
+
+  private async submitDraft(
+    tx: Database,
+    order: PurchaseOrder,
+    actor: AuthenticatedEmployee,
+  ) {
+    const id = order.id;
+    const now = new Date();
+
+    await tx
+      .update(schema.purchaseOrders)
+      .set({
+        status: 'pending_procurement_head',
+        submittedAt: now,
+        submittedBy: actor.id,
+        updatedAt: now,
+        updatedBy: actor.id,
+      })
+      .where(eq(schema.purchaseOrders.id, id));
+    const request = await requireRequest(tx, order.purchaseRequestId);
+
+    await this.audit.logPurchase(tx, {
+      requestId: request.id,
+      revision: request.currentRevision,
+      actionType: 'purchase.order.submit',
+      actor,
+      result: 'pending',
+      previousStatus: order.status,
+      newStatus: 'pending_procurement_head',
+      entityType: 'order',
+      entityId: id,
+    });
+    await notifyProcurementHeads(this.notifications, tx, {
+      recipientEvent: 'purchase_order_pending_approval',
+      order,
+      title: 'Đơn đặt mua chờ duyệt',
+      body: `${order.purchaseOrderCode} đang chờ Trưởng Thu mua xử lý.`,
+    });
   }
 
   async decide(

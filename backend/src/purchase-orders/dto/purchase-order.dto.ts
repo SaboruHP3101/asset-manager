@@ -46,6 +46,12 @@ export class SavePurchaseOrderDto {
   items: PurchaseOrderItemDto[];
 }
 
+export class CreatePurchaseOrderDto extends SavePurchaseOrderDto {
+  @IsOptional()
+  @IsBoolean()
+  submitForApproval?: boolean;
+}
+
 /** Quyết định duyệt hoặc trả đơn mua về nháp của Trưởng Thu mua. */
 export class PurchaseOrderDecisionDto {
   @IsBoolean()

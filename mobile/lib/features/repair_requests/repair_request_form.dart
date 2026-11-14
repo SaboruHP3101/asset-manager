@@ -34,6 +34,8 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
   final List<XFile> _media = [];
   List<Map<String, dynamic>> _assets = [];
   String? _assetId;
+  String? _savedDraftId;
+  bool get _canChangeAssetAndMedia => _savedDraftId == null && !_submitting;
   bool _loading = true;
   bool _submitting = false;
 
@@ -179,17 +181,17 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
     setState(() => _assetId = matches.first['id'] as String);
   }
 
-  // Gửi dữ liệu và các tệp đã chọn bằng multipart form
   Future<void> _save({required bool submit}) async {
     if (submit && !_formKey.currentState!.validate()) return;
     if (submit && !await _review()) return;
     setState(() => _submitting = true);
 
     try {
-      final requestId = widget.requestId;
+      final requestId = _savedDraftId ?? widget.requestId;
       final savedId = requestId == null
           ? await _createDraft()
           : await _updateDraft(requestId);
+      if (widget.requestId == null) _savedDraftId = savedId;
 
       if (submit) {
         final action = widget.revisionRequired ? 'resubmit' : 'submit';
@@ -291,19 +293,16 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
         false;
   }
 
-  // Lấy tên tệp gọn để hiển thị trong danh sách
   String _fileName(XFile file) {
     return file.path.split(RegExp(r'[/\\]')).last;
   }
 
-  // Đổi số byte thành dung lượng dễ đọc
   String _fileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
   }
 
-  // Kiểm tra tệp video bằng phần mở rộng phổ biến
   bool _isVideo(XFile file) {
     return RegExp(
       r'\.(mp4|mov|avi|mkv)$',
@@ -311,7 +310,6 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
     ).hasMatch(file.name);
   }
 
-  // Mở trang xem trước khi chạm vào tệp đã chọn
   void _previewMedia(XFile file) {
     _removeFocus();
     Navigator.of(context).push(
@@ -354,7 +352,9 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
                             ? 'Không có tài sản phù hợp để tạo yêu cầu.'
                             : null,
                         suffixIcon: IconButton(
-                          onPressed: _assets.isEmpty ? null : _scanQrCode,
+                          onPressed: _assets.isEmpty || !_canChangeAssetAndMedia
+                              ? null
+                              : _scanQrCode,
                           tooltip: 'Quét mã QR',
                           icon: const Icon(Icons.qr_code_scanner),
                         ),
@@ -370,7 +370,7 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
                             ),
                           )
                           .toList(),
-                      onChanged: _assets.isEmpty
+                      onChanged: _assets.isEmpty || !_canChangeAssetAndMedia
                           ? null
                           : (value) => setState(() => _assetId = value),
                       validator: (value) => value == null
@@ -412,14 +412,15 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
                         title: const Text('Hình ảnh/Video'),
                         subtitle: Text('Đã chọn ${_media.length} mục'),
                         trailing: OutlinedButton.icon(
-                          onPressed: _showMediaOptions,
+                          onPressed: _canChangeAssetAndMedia
+                              ? _showMediaOptions
+                              : null,
                           icon: const Icon(Icons.add_photo_alternate_outlined),
                           label: const Text('Thêm'),
                         ),
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // Danh sách tệp đã chọn với nút xóa bên phải
                     ..._media.asMap().entries.map(
                       (entry) => Card(
                         child: ListTile(
@@ -442,8 +443,10 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
                             ),
                           ),
                           trailing: IconButton(
-                            onPressed: () =>
-                                setState(() => _media.removeAt(entry.key)),
+                            onPressed: _canChangeAssetAndMedia
+                                ? () =>
+                                      setState(() => _media.removeAt(entry.key))
+                                : null,
                             tooltip: 'Xóa',
                             icon: const Icon(Icons.close),
                           ),

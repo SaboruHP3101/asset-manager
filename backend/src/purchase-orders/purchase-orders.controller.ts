@@ -19,6 +19,7 @@ import {
 import { WORKFLOW_ACTIONS } from '../auth/workflow-actions.config.js';
 import {
   CancelPurchaseOrderDto,
+  CreatePurchaseOrderDto,
   PurchaseOrderDecisionDto,
   PurchaseOrderQueryDto,
   SavePurchaseOrderDto,
@@ -34,7 +35,7 @@ export class PurchaseOrdersController {
   @Post()
   @RequireWorkflowAction(WORKFLOW_ACTIONS.purchaseOrderCreate)
   create(
-    @Body() dto: SavePurchaseOrderDto,
+    @Body() dto: CreatePurchaseOrderDto,
     @CurrentEmployee() actor: AuthenticatedEmployee,
   ) {
     return this.service.create(dto, actor);

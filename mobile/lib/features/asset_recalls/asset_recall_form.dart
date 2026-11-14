@@ -67,19 +67,22 @@ class _AssetRecallFormState extends State<AssetRecallForm> {
     super.dispose();
   }
 
+  String? _savedDraftId;
+
   Future<String> _saveDraft() async {
-    final request = widget.requestId == null
+    final id = _savedDraftId ?? widget.requestId;
+    final request = id == null
         ? await _repository.create(
             assetId: widget.assetId,
             reason: _reasonController.text.trim(),
             type: _type,
           )
         : await _repository.update(
-            id: widget.requestId!,
+            id: id,
             reason: _reasonController.text.trim(),
           );
 
-    return request['id'] as String;
+    return _savedDraftId = request['id'] as String;
   }
 
   Future<void> _save({required bool submit}) async {
@@ -187,7 +190,8 @@ class _AssetRecallFormState extends State<AssetRecallForm> {
                   child: Text('Báo phế tài sản'),
                 ),
               ],
-              onChanged: widget.requestId == null
+              onChanged:
+                  widget.requestId == null && _savedDraftId == null && !_saving
                   ? (value) => setState(() => _type = value!)
                   : null,
             ),

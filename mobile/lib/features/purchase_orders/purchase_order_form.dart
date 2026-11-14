@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../core/utils/display_date.dart';
-import '../../core/widgets/button_spinner.dart';
 import '../../core/widgets/retry_message.dart';
 
 import 'purchase_order_models.dart';
@@ -335,6 +334,9 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
               enabled: _canSave,
               hint: _actionHint,
               onSave: _save,
+              onSubmit: widget.initial == null
+                  ? () => _save(submitForApproval: true)
+                  : null,
             ),
     );
   }
@@ -408,12 +410,17 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     });
   }
 
-  Future<void> _save() async {
+  Future<void> _save({bool submitForApproval = false}) async {
     if (!_formKey.currentState!.validate() || !_canSave) return;
     final quantities = <String, int>{
       for (final item in _items)
         item.itemId: int.tryParse(_quantities[item.itemId]?.text ?? '') ?? 0,
     };
+    if (submitForApproval) {
+      final confirmed = await _confirmSubmission(quantities);
+      if (!mounted || confirmed != true) return;
+    }
+
     setState(() => _saving = true);
     try {
       await _repository.save(
@@ -424,6 +431,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
         expectedDeliveryDate: _formatApiDate(_deliveryDate),
         contractId: widget.initial?.contractId,
         quantities: quantities,
+        submitForApproval: submitForApproval,
       );
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -434,6 +442,23 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
           .showSnackBar(SnackBar(content: Text(purchaseOrderApiError(error))));
     }
   }
+
+  Future<bool?> _confirmSubmission(Map<String, int> quantities) =>
+      showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => _NewOrderReviewSheet(
+          requestCode: _selectedRequest!.requestCode,
+          supplierName: _items.first.supplierName,
+          orderDate: _orderDate,
+          deliveryDate: _deliveryDate,
+          items: {
+            for (final item in _items)
+              if (quantities[item.itemId]! > 0) item: quantities[item.itemId]!,
+          },
+        ),
+      );
 
   DateTime _today() {
     final now = DateTime.now();

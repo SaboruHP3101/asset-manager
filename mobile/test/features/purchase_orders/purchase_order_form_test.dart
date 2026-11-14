@@ -11,6 +11,7 @@ class _FakeRepository extends PurchaseOrdersRepository {
 
   Map<String, int>? savedQuantities;
   String? savedId;
+  bool? submittedForApproval;
 
   @override
   Future<PurchaseOrderDetail> save({
@@ -21,9 +22,11 @@ class _FakeRepository extends PurchaseOrdersRepository {
     required String expectedDeliveryDate,
     String? contractId,
     required Map<String, int> quantities,
+    bool submitForApproval = false,
   }) async {
     savedId = id;
     savedQuantities = quantities;
+    submittedForApproval = submitForApproval;
     return _draft;
   }
 
@@ -101,6 +104,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.savedId, 'draft-id');
+    expect(repository.submittedForApproval, isFalse);
     expect(repository.savedQuantities, {
       'laptop-id': 2,
       'monitor-id': 0,
@@ -136,11 +140,12 @@ void main() {
   });
 
   testWidgets('chọn hạng mục cập nhật tóm tắt và cho phép lưu', (tester) async {
+    final repository = _FakeRepository();
     await tester.pumpWidget(
       MaterialApp(
         theme: buildAppTheme(),
         home: PurchaseOrderFormScreen(
-          repository: _FakeRepository(),
+          repository: repository,
           initialRequestId: 'request-id',
         ),
       ),
@@ -171,5 +176,18 @@ void main() {
       find.widgetWithText(FilledButton, 'Lưu nháp'),
     );
     expect(saveButton.onPressed, isNotNull);
+    await tester.tap(find.text('Gửi duyệt'));
+    await tester.pumpAndSettle();
+    expect(repository.submittedForApproval, isNull);
+    await tester.tap(find.text('Quay lại kiểm tra'));
+    await tester.pumpAndSettle();
+    expect(repository.submittedForApproval, isNull);
+    await tester.tap(find.text('Gửi duyệt'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Xác nhận gửi duyệt'));
+    await tester.pumpAndSettle();
+    expect(repository.submittedForApproval, isTrue);
+    expect(repository.savedId, isNull);
+    expect(repository.savedQuantities?['laptop-id'], 1);
   });
 }

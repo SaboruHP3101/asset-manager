@@ -9,6 +9,70 @@ import 'package:mobile/features/repair_requests/repair_request_form.dart';
 import 'package:mobile/features/repair_requests/repair_requests_screen.dart';
 
 void main() {
+  testWidgets('repair submit retry patches the draft and submits the same ID', (
+    tester,
+  ) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final dio = ApiClient.instance.dio;
+    final writes = <String>[];
+    var submits = 0;
+    final fixture = InterceptorsWrapper(
+      onRequest: (options, handler) {
+        if (options.method != 'GET') {
+          writes.add('${options.method} ${options.path}');
+        }
+        switch ((options.method, options.path)) {
+          case ('GET', '/assets/mine'):
+            handler.resolve(
+              Response<List<dynamic>>(
+                requestOptions: options,
+                data: [
+                  {'id': 'asset-id', 'name': 'Laptop'},
+                ],
+              ),
+            );
+          case ('GET', '/repair-requests/mine'):
+            handler.resolve(
+              Response<List<dynamic>>(requestOptions: options, data: []),
+            );
+          case ('POST', '/repair-requests/mine'):
+            handler.resolve(
+              Response<Map<String, dynamic>>(
+                requestOptions: options,
+                data: {'id': 'repair-id'},
+              ),
+            );
+          case ('POST', '/repair-requests/repair-id/submit')
+              when submits++ == 0:
+            handler.reject(DioException(requestOptions: options));
+          default:
+            handler.resolve(Response<void>(requestOptions: options));
+        }
+      },
+    );
+    dio.interceptors.add(fixture);
+    addTearDown(() => dio.interceptors.remove(fixture));
+    await tester.pumpWidget(
+      const MaterialApp(home: RepairRequestForm(initialAssetId: 'asset-id')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), 'Màn hình hỏng');
+    final submit = find.text('Kiểm tra & gửi');
+    for (var attempt = 0; attempt < 2; attempt++) {
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Xác nhận gửi'));
+      await tester.pumpAndSettle();
+    }
+    expect(writes, [
+      'POST /repair-requests/mine',
+      'POST /repair-requests/repair-id/submit',
+      'PATCH /repair-requests/repair-id',
+      'POST /repair-requests/repair-id/submit',
+    ]);
+  });
+
   testWidgets('asset progress renders the wrapped request and timeline', (
     tester,
   ) async {
