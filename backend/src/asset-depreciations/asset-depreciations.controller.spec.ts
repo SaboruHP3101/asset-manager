@@ -50,8 +50,6 @@ describe('AssetDepreciationsController', () => {
           req.user = {
             id: periodId,
             email: 'test@example.com',
-            roleId: periodId,
-            roleName: 'EMPLOYEE',
             departmentId: periodId,
             departmentName: token === 'Bearer it' ? 'IT' : 'ACCOUNTING',
             isDepartmentHead: token === 'Bearer head',

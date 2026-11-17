@@ -10,8 +10,6 @@ import { WarehousesService } from './warehouses.service.js';
 const actor: AuthenticatedEmployee = {
   id: 'employee',
   email: 'it@example.test',
-  roleId: 'role',
-  roleName: 'EMPLOYEE',
   departmentId: 'it',
   departmentName: 'IT',
   isDepartmentHead: false,

@@ -17,8 +17,6 @@ vi.mock('../attachments/upload-cleanup.js', () => ({
 const reporter: AuthenticatedEmployee = {
   id: 'reporter',
   email: 'reporter@example.test',
-  roleId: 'role',
-  roleName: 'EMPLOYEE',
   departmentId: 'operations',
   departmentName: 'OPERATIONS',
   isDepartmentHead: false,

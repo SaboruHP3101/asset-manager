@@ -12,8 +12,6 @@ describe.each(['repair', 'transfer'] as const)(
     const actor: AuthenticatedEmployee = {
       id: 'outsider',
       email: 'user@example.test',
-      roleId: 'role',
-      roleName: 'EMPLOYEE',
       departmentId: 'other',
       departmentName: 'ACCOUNTING',
       isDepartmentHead: false,
@@ -106,8 +104,6 @@ describe('RequestAuditService', () => {
       actor: {
         id: 'actor-id',
         email: 'head@example.com',
-        roleId: 'role-id',
-        roleName: 'EMPLOYEE',
         departmentId: 'department-id',
         departmentName: 'WAREHOUSE',
         isDepartmentHead: true,
@@ -125,6 +121,7 @@ describe('RequestAuditService', () => {
         requestId: 'request-id',
         workflowRevision: 2,
         actorDepartmentId: 'department-id',
+        approverRole: 'WAREHOUSE',
         actorIsDepartmentHead: true,
         previousStatus: 'pending_department_head',
         newStatus: 'pending_procurement_enrichment',

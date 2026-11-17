@@ -18,8 +18,6 @@ describe('RepairCostsService', () => {
     const actor: AuthenticatedEmployee = {
       id: 'employee',
       email: 'employee@example.test',
-      roleId: 'role',
-      roleName: 'IT',
       departmentId: 'department',
       departmentName: 'WAREHOUSE',
       isDepartmentHead: false,
@@ -46,8 +44,6 @@ describe('RepairCostsService', () => {
     const actor: AuthenticatedEmployee = {
       id: actorId,
       email: 'it@example.test',
-      roleId: 'role',
-      roleName: 'EMPLOYEE',
       departmentId: 'it',
       departmentName: 'IT',
       isDepartmentHead: false,

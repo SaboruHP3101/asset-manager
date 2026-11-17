@@ -64,7 +64,6 @@ export class AuthService {
     const payload = {
       sub: employee.id,
       email: employee.email,
-      role: employee.roleId,
     };
 
     // 3. Ký và trả về Access Token
@@ -138,7 +137,7 @@ export class AuthService {
     return { exists: true, email: employee.email, firstTimeLogin: false };
   }
 
-  // Xác thực token và lấy thông tin nhân viên cùng phòng ban, vai trò
+  // Xác thực token và lấy thông tin nhân viên cùng phòng ban
   async getProfile(authHeader?: string) {
     const employeeId = await this.getEmployeeId(authHeader);
     const [profile] = await this.db
@@ -148,7 +147,6 @@ export class AuthService {
         email: schema.employees.email,
         phoneNumber: schema.employees.phoneNumber,
         department: schema.departments.name,
-        role: schema.roles.name,
         isDepartmentHead: schema.employees.isDepartmentHead,
       })
       .from(schema.employees)
@@ -156,7 +154,6 @@ export class AuthService {
         schema.departments,
         eq(schema.employees.departmentId, schema.departments.id),
       )
-      .innerJoin(schema.roles, eq(schema.employees.roleId, schema.roles.id))
       .where(eq(schema.employees.id, employeeId));
 
     if (!profile) throw new UnauthorizedException('Account not found.');
@@ -164,7 +161,6 @@ export class AuthService {
     return {
       ...profile,
       allowedActions: getAllowedWorkflowActions(
-        profile.role,
         profile.isDepartmentHead,
         profile.department,
       ),

@@ -25,7 +25,6 @@ export function assertAction(
 ) {
   if (
     !getAllowedWorkflowActions(
-      actor.roleName,
       actor.isDepartmentHead,
       actor.departmentName,
     ).includes(action)

@@ -10,8 +10,6 @@ import { PurchaseRequestsService } from './purchase-requests.service.js';
 const actor: AuthenticatedEmployee = {
   id: 'procurement-head-id',
   email: 'head@example.com',
-  roleId: 'role-id',
-  roleName: 'PROCUREMENT',
   departmentId: 'procurement-id',
   departmentName: 'PROCUREMENT',
   isDepartmentHead: true,

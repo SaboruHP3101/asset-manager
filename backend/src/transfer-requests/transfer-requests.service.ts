@@ -42,7 +42,7 @@ export class TransferRequestsService {
         requestId: request.id,
         actionType: 'requested',
         approvedBy: actor.id,
-        approverRole: actor.roleName,
+        approverRole: actor.departmentName,
         status: 'approved',
       });
 
@@ -134,7 +134,7 @@ export class TransferRequestsService {
         requestId: id,
         actionType: status,
         approvedBy: actor.id,
-        approverRole: actor.roleName,
+        approverRole: actor.departmentName,
         status: dto.approved ? 'approved' : 'rejected',
         notes: dto.note,
       });
@@ -165,7 +165,7 @@ export class TransferRequestsService {
         requestId: id,
         actionType: 'verified',
         approvedBy: actor.id,
-        approverRole: actor.roleName,
+        approverRole: actor.departmentName,
         status: 'approved',
       });
 
@@ -245,7 +245,7 @@ export class TransferRequestsService {
           requestId: id,
           actionType: 'completed',
           approvedBy: actor.id,
-          approverRole: actor.roleName,
+          approverRole: actor.departmentName,
           status: 'approved',
         });
       } else {
@@ -254,7 +254,7 @@ export class TransferRequestsService {
           requestId: id,
           actionType: `${role}_confirmed`,
           approvedBy: actor.id,
-          approverRole: actor.roleName,
+          approverRole: actor.departmentName,
           status: 'approved',
         });
       }

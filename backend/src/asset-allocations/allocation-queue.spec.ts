@@ -33,7 +33,6 @@ describe('allocation queue progress', () => {
       id: 'head-id',
       departmentId: 'department-id',
       departmentName: 'WAREHOUSE',
-      roleName: 'EMPLOYEE',
       isDepartmentHead: true,
     } as AuthenticatedEmployee;
 

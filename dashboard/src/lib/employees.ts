@@ -24,7 +24,7 @@ async function request<TData = unknown>(
       throw new Error("Bạn không có quyền quản lý nhân viên.");
     if (response.status === 409)
       throw new Error(
-        "Mã nhân viên hoặc email đã tồn tại, hoặc phòng ban/vai trò không hợp lệ."
+        "Mã nhân viên hoặc email đã tồn tại, hoặc phòng ban không hợp lệ."
       );
     if (response.status === 404)
       throw new Error(
@@ -43,7 +43,7 @@ export async function getEmployees(signal?: AbortSignal) {
 }
 
 export async function saveEmployee(
-  values: (EmployeeFormValue & { roleId: string }) | { isActive: boolean },
+  values: EmployeeFormValue | { isActive: boolean },
   id?: string
 ) {
   // Tạo mới hoặc lưu một nhân viên tuỳ vào có id hay không
@@ -65,20 +65,12 @@ const departmentLabels: Record<string, string> = {
   EXECUTIVE: "Ban Điều hành",
 };
 
-async function getOptions(path: string, signal: AbortSignal) {
-  return request<Option[]>(path, { signal });
-}
-
 export async function getEmployeeOptions(signal: AbortSignal) {
-  const [departments, roles] = await Promise.all([
-    getOptions("/departments", signal),
-    getOptions("/roles", signal),
-  ]);
+  const departments = await request<Option[]>("/departments", { signal });
   return {
     departments: departments.map((department) => ({
       ...department,
       label: departmentLabels[department.name] ?? department.name,
     })),
-    roles,
   };
 }

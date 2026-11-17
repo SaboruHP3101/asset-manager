@@ -238,7 +238,6 @@ function allowedActionsForRequest(
   },
 ) {
   const configured = getAllowedWorkflowActions(
-    actor.roleName,
     actor.isDepartmentHead,
     actor.departmentName,
   );

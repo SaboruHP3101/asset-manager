@@ -20,7 +20,6 @@ describe('EmployeesService', () => {
     fullName: 'New Employee',
     email: 'new@example.com',
     departmentId: 'department-id',
-    roleId: 'role-id',
     isDepartmentHead: false,
   };
 
@@ -55,7 +54,6 @@ describe('EmployeesService', () => {
       email: schema.employees.email,
       phoneNumber: schema.employees.phoneNumber,
       departmentId: schema.employees.departmentId,
-      roleId: schema.employees.roleId,
       isDepartmentHead: schema.employees.isDepartmentHead,
       isActive: schema.employees.isActive,
     });
@@ -82,7 +80,6 @@ describe('EmployeesService', () => {
       expect.objectContaining({
         id: schema.employees.id,
         departmentId: schema.employees.departmentId,
-        roleId: schema.employees.roleId,
       }),
     );
     expect(returning.mock.calls[0][0]).not.toHaveProperty('password');

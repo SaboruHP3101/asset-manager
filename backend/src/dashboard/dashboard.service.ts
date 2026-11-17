@@ -34,7 +34,6 @@ export class DashboardService {
   async getMySummary(actor: AuthenticatedEmployee) {
     const actions = new Set(
       getAllowedWorkflowActions(
-        actor.roleName,
         actor.isDepartmentHead,
         actor.departmentName,
       ),

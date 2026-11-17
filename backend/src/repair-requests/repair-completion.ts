@@ -77,7 +77,7 @@ export async function assign(
       requestId: id,
       actionType: 'assigned',
       approvedBy: actor.id,
-      approverRole: actor.roleName,
+      approverRole: actor.departmentName,
       status: 'approved',
       metadata: { assignedTo: dto.assignedTo }, // Phân biệt người giao việc với người nhận việc.
     });
@@ -124,7 +124,7 @@ export async function complete(
       requestId: id,
       actionType: 'completed',
       approvedBy: actor.id,
-      approverRole: actor.roleName,
+      approverRole: actor.departmentName,
       status: 'approved', // Ghi nhận bước IT hoàn tất. Nghiệm thu là một sự kiện riêng.
       previousStatus: current.status,
       newStatus: 'ready_for_return',
@@ -223,7 +223,7 @@ export async function confirmResult(
       requestId: id,
       actionType: dto.accepted ? 'confirmed' : 'rejected',
       approvedBy: actor.id,
-      approverRole: actor.roleName,
+      approverRole: actor.departmentName,
       status: dto.accepted ? 'approved' : 'rejected',
       previousStatus: current.status,
       newStatus: status,

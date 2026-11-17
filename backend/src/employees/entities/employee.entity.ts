@@ -5,7 +5,6 @@ export class Employee {
   email: string;
   phoneNumber?: string | null;
   departmentId: string;
-  roleId: string;
   isDepartmentHead: boolean;
   isActive: boolean;
   createdAt: Date;

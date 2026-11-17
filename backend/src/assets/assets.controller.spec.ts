@@ -21,8 +21,6 @@ describe('AssetsController', () => {
   const actor: AuthenticatedEmployee = {
     id: 'employee-id',
     email: 'it@example.com',
-    roleId: 'role-id',
-    roleName: 'EMPLOYEE',
     departmentId: 'department-id',
     departmentName: 'IT',
     isDepartmentHead: false,

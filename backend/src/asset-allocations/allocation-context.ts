@@ -217,7 +217,6 @@ export function canRead(
 
 export function actionsFor(actor: AuthenticatedEmployee): WorkflowAction[] {
   return getAllowedWorkflowActions(
-    actor.roleName,
     actor.isDepartmentHead,
     actor.departmentName,
   );

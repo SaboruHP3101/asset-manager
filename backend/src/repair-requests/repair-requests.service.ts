@@ -198,7 +198,7 @@ export class RepairRequestsService {
           requestId: request.id,
           actionType: 'repair.draft_created',
           approvedBy: actor.id,
-          approverRole: actor.roleName,
+          approverRole: actor.departmentName,
           status: 'pending',
           previousStatus: 'draft',
           newStatus: 'draft',

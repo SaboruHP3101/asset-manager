@@ -218,15 +218,6 @@ export const departments = pgTable('departments', {
   updatedBy: updatedBy(),
 });
 
-export const roles = pgTable('roles', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: varchar('name', { length: 100 }).notNull().unique(),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-  createdBy: createdBy(),
-  updatedBy: updatedBy(),
-});
-
 export const employees = pgTable('employees', {
   id: uuid('id').primaryKey().defaultRandom(),
   employeeCode: varchar('employee_code', { length: 100 }).notNull().unique(),
@@ -236,9 +227,6 @@ export const employees = pgTable('employees', {
   departmentId: uuid('department_id')
     .notNull()
     .references(() => departments.id),
-  roleId: uuid('role_id')
-    .notNull()
-    .references(() => roles.id),
   password: varchar('password', { length: 255 }),
   isActive: boolean('is_active').notNull().default(true),
   isDepartmentHead: boolean('is_department_head').notNull().default(false),
@@ -1013,7 +1001,8 @@ export const requestApprovals = pgTable('request_approvals', {
   requestId: uuid('request_id').notNull(),
   workflowRevision: integer('workflow_revision'),
   actionType: varchar('action_type', { length: 50 }).notNull(),
-  approverRole: varchar('approver_role', { length: 50 }).notNull(),
+  // Preserve historical role labels; new entries store the actor's department.
+  approverRole: varchar('approver_role', { length: 255 }).notNull(),
   approvedBy: uuid('approved_by')
     .notNull()
     .references(() => employees.id),

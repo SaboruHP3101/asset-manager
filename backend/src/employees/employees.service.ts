@@ -21,7 +21,6 @@ const employeeFields = {
   email: schema.employees.email,
   phoneNumber: schema.employees.phoneNumber,
   departmentId: schema.employees.departmentId,
-  roleId: schema.employees.roleId,
   isDepartmentHead: schema.employees.isDepartmentHead,
   isActive: schema.employees.isActive,
 };
@@ -43,7 +42,7 @@ export class EmployeesService {
     } catch (error: unknown) {
       if (isConstraintViolation(error)) {
         throw new ConflictException(
-          'Mã nhân viên hoặc email đã tồn tại, hoặc phòng ban/vai trò không hợp lệ.',
+          'Mã nhân viên hoặc email đã tồn tại, hoặc phòng ban không hợp lệ.',
         );
       }
 
@@ -97,7 +96,7 @@ export class EmployeesService {
 
       if (isConstraintViolation(error)) {
         throw new ConflictException(
-          'Mã nhân viên hoặc email đã tồn tại, hoặc phòng ban/vai trò không hợp lệ.',
+          'Mã nhân viên hoặc email đã tồn tại, hoặc phòng ban không hợp lệ.',
         );
       }
 

@@ -434,7 +434,7 @@ export class AssetDepreciationsService
       requestId: period.id,
       actionType: `depreciation.${action}`,
       approvedBy: actor.id,
-      approverRole: actor.roleName,
+      approverRole: actor.departmentName,
       actorDepartmentId: actor.departmentId,
       actorIsDepartmentHead: actor.isDepartmentHead,
       previousStatus: period.status,

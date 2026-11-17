@@ -14,12 +14,11 @@ export const preservedCoreTables = [
   'departments',
   'suppliers',
   'employees',
-  'roles',
   'warehouses',
 ] as const;
 
 // Thứ tự xóa đi từ bảng phụ thuộc đến bảng cha để giữ nguyên khóa ngoại
-// của bảy bảng lõi mà không cần dùng CASCADE.
+// của các bảng lõi mà không cần dùng CASCADE.
 export const nonCoreTableCleanupOrder = [
   'notifications',
   'approval_history',

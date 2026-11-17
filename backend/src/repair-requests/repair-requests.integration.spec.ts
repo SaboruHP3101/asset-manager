@@ -33,10 +33,6 @@ describe.skipIf(!connectionString)(
         .insert(schema.departments)
         .values({ name: 'REPAIR_TEST' })
         .returning();
-      const [role] = await db
-        .insert(schema.roles)
-        .values({ name: 'EMPLOYEE' })
-        .returning();
       const [employee] = await db
         .insert(schema.employees)
         .values({
@@ -44,7 +40,6 @@ describe.skipIf(!connectionString)(
           fullName: 'Repair reporter',
           email: 'repair-test@example.test',
           departmentId: department.id,
-          roleId: role.id,
         })
         .returning();
       const [category] = await db
@@ -85,8 +80,6 @@ describe.skipIf(!connectionString)(
         email: employee.email,
         departmentId: department.id,
         departmentName: department.name,
-        roleId: role.id,
-        roleName: role.name,
         isDepartmentHead: false,
       };
       assetId = asset.id;

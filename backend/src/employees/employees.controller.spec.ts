@@ -18,14 +18,11 @@ describe('EmployeesController', () => {
     fullName: 'New Employee',
     email: 'new@example.com',
     departmentId: '11111111-1111-4111-8111-111111111111',
-    roleId: '22222222-2222-4222-8222-222222222222',
     isDepartmentHead: false,
   };
   const actor: AuthenticatedEmployee = {
     id: 'employee-id',
     email: 'it@example.com',
-    roleId: 'role-id',
-    roleName: 'IT',
     departmentId: 'department-id',
     departmentName: 'IT',
     isDepartmentHead: false,
@@ -95,6 +92,26 @@ describe('EmployeesController', () => {
     ).toThrow(ForbiddenException);
     expect(create).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
+  });
+
+  it('accepts employee creation without a role and rejects removed role fields', async () => {
+    const pipe = new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
+
+    await expect(
+      pipe.transform(values, { type: 'body', metatype: CreateEmployeeDto }),
+    ).resolves.toMatchObject(values);
+
+    for (const metatype of [CreateEmployeeDto, UpdateEmployeeDto]) {
+      await expect(
+        pipe.transform(
+          { ...values, roleId: '22222222-2222-4222-8222-222222222222' },
+          { type: 'body', metatype },
+        ),
+      ).rejects.toThrow();
+    }
   });
 
   it('rejects password fields and accepts activation-only updates', async () => {

@@ -5,7 +5,6 @@ import { AppService } from './app.service.js';
 import { DrizzleModule } from './drizzle/drizzle.module.js';
 import { EmployeesModule } from './employees/employees.module.js';
 import { DepartmentsModule } from './departments/departments.module.js';
-import { RolesModule } from './roles/roles.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { AssetCategoriesModule } from './asset-categories/asset-categories.module.js';
 import { SuppliersModule } from './suppliers/suppliers.module.js';
@@ -52,7 +51,6 @@ import { ChatModule } from './chat/chat.module.js';
     WarehousesModule,
     EmployeesModule,
     DepartmentsModule,
-    RolesModule,
     AuthModule,
     AssetCategoriesModule,
     SuppliersModule,

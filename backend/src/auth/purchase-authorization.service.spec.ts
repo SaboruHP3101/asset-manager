@@ -5,8 +5,6 @@ import { PurchaseAuthorizationService } from './purchase-authorization.service.j
 const actor: AuthenticatedEmployee = {
   id: 'employee-id',
   email: 'employee@example.com',
-  roleId: 'role-id',
-  roleName: 'EMPLOYEE',
   departmentId: 'department-id',
   departmentName: 'WAREHOUSE',
   isDepartmentHead: false,

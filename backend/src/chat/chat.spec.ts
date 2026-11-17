@@ -22,8 +22,6 @@ import { GeminiService } from './gemini.service.js';
 const actor: AuthenticatedEmployee = {
   id: 'employee-one',
   email: 'one@example.test',
-  roleId: 'role-one',
-  roleName: 'EMPLOYEE',
   departmentId: 'department-one',
   departmentName: 'WAREHOUSE',
   isDepartmentHead: false,
@@ -167,7 +165,7 @@ describe('chat input and scope', () => {
 
     for (const principal of [
       actor,
-      { ...actor, roleName: 'IT', isDepartmentHead: true },
+      { ...actor, isDepartmentHead: true },
     ]) {
       const compiled = dialect.sqlToQuery(assetReadScope(principal));
 

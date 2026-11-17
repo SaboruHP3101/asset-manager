@@ -8,8 +8,6 @@ import { AssetDepreciationsService } from './asset-depreciations.service.js';
 const actor: AuthenticatedEmployee = {
   id: 'staff',
   email: 'staff@example.com',
-  roleId: 'role',
-  roleName: 'EMPLOYEE',
   departmentId: 'department',
   departmentName: 'ACCOUNTING',
   isDepartmentHead: false,

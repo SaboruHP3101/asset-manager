@@ -47,15 +47,12 @@ export class JwtAuthGuard implements CanActivate {
       .select({
         id: schema.employees.id,
         email: schema.employees.email,
-        roleId: schema.employees.roleId,
-        roleName: schema.roles.name,
         departmentId: schema.employees.departmentId,
         departmentName: schema.departments.name,
         isDepartmentHead: schema.employees.isDepartmentHead,
         isActive: schema.employees.isActive,
       })
       .from(schema.employees)
-      .innerJoin(schema.roles, eq(schema.employees.roleId, schema.roles.id))
       .innerJoin(
         schema.departments,
         eq(schema.employees.departmentId, schema.departments.id),

@@ -133,7 +133,7 @@ export class RequestAuditService {
       workflowRevision: entry.revision,
       actionType: entry.actionType,
       approvedBy: entry.actor.id,
-      approverRole: entry.actor.roleName,
+      approverRole: entry.actor.departmentName,
       actorDepartmentId: entry.actor.departmentId,
       actorIsDepartmentHead: entry.actor.isDepartmentHead,
       status: entry.result,

@@ -261,7 +261,6 @@ export function allowedActions(
   actor: AuthenticatedEmployee,
 ) {
   const configured = getAllowedWorkflowActions(
-    actor.roleName,
     actor.isDepartmentHead,
     actor.departmentName,
   );

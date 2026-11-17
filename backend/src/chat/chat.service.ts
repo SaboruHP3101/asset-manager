@@ -258,7 +258,6 @@ export class ChatService {
             departmentName: actor.departmentName,
             isDepartmentHead: actor.isDepartmentHead,
             allowedActions: getAllowedWorkflowActions(
-              actor.roleName,
               actor.isDepartmentHead,
               actor.departmentName,
             ),

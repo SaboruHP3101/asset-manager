@@ -41,7 +41,6 @@ export class ChatQueryService {
         return depreciation(this.db, query, actor);
       case 'permissions':
         return getAllowedWorkflowActions(
-          actor.roleName,
           actor.isDepartmentHead,
           actor.departmentName,
         ).map((action) => {

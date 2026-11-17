@@ -13,8 +13,6 @@ describe('authenticated read-only chat HTTP', () => {
   const employee = {
     id: 'server-employee',
     email: 'one@example.test',
-    roleId: 'role',
-    roleName: 'EMPLOYEE',
     departmentId: 'department',
     departmentName: 'WAREHOUSE',
     isDepartmentHead: false,

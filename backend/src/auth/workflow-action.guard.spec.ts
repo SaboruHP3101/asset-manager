@@ -4,17 +4,13 @@ import type { Reflector } from '@nestjs/core';
 import { WorkflowActionGuard } from './workflow-action.guard.js';
 import { WORKFLOW_ACTIONS } from './workflow-actions.config.js';
 
-function contextFor(
-  roleName: string,
-  isDepartmentHead = false,
-  departmentName = 'WAREHOUSE',
-) {
+function contextFor(isDepartmentHead = false, departmentName = 'WAREHOUSE') {
   return {
     getHandler: () => function handler() {},
     getClass: () => class Controller {},
     switchToHttp: () => ({
       getRequest: () => ({
-        user: { roleName, isDepartmentHead, departmentName },
+        user: { isDepartmentHead, departmentName },
       }),
     }),
   } as unknown as ExecutionContext;
@@ -29,16 +25,16 @@ function guardFor(action: string) {
 }
 
 describe('WorkflowActionGuard', () => {
-  it('cho phép role thực hiện hành động đã cấu hình', () => {
+  it('allows IT department staff to assess repairs without a role', () => {
     const guard = guardFor(WORKFLOW_ACTIONS.repairAssess);
 
-    expect(guard.canActivate(contextFor('IT'))).toBe(true);
+    expect(guard.canActivate(contextFor(false, 'IT'))).toBe(true);
   });
 
-  it('từ chối role không có hành động tương ứng', () => {
+  it('rejects employees outside the permitted department', () => {
     const guard = guardFor(WORKFLOW_ACTIONS.repairAssess);
 
-    expect(() => guard.canActivate(contextFor('EMPLOYEE'))).toThrow(
+    expect(() => guard.canActivate(contextFor(false, 'WAREHOUSE'))).toThrow(
       ForbiddenException,
     );
   });
@@ -46,22 +42,22 @@ describe('WorkflowActionGuard', () => {
   it('cấp hành động duyệt phòng ban theo cờ isDepartmentHead', () => {
     const guard = guardFor(WORKFLOW_ACTIONS.repairApproveDepartment);
 
-    expect(guard.canActivate(contextFor('IT', true))).toBe(true);
+    expect(guard.canActivate(contextFor(true))).toBe(true);
   });
 
-  it('cho phép role chuyên môn sử dụng hành động tự phục vụ của nhân viên', () => {
+  it('allows self-service actions across departments', () => {
     const guard = guardFor(WORKFLOW_ACTIONS.repairReport);
 
-    expect(guard.canActivate(contextFor('IT'))).toBe(true);
-    expect(guard.canActivate(contextFor('ACCOUNTING'))).toBe(true);
+    expect(guard.canActivate(contextFor(false, 'IT'))).toBe(true);
+    expect(guard.canActivate(contextFor(false, 'ACCOUNTING'))).toBe(true);
   });
 
-  it('cho phép role mới hoặc role cũ tạo request nhưng không cấp quyền chuyên môn', () => {
+  it('allows self-service but not IT actions for unknown departments', () => {
     const reportGuard = guardFor(WORKFLOW_ACTIONS.repairReport);
     const assessGuard = guardFor(WORKFLOW_ACTIONS.repairAssess);
 
-    expect(reportGuard.canActivate(contextFor('Quản lý'))).toBe(true);
-    expect(() => assessGuard.canActivate(contextFor('Quản lý'))).toThrow(
+    expect(reportGuard.canActivate(contextFor(false, 'Quản lý'))).toBe(true);
+    expect(() => assessGuard.canActivate(contextFor(false, 'Quản lý'))).toThrow(
       ForbiddenException,
     );
   });
@@ -69,17 +65,17 @@ describe('WorkflowActionGuard', () => {
   it('cấp quyền purchase theo phòng ban và cờ trưởng phòng', () => {
     expect(
       guardFor(WORKFLOW_ACTIONS.purchaseRequestEnrichProcurement).canActivate(
-        contextFor('EMPLOYEE', false, 'PROCUREMENT'),
+        contextFor(false, 'PROCUREMENT'),
       ),
     ).toBe(true);
     expect(
       guardFor(WORKFLOW_ACTIONS.purchaseRequestApproveProcurement).canActivate(
-        contextFor('EMPLOYEE', true, 'PROCUREMENT'),
+        contextFor(true, 'PROCUREMENT'),
       ),
     ).toBe(true);
     expect(
       guardFor(WORKFLOW_ACTIONS.purchaseRequestApproveIt).canActivate(
-        contextFor('EMPLOYEE', true, 'IT'),
+        contextFor(true, 'IT'),
       ),
     ).toBe(true);
   });
@@ -87,11 +83,11 @@ describe('WorkflowActionGuard', () => {
   it('không cấp quyền purchase approval cho Accounting hoặc Executive', () => {
     const guard = guardFor(WORKFLOW_ACTIONS.purchaseRequestApproveProcurement);
 
-    expect(() =>
-      guard.canActivate(contextFor('ACCOUNTING', true, 'ACCOUNTING')),
-    ).toThrow(ForbiddenException);
-    expect(() =>
-      guard.canActivate(contextFor('EXECUTIVE', true, 'EXECUTIVE')),
-    ).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(contextFor(true, 'ACCOUNTING'))).toThrow(
+      ForbiddenException,
+    );
+    expect(() => guard.canActivate(contextFor(true, 'EXECUTIVE'))).toThrow(
+      ForbiddenException,
+    );
   });
 });

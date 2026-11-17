@@ -9,8 +9,6 @@ import { AssetRecallRequestsService } from './asset-recall-requests.service.js';
 const actor: AuthenticatedEmployee = {
   id: 'employee-id',
   email: 'employee@example.com',
-  roleId: 'role-id',
-  roleName: 'EMPLOYEE',
   departmentId: 'department-id',
   departmentName: 'WAREHOUSE',
   isDepartmentHead: false,

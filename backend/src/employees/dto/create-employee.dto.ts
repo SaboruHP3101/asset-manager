@@ -33,10 +33,6 @@ export class CreateEmployeeDto {
   @IsNotEmpty()
   departmentId: string;
 
-  @IsUUID()
-  @IsNotEmpty()
-  roleId: string;
-
   @IsBoolean()
   @IsOptional()
   isDepartmentHead?: boolean;

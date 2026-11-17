@@ -22,11 +22,11 @@ export const RequireWorkflowAction = (action: WorkflowAction) =>
   SetMetadata(WORKFLOW_ACTION_KEY, action);
 
 @Injectable()
-/** Đối chiếu hành động của route với role và cờ trưởng bộ phận của principal. */
+/** Đối chiếu hành động của route với phòng ban và cờ trưởng bộ phận của principal. */
 export class WorkflowActionGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
-  /** Kết hợp quyền của role với quyền trưởng phòng được khai báo cùng cấu hình. */
+  /** Kết hợp quyền của phòng ban với quyền trưởng phòng được khai báo cùng cấu hình. */
   canActivate(context: ExecutionContext): boolean {
     const action = this.reflector.getAllAndOverride<WorkflowAction>(
       WORKFLOW_ACTION_KEY,
@@ -42,7 +42,6 @@ export class WorkflowActionGuard implements CanActivate {
       throw new ForbiddenException('Authenticated user is missing.');
 
     const allowedActions = getAllowedWorkflowActions(
-      employee.roleName,
       employee.isDepartmentHead,
       employee.departmentName,
     );

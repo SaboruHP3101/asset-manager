@@ -184,7 +184,6 @@ export async function depreciation(
 ): Promise<ChatRecord[]> {
   if (
     !getAllowedWorkflowActions(
-      actor.roleName,
       actor.isDepartmentHead,
       actor.departmentName,
     ).includes(WORKFLOW_ACTIONS.depreciationView)

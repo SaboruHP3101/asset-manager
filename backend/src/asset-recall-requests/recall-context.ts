@@ -327,7 +327,7 @@ export function logAction(
     workflowRevision: entry.revision,
     actionType: entry.actionType,
     approvedBy: actor.id,
-    approverRole: actor.roleName,
+    approverRole: actor.departmentName,
     actorDepartmentId: actor.departmentId,
     actorIsDepartmentHead: actor.isDepartmentHead,
     status: entry.result,

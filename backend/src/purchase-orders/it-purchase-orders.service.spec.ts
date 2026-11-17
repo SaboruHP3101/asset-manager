@@ -9,8 +9,6 @@ import { ItPurchaseOrdersService } from './it-purchase-orders.service.js';
 const actor: AuthenticatedEmployee = {
   id: 'it-employee',
   email: 'it@example.test',
-  roleId: 'employee',
-  roleName: 'EMPLOYEE',
   departmentId: 'it',
   departmentName: 'IT',
   isDepartmentHead: false,

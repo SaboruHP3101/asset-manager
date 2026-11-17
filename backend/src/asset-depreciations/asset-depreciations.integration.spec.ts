@@ -49,10 +49,6 @@ describe.skipIf(!connectionString)('depreciation PostgreSQL workflow', () => {
       .insert(schema.departments)
       .values({ name: 'ACCOUNTING' })
       .returning();
-    const [role] = await db
-      .insert(schema.roles)
-      .values({ name: 'EMPLOYEE' })
-      .returning();
     const employees = await db
       .insert(schema.employees)
       .values([
@@ -61,14 +57,12 @@ describe.skipIf(!connectionString)('depreciation PostgreSQL workflow', () => {
           fullName: 'Accounting staff',
           email: 'staff@example.test',
           departmentId: department.id,
-          roleId: role.id,
         },
         {
           employeeCode: 'TEST-HEAD',
           fullName: 'Accounting head',
           email: 'head@example.test',
           departmentId: department.id,
-          roleId: role.id,
           isDepartmentHead: true,
         },
       ])
@@ -79,8 +73,6 @@ describe.skipIf(!connectionString)('depreciation PostgreSQL workflow', () => {
       email: employees[0].email,
       departmentId: department.id,
       departmentName: 'ACCOUNTING',
-      roleId: role.id,
-      roleName: 'EMPLOYEE',
       isDepartmentHead: false,
     };
     head = {

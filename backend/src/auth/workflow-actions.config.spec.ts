@@ -4,33 +4,45 @@ import {
 } from './workflow-actions.config.js';
 
 const seedAccounts = [
-  ['NV001', 'IT', 'IT', true],
-  ['NV002', 'ACCOUNTING', 'ACCOUNTING', true],
-  ['NV003', 'EMPLOYEE', 'WAREHOUSE', true],
-  ['NV004', 'PROCUREMENT', 'PROCUREMENT', false],
-  ['NV005', 'EMPLOYEE', 'IT', false],
-  ['NV006', 'EXECUTIVE', 'EXECUTIVE', false],
-  ['NV007', 'PROCUREMENT', 'PROCUREMENT', true],
-  ['NV008', 'EMPLOYEE', 'WAREHOUSE', false],
+  ['NV001', 'IT', true],
+  ['NV002', 'ACCOUNTING', true],
+  ['NV003', 'WAREHOUSE', true],
+  ['NV004', 'PROCUREMENT', false],
+  ['NV005', 'IT', false],
+  ['NV006', 'EXECUTIVE', false],
+  ['NV007', 'PROCUREMENT', true],
+  ['NV008', 'WAREHOUSE', false],
 ] as const;
 
 describe('seed account purchase actions', () => {
-  it('cấp quyền hoàn tất sửa chữa theo phòng IT, không theo role', () => {
-    expect(getAllowedWorkflowActions('EMPLOYEE', false, 'IT')).toContain(
+  it.each([
+    WORKFLOW_ACTIONS.transferVerify,
+    WORKFLOW_ACTIONS.repairAssess,
+    WORKFLOW_ACTIONS.repairAssign,
+  ])('grants %s by IT department membership, not head status', (action) => {
+    expect(getAllowedWorkflowActions(false, 'IT')).toContain(action);
+    expect(getAllowedWorkflowActions(true, 'IT')).toContain(action);
+    expect(getAllowedWorkflowActions(false, 'WAREHOUSE')).not.toContain(action);
+    expect(getAllowedWorkflowActions(true, 'WAREHOUSE')).not.toContain(action);
+    expect(getAllowedWorkflowActions(false)).not.toContain(action);
+  });
+
+  it('grants repair completion to the IT department', () => {
+    expect(getAllowedWorkflowActions(false, 'IT')).toContain(
       WORKFLOW_ACTIONS.repairComplete,
     );
-    expect(getAllowedWorkflowActions('IT', true, 'IT')).toContain(
+    expect(getAllowedWorkflowActions(true, 'IT')).toContain(
       WORKFLOW_ACTIONS.repairComplete,
     );
-    expect(getAllowedWorkflowActions('IT', false, 'WAREHOUSE')).not.toContain(
+    expect(getAllowedWorkflowActions(false, 'WAREHOUSE')).not.toContain(
       WORKFLOW_ACTIONS.repairComplete,
     );
   });
 
   it('separates Accounting preparation from head approval by department', () => {
-    const staff = getAllowedWorkflowActions('EMPLOYEE', false, 'ACCOUNTING');
-    const head = getAllowedWorkflowActions('ACCOUNTING', true, 'ACCOUNTING');
-    const moved = getAllowedWorkflowActions('ACCOUNTING', true, 'IT');
+    const staff = getAllowedWorkflowActions(false, 'ACCOUNTING');
+    const head = getAllowedWorkflowActions(true, 'ACCOUNTING');
+    const moved = getAllowedWorkflowActions(true, 'IT');
 
     expect(staff).toContain(WORKFLOW_ACTIONS.depreciationPrepare);
     expect(staff).not.toContain(WORKFLOW_ACTIONS.depreciationApprove);
@@ -40,8 +52,8 @@ describe('seed account purchase actions', () => {
   });
   it.each(seedAccounts)(
     '%s luôn có action tự phục vụ',
-    (_code, role, department, isHead) => {
-      const actions = getAllowedWorkflowActions(role, isHead, department);
+    (_code, department, isHead) => {
+      const actions = getAllowedWorkflowActions(isHead, department);
 
       expect(actions).toEqual(
         expect.arrayContaining([
@@ -63,17 +75,9 @@ describe('seed account purchase actions', () => {
   );
 
   it('cấp đúng action chuyên môn theo department và cờ trưởng phòng', () => {
-    const itHead = getAllowedWorkflowActions('IT', true, 'IT');
-    const procurementStaff = getAllowedWorkflowActions(
-      'PROCUREMENT',
-      false,
-      'PROCUREMENT',
-    );
-    const procurementHead = getAllowedWorkflowActions(
-      'PROCUREMENT',
-      true,
-      'PROCUREMENT',
-    );
+    const itHead = getAllowedWorkflowActions(true, 'IT');
+    const procurementStaff = getAllowedWorkflowActions(false, 'PROCUREMENT');
+    const procurementHead = getAllowedWorkflowActions(true, 'PROCUREMENT');
 
     expect(itHead).toContain(WORKFLOW_ACTIONS.purchaseRequestApproveIt);
     expect(itHead).toContain(WORKFLOW_ACTIONS.assetRecallApproveIt);
@@ -90,11 +94,11 @@ describe('seed account purchase actions', () => {
   });
 
   it('không cấp action duyệt chuyên môn cho Accounting và Executive', () => {
-    for (const [role, department, isHead] of [
-      ['ACCOUNTING', 'ACCOUNTING', true],
-      ['EXECUTIVE', 'EXECUTIVE', false],
+    for (const [department, isHead] of [
+      ['ACCOUNTING', true],
+      ['EXECUTIVE', false],
     ] as const) {
-      const actions = getAllowedWorkflowActions(role, isHead, department);
+      const actions = getAllowedWorkflowActions(isHead, department);
 
       expect(actions).not.toContain(
         WORKFLOW_ACTIONS.purchaseRequestApproveProcurement,

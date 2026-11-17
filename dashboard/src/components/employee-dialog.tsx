@@ -62,21 +62,7 @@ export default function EmployeeDialog({
     retry: false,
   });
   const save = useMutation({
-    mutationFn: (values: EmployeeFormValue) => {
-      const department = options.data?.departments.find(
-        (item) => item.id === values.departmentId
-      );
-      const role =
-        options.data?.roles.find((item) => item.name === department?.name) ??
-        options.data?.roles.find((item) => item.name === "EMPLOYEE");
-
-      if (!role)
-        throw new Error(
-          "Chưa có cấu hình phù hợp cho phòng ban. Vui lòng liên hệ quản trị viên."
-        );
-
-      return saveEmployee({ ...values, roleId: role.id }, employee?.id);
-    },
+    mutationFn: (values: EmployeeFormValue) => saveEmployee(values, employee?.id),
     onSuccess() {
       onClose();
 
@@ -88,10 +74,7 @@ export default function EmployeeDialog({
     },
   });
 
-  const hasOptions =
-    options.data &&
-    options.data.departments.length > 0 &&
-    options.data.roles.length > 0;
+  const hasOptions = options.data && options.data.departments.length > 0;
   const departmentItems =
     options.data?.departments.map((item) => ({
       value: item.id,

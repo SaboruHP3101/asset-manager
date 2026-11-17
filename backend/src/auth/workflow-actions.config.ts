@@ -82,23 +82,6 @@ const EMPLOYEE_ACTIONS: readonly WorkflowAction[] = [
   WORKFLOW_ACTIONS.assetRecallConfirmUpgradeReturn,
 ];
 
-/**
- * Bảng này chỉ chứa quyền bổ sung theo chuyên môn. EMPLOYEE_ACTIONS được cộng
- * cho mọi nhân viên, kể cả role mới chưa được khai báo trong bảng này.
- */
-const ROLE_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
-  {
-    EMPLOYEE: [],
-    ACCOUNTING: [],
-    EXECUTIVE: [],
-    PROCUREMENT: [],
-    IT: [
-      WORKFLOW_ACTIONS.transferVerify,
-      WORKFLOW_ACTIONS.repairAssess,
-      WORKFLOW_ACTIONS.repairAssign,
-    ],
-  };
-
 const DEPARTMENT_HEAD_ACTIONS: readonly WorkflowAction[] = [
   WORKFLOW_ACTIONS.transferApproveDepartment,
   WORKFLOW_ACTIONS.repairApproveDepartment,
@@ -119,6 +102,9 @@ const DEPARTMENT_ACTIONS: Readonly<Record<string, readonly WorkflowAction[]>> =
       WORKFLOW_ACTIONS.purchaseAllocationReallocateProcurement,
     ],
     IT: [
+      WORKFLOW_ACTIONS.transferVerify,
+      WORKFLOW_ACTIONS.repairAssess,
+      WORKFLOW_ACTIONS.repairAssign,
       WORKFLOW_ACTIONS.repairComplete,
       WORKFLOW_ACTIONS.purchaseReceiptInspectIt,
       WORKFLOW_ACTIONS.purchaseAllocationReallocateIt,
@@ -149,11 +135,9 @@ const DEPARTMENT_HEAD_PURCHASE_ACTIONS: Readonly<
  * trả cùng kết quả. `new Set` loại bỏ quyền trùng khi một nhóm được mở rộng về sau.
  */
 export function getAllowedWorkflowActions(
-  roleName: string,
   isDepartmentHead: boolean,
   departmentName?: string,
 ): WorkflowAction[] {
-  const roleActions = ROLE_ACTIONS[roleName] ?? [];
   const departmentActions = departmentName
     ? (DEPARTMENT_ACTIONS[departmentName] ?? [])
     : [];
@@ -165,7 +149,6 @@ export function getAllowedWorkflowActions(
   return [
     ...new Set([
       ...EMPLOYEE_ACTIONS,
-      ...roleActions,
       ...departmentActions,
       ...(isDepartmentHead ? DEPARTMENT_HEAD_ACTIONS : []),
       ...departmentHeadPurchaseActions,

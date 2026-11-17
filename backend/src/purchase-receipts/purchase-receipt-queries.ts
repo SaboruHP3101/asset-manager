@@ -340,7 +340,6 @@ export async function requireUnitContext(db: Database, unitId: string) {
 
 export function allowedReceiptActions(actor: AuthenticatedEmployee) {
   const actions = getAllowedWorkflowActions(
-    actor.roleName,
     actor.isDepartmentHead,
     actor.departmentName,
   );

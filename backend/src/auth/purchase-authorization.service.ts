@@ -31,7 +31,6 @@ export class PurchaseAuthorizationService {
 
   assertAction(actor: AuthenticatedEmployee, action: WorkflowAction): void {
     const actions = getAllowedWorkflowActions(
-      actor.roleName,
       actor.isDepartmentHead,
       actor.departmentName,
     );

@@ -32,8 +32,6 @@ function createActor(
   return {
     id: 'employee-id',
     email: 'employee@example.com',
-    roleId: 'role-id',
-    roleName: 'EMPLOYEE',
     departmentId: 'department-id',
     departmentName: 'ACCOUNTING',
     isDepartmentHead: false,
@@ -125,7 +123,6 @@ describe('DashboardService', () => {
 
     const result = await service.getMySummary(
       createActor({
-        roleName: 'PROCUREMENT',
         departmentName: 'PROCUREMENT',
       }),
     );
