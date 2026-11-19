@@ -106,6 +106,11 @@ class AssetInformation extends StatelessWidget {
             label: 'Nguyên giá',
             value: _formatCurrency(asset['initialValue']),
           ),
+          _InfoRow(
+            icon: Icons.payments_outlined,
+            label: 'Giá trị còn lại',
+            value: _formatCurrency(asset['currentValue']),
+          ),
         ],
       ),
     ],

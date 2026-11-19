@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { History, Pencil } from "lucide-react";
 import AssetEditDialog from "@/components/asset-edit-dialog";
+import AssetDetailDialog from "@/components/asset-detail-dialog";
 import StatusChip from "@/components/status-chip";
 import ExportExcelButton from "@/components/export-excel-button";
 import type { Asset } from "@/types";
@@ -256,9 +257,21 @@ function AssetHistory({ assetId }: { assetId: string }) {
   );
 }
 
+const excelHeaders = [
+  "Mã tài sản",
+  "Tên tài sản",
+  "Danh mục",
+  "Người sử dụng",
+  "Phòng ban",
+  "Vị trí",
+  "Trạng thái",
+  "Giá trị còn lại",
+];
+
 export default function AssetsPage() {
   const { token } = useAuth();
   const [editing, setEditing] = useState<Asset | null>(null);
+  const [viewing, setViewing] = useState<Asset | null>(null);
   const assets = useQuery({
     queryKey: ["assets", token],
     queryFn: ({ signal }) => getAssets(signal),
@@ -274,24 +287,24 @@ export default function AssetsPage() {
       cell: (asset) => asset.assetCode,
       cellClassName: "font-medium",
     },
-    { id: "name", header: "Tên tài sản", cell: (asset) => asset.name || "—" },
     {
-      id: "category",
-      header: "Danh mục",
-      cell: (asset) => asset.category || "—",
+      id: "name",
+      header: "Tên tài sản",
+      cell: (asset) => (
+        <Button
+          variant="link"
+          className="h-auto p-0 text-left whitespace-normal"
+          onClick={() => setViewing(asset)}
+          aria-label={`Xem chi tiết ${asset.name || asset.assetCode}`}
+        >
+          {asset.name || asset.assetCode}
+        </Button>
+      ),
     },
     {
       id: "assignee",
       header: "Người sử dụng",
       cell: (asset) => asset.assignedTo || "—",
-    },
-    {
-      id: "department",
-      header: "Phòng ban",
-      cell: (asset) =>
-        asset.department
-          ? (assetDepartmentLabels[asset.department] ?? asset.department)
-          : "—",
     },
     {
       id: "location",
@@ -341,9 +354,7 @@ export default function AssetsPage() {
         <ExportExcelButton
           fileName="danh-sach-tai-san"
           sheetName="Tài sản"
-          headers={columns
-            .filter((column) => column.id !== "actions")
-            .map((column) => column.header)}
+          headers={excelHeaders}
           rows={(assets.data ?? []).map((asset) => [
             asset.assetCode,
             asset.name || "—",
@@ -354,6 +365,9 @@ export default function AssetsPage() {
               : "—",
             asset.location || "—",
             assetStatusLabels[asset.status.toLowerCase()] ?? "Chưa xác định",
+            asset.currentValue == null
+              ? "Chưa cập nhật"
+              : formatVnd(asset.currentValue),
           ])}
           disabled={!assets.isSuccess || assets.isFetching}
         />
@@ -377,14 +391,16 @@ export default function AssetsPage() {
         <DataTable
           columns={columns}
           data={assets.data ?? []}
-
-          tableClassName="min-w-[960px]"
+          tableClassName="min-w-[720px]"
           emptyContent="Chưa có tài sản."
           loading="Đang tải tài sản..."
         />
       )}
       {editing ? (
         <AssetEditDialog asset={editing} onClose={() => setEditing(null)} />
+      ) : null}
+      {viewing ? (
+        <AssetDetailDialog asset={viewing} onClose={() => setViewing(null)} />
       ) : null}
     </div>
   );

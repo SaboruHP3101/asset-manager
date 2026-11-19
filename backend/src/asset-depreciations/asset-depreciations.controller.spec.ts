@@ -80,6 +80,31 @@ describe('AssetDepreciationsController', () => {
       .expect(200);
   });
 
+  it('allows staff and head to generate drafts but rejects other users', async () => {
+    service.findAll.mockClear();
+    await request(app.getHttpServer())
+      .post('/asset-depreciations/periods/generate')
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/asset-depreciations/periods/generate')
+      .set('Authorization', 'Bearer it')
+      .expect(403);
+    expect(service.findAll).not.toHaveBeenCalled();
+
+    for (const token of ['staff', 'head']) {
+      await request(app.getHttpServer())
+        .post('/asset-depreciations/periods/generate')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(201, []);
+      expect(service.findAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          departmentName: 'ACCOUNTING',
+          isDepartmentHead: token === 'head',
+        }),
+      );
+    }
+  });
+
   it('keeps preparation and approval separate', async () => {
     await request(app.getHttpServer())
       .put(`/asset-depreciations/assets/${periodId}/configuration`)

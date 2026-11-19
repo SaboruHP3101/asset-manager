@@ -26,6 +26,15 @@ class DepreciationsRepository {
     return DepreciationPeriod.fromJson(response.data!);
   }
 
+  Future<List<DepreciationPeriod>> generateDuePeriods() async {
+    final response = await _dio.post<List<dynamic>>('$_path/generate');
+    return response.data!
+        .map(
+          (item) => DepreciationPeriod.fromJson(item as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
   Future<DepreciationPeriod> recalculate(String id) => _post(id, 'recalculate');
   Future<DepreciationPeriod> submit(String id) => _post(id, 'submit');
   Future<DepreciationPeriod> decide(

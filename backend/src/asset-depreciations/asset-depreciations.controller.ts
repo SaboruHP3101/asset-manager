@@ -77,6 +77,12 @@ export class AssetDepreciationsController {
     return this.service.findOne(id, actor);
   }
 
+  @Post('periods/generate')
+  @RequireWorkflowAction(WORKFLOW_ACTIONS.depreciationView)
+  generateDuePeriods(@CurrentEmployee() actor: AuthenticatedEmployee) {
+    return this.service.findAll(actor);
+  }
+
   @Post('periods/:id/recalculate')
   @RequireWorkflowAction(WORKFLOW_ACTIONS.depreciationPrepare)
   recalculate(

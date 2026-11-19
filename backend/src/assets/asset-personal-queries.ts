@@ -190,6 +190,7 @@ export async function findMineById(
       purchaseDate: schema.assets.purchaseDate,
       inServiceDate: schema.assets.inServiceDate,
       initialValue: schema.assets.initialValue,
+      currentValue: schema.assets.currentValue,
       managementOwner: schema.assetCategories.managementOwner,
       currentWarehouseId: schema.assets.currentWarehouseId,
     })

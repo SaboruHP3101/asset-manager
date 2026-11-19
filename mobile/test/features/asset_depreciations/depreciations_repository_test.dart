@@ -55,7 +55,11 @@ void main() {
             handler.resolve(
               Response(
                 requestOptions: options,
-                data: options.path.endsWith('/periods') ? [period] : period,
+                data:
+                    options.path.endsWith('/periods') ||
+                        options.path.endsWith('/generate')
+                    ? [period]
+                    : period,
               ),
             );
           },
@@ -70,6 +74,9 @@ void main() {
       await repository.submit('period-id');
       await repository.decide('period-id', approve: true);
       await repository.decide('period-id', approve: false, reason: 'Sửa số dư');
+      final generated = await repository.generateDuePeriods();
+      expect(generated.single.assetCount, 2);
+      expect(generated.single.total, '999999999999999999');
       expect(requests.map((request) => '${request.method} ${request.path}'), [
         'GET /asset-depreciations/periods',
         'GET /asset-depreciations/periods/period-id',
@@ -77,6 +84,7 @@ void main() {
         'POST /asset-depreciations/periods/period-id/submit',
         'POST /asset-depreciations/periods/period-id/decision',
         'POST /asset-depreciations/periods/period-id/decision',
+        'POST /asset-depreciations/periods/generate',
       ]);
       expect(requests[4].data, {'decision': 'approve'});
       expect(requests[5].data, {'decision': 'return', 'reason': 'Sửa số dư'});

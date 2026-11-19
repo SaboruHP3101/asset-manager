@@ -123,7 +123,7 @@ export class AssetsService {
 
   async findHistory(assetId: string) {
     const history = schema.changeHistory;
-    const [changes, handovers] = await Promise.all([
+    const [changes, handovers, depreciations] = await Promise.all([
       this.db
         .select({
           id: history.id,
@@ -146,9 +146,30 @@ export class AssetsService {
         )
         .orderBy(desc(history.createdAt), desc(history.id)),
       findHandoverHistory(this.db, assetId),
+      this.db
+        .select({
+          id: schema.assetDepreciations.id,
+          fromDate: schema.assetDepreciations.fromDate,
+          toDate: schema.assetDepreciations.toDate,
+          openingValue: schema.assetDepreciations.openingValue,
+          depreciationAmount: schema.assetDepreciations.depreciationAmount,
+          remainingValue: schema.assetDepreciations.remainingValue,
+        })
+        .from(schema.assetDepreciations)
+        .innerJoin(
+          schema.depreciationPeriods,
+          eq(schema.assetDepreciations.periodId, schema.depreciationPeriods.id),
+        )
+        .where(
+          and(
+            eq(schema.assetDepreciations.assetId, assetId),
+            eq(schema.depreciationPeriods.status, 'recorded'),
+          ),
+        )
+        .orderBy(desc(schema.assetDepreciations.fromDate)),
     ]);
 
-    return { changes, handovers };
+    return { changes, handovers, depreciations };
   }
 
   async findOne(id: string) {

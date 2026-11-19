@@ -30,6 +30,7 @@ export type Asset = {
   assetCategoryId: string;
   supplierId: string;
   initialValue: string;
+  currentValue: `${number}` | null;
   purchaseDate: string;
   inServiceDate: string;
 };

@@ -157,16 +157,21 @@ describe('AssetsService', () => {
     await expect(service.findAll()).resolves.toEqual([]);
   });
 
-  it('returns both history sources for the asset', async () => {
+  it('returns edits, handovers and recorded depreciation for the asset', async () => {
     const changes = [{ id: 'edit-id', employeeName: 'Nguyễn An' }];
     const handovers = [{ id: 'handover-id', recipientName: 'Nguyễn Bình' }];
+    const depreciations = [{ id: 'depreciation-id', remainingValue: '23000000' }];
     const orderBy = vi
       .fn()
       .mockResolvedValueOnce(changes)
-      .mockResolvedValueOnce(handovers);
+      .mockResolvedValueOnce(handovers)
+      .mockResolvedValueOnce(depreciations);
     const filter = { where: () => ({ orderBy }) };
 
-    from.mockReturnValueOnce({ innerJoin: () => filter });
+    from
+      .mockReturnValueOnce({ innerJoin: () => filter })
+      .mockReturnValueOnce({ leftJoin })
+      .mockReturnValueOnce({ innerJoin: () => filter });
     leftJoin
       .mockReset()
       .mockReturnValueOnce({ leftJoin })
@@ -175,10 +180,12 @@ describe('AssetsService', () => {
     await expect(service.findHistory('second')).resolves.toEqual({
       changes,
       handovers,
+      depreciations,
     });
     expect(from.mock.calls.map(([table]) => table)).toEqual([
       schema.changeHistory,
       schema.assetHandoverHistory,
+      schema.assetDepreciations,
     ]);
   });
 

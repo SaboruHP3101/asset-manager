@@ -60,6 +60,9 @@ class _Repository extends DepreciationsRepository {
   bool failSubmit = false;
   int loads = 0;
   int calculations = 0;
+  int generations = 0;
+  bool failGenerate = false;
+  Completer<List<DepreciationPeriod>>? generation;
   int submits = 0;
   bool? approved;
   String? reason;
@@ -75,6 +78,15 @@ class _Repository extends DepreciationsRepository {
   @override
   Future<DepreciationPeriod> findOne(String id) async =>
       DepreciationPeriod.fromJson(data);
+
+  @override
+  Future<List<DepreciationPeriod>> generateDuePeriods() async {
+    generations++;
+    if (failGenerate) throw StateError('offline');
+    return generation != null
+        ? generation!.future
+        : [DepreciationPeriod.fromJson(data)];
+  }
 
   @override
   Future<String?> currentEmployeeId() async => 'head-id';
@@ -202,7 +214,73 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(repository.loads, 0);
+    expect(find.text('Tạo kỳ nháp đến hạn'), findsNothing);
     expect(find.text('Bạn không có quyền xem khấu hao.'), findsOneWidget);
+  });
+
+  for (final action in ['depreciation.prepare', 'depreciation.approve']) {
+    testWidgets('$action can generate drafts and cannot double submit', (
+      tester,
+    ) async {
+      final repository = _Repository(_data())
+        ..empty = true
+        ..generation = Completer<List<DepreciationPeriod>>();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildAppTheme(),
+          home: DepreciationPeriodsScreen(
+            profile: _profile({action}),
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tạo kỳ nháp đến hạn'));
+      await tester.pump();
+      expect(find.text('Đang tạo kỳ nháp...'), findsOneWidget);
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNull,
+      );
+      await tester.tap(find.text('Đang tạo kỳ nháp...'));
+      expect(repository.generations, 1);
+      repository.generation!.complete([DepreciationPeriod.fromJson(_data())]);
+      await tester.pumpAndSettle();
+      expect(find.text('Tháng 09/2026'), findsOneWidget);
+      expect(
+        find.text('Đã kiểm tra và bổ sung các kỳ nháp đến hạn.'),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNotNull,
+      );
+    });
+  }
+
+  testWidgets('generation failure preserves the list and allows retry', (
+    tester,
+  ) async {
+    final repository = _Repository(_data())..failGenerate = true;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: DepreciationPeriodsScreen(
+          profile: _profile({'depreciation.prepare'}),
+          repository: repository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tạo kỳ nháp đến hạn'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tháng 09/2026'), findsOneWidget);
+    expect(find.textContaining('Kiểm tra kết nối và thử lại.'), findsOneWidget);
+    repository.failGenerate = false;
+    await tester.tap(find.text('Tạo kỳ nháp đến hạn'));
+    await tester.pumpAndSettle();
+    expect(repository.generations, 2);
+    expect(find.text('Tháng 09/2026'), findsOneWidget);
   });
 
   testWidgets('empty list explains automatic drafts and can refresh', (

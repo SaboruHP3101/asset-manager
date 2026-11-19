@@ -279,6 +279,7 @@ class _DepreciationDetailScreenState extends State<DepreciationDetailScreen> {
                               ),
                         child: const Text('Tính lại'),
                       ),
+                      const SizedBox(height: 12),
                       FilledButton(
                         onPressed:
                             busy ||

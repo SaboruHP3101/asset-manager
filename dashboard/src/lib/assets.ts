@@ -6,6 +6,14 @@ export async function getAssets(signal?: AbortSignal): Promise<Asset[]> {
 }
 
 type AssetHistory = {
+  depreciations: {
+    id: string;
+    fromDate: string;
+    toDate: string;
+    openingValue: `${number}`;
+    depreciationAmount: `${number}`;
+    remainingValue: `${number}`;
+  }[];
   changes: {
     id: string;
     createdAt: string;

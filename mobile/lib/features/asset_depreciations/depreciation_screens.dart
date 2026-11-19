@@ -26,6 +26,8 @@ class _DepreciationPeriodsScreenState extends State<DepreciationPeriodsScreen> {
   late final _repository = widget.repository ?? DepreciationsRepository();
   List<DepreciationPeriod>? _periods;
   String? _error;
+  bool _loading = false;
+  bool _generating = false;
 
   @override
   void initState() {
@@ -34,12 +36,42 @@ class _DepreciationPeriodsScreenState extends State<DepreciationPeriodsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _error = null);
+    if (_generating) return;
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
     try {
       final periods = await _repository.findAll();
       if (mounted) setState(() => _periods = periods);
     } catch (error) {
       if (mounted) setState(() => _error = depreciationError(error));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _generate() async {
+    if (_generating || _loading) return;
+    setState(() => _generating = true);
+    try {
+      final periods = await _repository.generateDuePeriods();
+      if (!mounted) return;
+      setState(() {
+        _periods = periods;
+        _error = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã kiểm tra và bổ sung các kỳ nháp đến hạn.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(depreciationError(error))));
+    } finally {
+      if (mounted) setState(() => _generating = false);
     }
   }
 
@@ -59,6 +91,18 @@ class _DepreciationPeriodsScreenState extends State<DepreciationPeriodsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Khấu hao')),
+    bottomNavigationBar: widget.profile.allows('depreciation.view')
+        ? SafeArea(
+            minimum: const EdgeInsets.all(16),
+            child: FilledButton.icon(
+              onPressed: _loading || _generating ? null : _generate,
+              icon: const Icon(Icons.playlist_add),
+              label: Text(
+                _generating ? 'Đang tạo kỳ nháp...' : 'Tạo kỳ nháp đến hạn',
+              ),
+            ),
+          )
+        : null,
     body: !widget.profile.allows('depreciation.view')
         ? const Center(child: Text('Bạn không có quyền xem khấu hao.'))
         : _error != null
